@@ -79,3 +79,11 @@ Cargo.lock
 # Miscellaneous files and directories to ignore
 # Add any additional file patterns a directory names that should be ignored down here
 .DS_Store
+quadtree-zng
+quadtree-zng.exe
+kdtree_2d.dot
+kdtree_3d.dot
+octree.dot
+quadtree.dot
+rtree_2d.dot
+rtree_3d.dot

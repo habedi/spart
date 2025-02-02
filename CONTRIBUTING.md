@@ -5,17 +5,17 @@ Contributions are always welcome and appreciated.
 
 ## How to Contribute
 
-Please check the [issue tracker](https://github.com/habedi/template-go-project/issues) to see if there is an issue you
+Please check the [issue tracker](https://github.com/habedi/quadtree-zng/issues) to see if there is an issue you
 would like to work on or if it has already been resolved.
 
 ### Reporting Bugs
 
-1. Open an issue on the [issue tracker](https://github.com/habedi/template-go-project/issues).
+1. Open an issue on the [issue tracker](https://github.com/habedi/quadtree-zng/issues).
 2. Include information such as steps to reproduce, expected/actual behavior, and relevant logs or screenshots.
 
 ### Suggesting Features
 
-1. Open an issue on the [issue tracker](https://github.com/habedi/template-go-project/issues).
+1. Open an issue on the [issue tracker](https://github.com/habedi/quadtree-zng/issues).
 2. Provide details about the feature, its purpose, and potential implementation ideas.
 
 ## Submitting Pull Requests

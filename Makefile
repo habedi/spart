@@ -1,8 +1,9 @@
 # Variables
-PKG = github.com/habedi/template-rust-project
+PKG = github.com/habedi/quadtree-zng
 BINARY_NAME = $(or $(PROJ_BINARY), $(notdir $(PKG)))
 BINARY = target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
+DEBUG_QUADTREE_ZNG = $DEBUG_QUADTREE_ZNG || false
 
 # Default target
 .DEFAULT_GOAL := help
@@ -64,3 +65,8 @@ lint: format ## Run linters on Rust files
 publish: ## Publish the package to crates.io (requires CARGO_REGISTRY_TOKEN to be set)
 	@echo "Publishing the package to Cargo registry..."
 	cargo publish --token $(CARGO_REGISTRY_TOKEN)
+
+.PHONY: bench
+bench: ## Run benchmarks
+	@echo "Running benchmarks..."
+	cargo bench
