@@ -1,0 +1,28 @@
+[package]
+name = "template-rust-project"
+version = "0.2.3"
+description = "A template for Rust projects"
+repository = "https://github.com/habedi/template-rust-project"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["project-template", "rust", "library", "application"]
+authors = ["Hassan Abedi <hassan.abedi.t@gmail.com>"]
+homepage = "https://github.com/habedi/template-rust-project"
+documentation = "https://docs.rs/template-rust-project"
+#categories = ["development-tools"]
+edition = "2021"
+
+[lib]
+name = "template_rust_project"
+path = "src/lib.rs"
+
+[[bin]]
+name = "template-rust-project"
+path = "src/main.rs"
+
+[dependencies]
+clap = "4.5.27"
+log = "0.4.25"
+tracing = "0.1.41"
+
+[dev-dependencies]
