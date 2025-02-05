@@ -125,7 +125,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         self.insert(point)
     }
 
-    pub fn find_closest(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
+    pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
         info!("Performing KNN search for target {:?} with k={}", target, k);
         let mut heap = BinaryHeap::new();
         let mut points_vec = Vec::new();
@@ -142,16 +142,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
 
         if self.divided {
             if let Some(ne) = &self.northeast {
-                points_vec.extend(ne.find_closest(target, k));
+                points_vec.extend(ne.knn_search(target, k));
             }
             if let Some(nw) = &self.northwest {
-                points_vec.extend(nw.find_closest(target, k));
+                points_vec.extend(nw.knn_search(target, k));
             }
             if let Some(se) = &self.southeast {
-                points_vec.extend(se.find_closest(target, k));
+                points_vec.extend(se.knn_search(target, k));
             }
             if let Some(sw) = &self.southwest {
-                points_vec.extend(sw.find_closest(target, k));
+                points_vec.extend(sw.knn_search(target, k));
             }
         }
 
@@ -161,7 +161,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             .collect()
     }
 
-    pub fn find_in_radius(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
+    pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
         info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
         let radius_sq = radius * radius;
@@ -174,16 +174,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
 
         if self.divided {
             if let Some(ne) = &self.northeast {
-                found.extend(ne.find_in_radius(center, radius));
+                found.extend(ne.range_search(center, radius));
             }
             if let Some(nw) = &self.northwest {
-                found.extend(nw.find_in_radius(center, radius));
+                found.extend(nw.range_search(center, radius));
             }
             if let Some(se) = &self.southeast {
-                found.extend(se.find_in_radius(center, radius));
+                found.extend(se.range_search(center, radius));
             }
             if let Some(sw) = &self.southwest {
-                found.extend(sw.find_in_radius(center, radius));
+                found.extend(sw.range_search(center, radius));
             }
         }
 

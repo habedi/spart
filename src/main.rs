@@ -24,13 +24,13 @@ fn main() {
     }
 
     // Test Quadtree implementation
-    //test_quadtree();
+    test_quadtree();
 
     // Test Octree implementation
-    //test_octree();
+    test_octree();
 
     // Test KdTree implementation
-    //test_kdtree();
+    test_kdtree();
 
     // Test RTree implementation
     test_rtree();
@@ -65,7 +65,7 @@ fn test_quadtree() {
     // KNN Query
     let target = Point2D::new(35.0, 45.0, None);
     info!("Performing KNN search for target {:?}", target);
-    let knn_results = tree.find_closest(&target, 2);
+    let knn_results = tree.knn_search(&target, 2);
     info!("Nearest Neighbors: {:?}", knn_results);
 
     // Range Query
@@ -79,7 +79,7 @@ fn test_quadtree() {
         "Performing range search for point {:?} with radius {}",
         range_query, radius
     );
-    let results = tree.find_in_radius(&range_query, radius);
+    let results = tree.range_search(&range_query, radius);
     info!(
         "Points in Range for ({}, {}, r={}):",
         range_query.x, range_query.y, radius

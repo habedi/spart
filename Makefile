@@ -1,5 +1,5 @@
 # Variables
-PKG = github.com/habedi/quadtree-zng
+PKG = github.com/habedi/spart
 BINARY_NAME = $(or $(PROJ_BINARY), $(notdir $(PKG)))
 BINARY = target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
