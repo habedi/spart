@@ -1,4 +1,4 @@
-use crate::geometry::{Point2D, Rectangle};
+use crate::geometry::{HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
@@ -6,7 +6,6 @@ use tracing::{debug, info};
 #[derive(Debug)]
 pub struct Quadtree<T: Clone + PartialEq> {
     boundary: Rectangle,
-    /// Points are stored **only in leaf nodes**.
     points: Vec<Point2D<T>>,
     capacity: usize,
     divided: bool,
@@ -40,7 +39,6 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         let y = self.boundary.y;
         let w = self.boundary.width / 2.0;
         let h = self.boundary.height / 2.0;
-
         self.northeast = Some(Box::new(Quadtree::new(
             &Rectangle {
                 x: x + w,
@@ -77,26 +75,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             },
             self.capacity,
         )));
-
         self.divided = true;
-
-        // Move existing points down into the appropriate children.
         let points = std::mem::take(&mut self.points);
         for point in points {
-            // Since self.divided is now true, the insert method will
-            // delegate the insertion to the children.
             self.insert(point);
         }
     }
 
     pub fn insert(&mut self, point: Point2D<T>) -> bool {
-        // If the point is not in this node's boundary, bail early.
         if !self.boundary.contains(&point) {
             debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
-
-        // IMPORTANT: Once subdivided, this node is an internal node and must not store points.
         if self.divided {
             return self
                 .northeast
@@ -112,66 +102,65 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     .map_or(false, |qt| qt.insert(point.clone()))
                 || self.southwest.as_mut().map_or(false, |qt| qt.insert(point));
         }
-
-        // Otherwise, if we are still a leaf node, insert the point if there is capacity.
         if self.points.len() < self.capacity {
             info!("Inserting point {:?} into Quadtree", point);
             self.points.push(point);
             return true;
         }
-
-        // No capacity left in this leaf node: subdivide and reinsert the point.
         self.subdivide();
         self.insert(point)
     }
 
     pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
-        info!("Performing KNN search for target {:?} with k={}", target, k);
-        let mut heap = BinaryHeap::new();
-        let mut points_vec = Vec::new();
+        let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
+        self.knn_search_helper(target, k, &mut heap);
+        let mut results: Vec<Point2D<T>> = heap
+            .into_sorted_vec()
+            .into_iter()
+            .filter_map(|item| item.point_2d)
+            .collect();
+        results.reverse();
+        results
+    }
 
+    fn knn_search_helper(&self, target: &Point2D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
         for point in &self.points {
-            let dist = OrderedFloat(-point.distance_sq(target));
-            points_vec.push(point.clone());
-            heap.push((dist, points_vec.len() - 1));
-
+            let dist_sq = point.distance_sq(target);
+            let item = HeapItem {
+                neg_distance: OrderedFloat(-dist_sq),
+                point_2d: Option::from(point.clone()),
+                point_3d: None,
+            };
+            heap.push(item);
             if heap.len() > k {
                 heap.pop();
             }
         }
-
         if self.divided {
-            if let Some(ne) = &self.northeast {
-                points_vec.extend(ne.knn_search(target, k));
+            if let Some(ref ne) = self.northeast {
+                ne.knn_search_helper(target, k, heap);
             }
-            if let Some(nw) = &self.northwest {
-                points_vec.extend(nw.knn_search(target, k));
+            if let Some(ref nw) = self.northwest {
+                nw.knn_search_helper(target, k, heap);
             }
-            if let Some(se) = &self.southeast {
-                points_vec.extend(se.knn_search(target, k));
+            if let Some(ref se) = self.southeast {
+                se.knn_search_helper(target, k, heap);
             }
-            if let Some(sw) = &self.southwest {
-                points_vec.extend(sw.knn_search(target, k));
+            if let Some(ref sw) = self.southwest {
+                sw.knn_search_helper(target, k, heap);
             }
         }
-
-        heap.into_sorted_vec()
-            .into_iter()
-            .map(|(_, idx)| points_vec[idx].clone())
-            .collect()
     }
 
     pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
         info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
         let radius_sq = radius * radius;
-
         for point in &self.points {
             if point.distance_sq(center) <= radius_sq {
                 found.push(point.clone());
             }
         }
-
         if self.divided {
             if let Some(ne) = &self.northeast {
                 found.extend(ne.range_search(center, radius));
@@ -186,90 +175,118 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                 found.extend(sw.range_search(center, radius));
             }
         }
-
         found
     }
 
-    pub fn visualize(&self, depth: usize) {
-        let indent = "  ".repeat(depth);
-        println!(
-            "{}+ Quadtree ([Quad: x:{:.1}, y:{:.1}, w:{:.1}, h:{:.1}], {} points)",
-            indent,
-            self.boundary.x,
-            self.boundary.y,
-            self.boundary.width,
-            self.boundary.height,
-            self.points.len()
-        );
-
-        for point in &self.points {
-            println!(
-                "{}  - Point2D ([x:{:.1}, y:{:.1}], data:{:?})",
-                indent, point.x, point.y, point.data
-            );
+    pub fn delete(&mut self, point: &Point2D<T>) -> bool {
+        if !self.boundary.contains(point) {
+            return false;
         }
-
+        let mut deleted = false;
         if self.divided {
-            if let Some(ne) = &self.northeast {
-                ne.visualize(depth + 1);
+            if let Some(ref mut child) = self.northeast {
+                deleted |= child.delete(point);
             }
-            if let Some(nw) = &self.northwest {
-                nw.visualize(depth + 1);
+            if let Some(ref mut child) = self.northwest {
+                deleted |= child.delete(point);
             }
-            if let Some(se) = &self.southeast {
-                se.visualize(depth + 1);
+            if let Some(ref mut child) = self.southeast {
+                deleted |= child.delete(point);
             }
-            if let Some(sw) = &self.southwest {
-                sw.visualize(depth + 1);
+            if let Some(ref mut child) = self.southwest {
+                deleted |= child.delete(point);
+            }
+            self.try_merge();
+            return deleted;
+        } else {
+            if let Some(pos) = self.points.iter().position(|p| p == point) {
+                info!("Deleting point {:?} from Quadtree", point);
+                self.points.remove(pos);
+                return true;
             }
         }
+        false
     }
 
-    pub fn visualize_dot(&self, filename: &str) {
-        let mut graph = String::new();
-        graph.push_str("digraph Quadtree {\n");
-        self.visualize_node(&mut graph, 0);
-        graph.push_str("}\n");
-
-        std::fs::write(filename, graph).expect("Unable to write file");
-    }
-
-    fn visualize_node(&self, graph: &mut String, id: usize) -> usize {
-        let mut current_id = id;
-        // Use shape=box to force a rectangle, style=rounded for rounded corners,
-        // and optionally style=filled with a fillcolor for a nicer look.
-        graph.push_str(&format!(
-            "  node{} [shape=box, style=rounded, fillcolor=lightblue, label=\"[({}, {}, {}, {}), {}]\"];\n",
-            current_id, self.boundary.x, self.boundary.y, self.boundary.width, self.boundary.height, self.points.len()
-        ));
-
-        if self.divided {
-            if let Some(ne) = &self.northeast {
-                current_id += 1;
-                let ne_id = current_id;
-                graph.push_str(&format!("  node{} -> node{};\n", id, ne_id));
-                current_id = ne.visualize_node(graph, ne_id);
-            }
-            if let Some(nw) = &self.northwest {
-                current_id += 1;
-                let nw_id = current_id;
-                graph.push_str(&format!("  node{} -> node{};\n", id, nw_id));
-                current_id = nw.visualize_node(graph, nw_id);
-            }
-            if let Some(se) = &self.southeast {
-                current_id += 1;
-                let se_id = current_id;
-                graph.push_str(&format!("  node{} -> node{};\n", id, se_id));
-                current_id = se.visualize_node(graph, se_id);
-            }
-            if let Some(sw) = &self.southwest {
-                current_id += 1;
-                let sw_id = current_id;
-                graph.push_str(&format!("  node{} -> node{};\n", id, sw_id));
-                current_id = sw.visualize_node(graph, sw_id);
+    fn try_merge(&mut self) {
+        if !self.divided {
+            return;
+        }
+        if let Some(ref mut ne) = self.northeast {
+            ne.try_merge();
+        }
+        if let Some(ref mut nw) = self.northwest {
+            nw.try_merge();
+        }
+        if let Some(ref mut se) = self.southeast {
+            se.try_merge();
+        }
+        if let Some(ref mut sw) = self.southwest {
+            sw.try_merge();
+        }
+        let merge_possible = self
+            .northeast
+            .as_ref()
+            .map(|child| !child.divided)
+            .unwrap_or(true)
+            && self
+                .northwest
+                .as_ref()
+                .map(|child| !child.divided)
+                .unwrap_or(true)
+            && self
+                .southeast
+                .as_ref()
+                .map(|child| !child.divided)
+                .unwrap_or(true)
+            && self
+                .southwest
+                .as_ref()
+                .map(|child| !child.divided)
+                .unwrap_or(true);
+        if merge_possible {
+            let total_points = self
+                .northeast
+                .as_ref()
+                .map(|child| child.points.len())
+                .unwrap_or(0)
+                + self
+                    .northwest
+                    .as_ref()
+                    .map(|child| child.points.len())
+                    .unwrap_or(0)
+                + self
+                    .southeast
+                    .as_ref()
+                    .map(|child| child.points.len())
+                    .unwrap_or(0)
+                + self
+                    .southwest
+                    .as_ref()
+                    .map(|child| child.points.len())
+                    .unwrap_or(0);
+            if total_points <= self.capacity {
+                let mut merged_points = Vec::new();
+                if let Some(child) = self.northeast.take() {
+                    merged_points.extend(child.points);
+                }
+                if let Some(child) = self.northwest.take() {
+                    merged_points.extend(child.points);
+                }
+                if let Some(child) = self.southeast.take() {
+                    merged_points.extend(child.points);
+                }
+                if let Some(child) = self.southwest.take() {
+                    merged_points.extend(child.points);
+                }
+                info!(
+                    "Merging children into parent node at boundary {:?} with {} points",
+                    self.boundary,
+                    merged_points.len()
+                );
+                self.points = merged_points;
+                self.divided = false;
             }
         }
-
-        current_id
     }
 }

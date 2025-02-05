@@ -1,5 +1,7 @@
+pub mod bsp_tree;
 pub mod geometry;
-pub mod kdtree;
+pub mod kd_tree;
+mod logging;
 pub mod octree;
 pub mod quadtree;
-pub mod rtree;
+pub mod r_tree;
