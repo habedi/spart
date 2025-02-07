@@ -1,7 +1,8 @@
+use crate::geometry::{
+    BSPBounds, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D, Rectangle,
+};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-
-use crate::geometry::{BSPBounds, Cube, Point2D, Point3D, Rectangle};
 use tracing::{debug, info};
 
 pub trait BoundingVolume: Clone {
@@ -225,11 +226,11 @@ where
                 objects: right_objs,
                 mbr: right_mbr.clone(),
             }),
-            mbr: left_mbr.clone().union(&right_mbr.clone()),
+            mbr: left_mbr.union(&right_mbr),
         }
     }
 
-    pub fn range_search(&self, query: &T::B) -> Vec<&T> {
+    pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
         info!("Starting range search with query: {:?}", query);
         let mut result = Vec::new();
         if let Some(ref root) = self.root {
@@ -261,47 +262,11 @@ where
         }
     }
 
-    pub fn knn_search(&self, query: &T::B, k: usize) -> Vec<&T> {
-        info!("Starting kNN search with query: {:?}, k: {}", query, k);
-        let mut heap = BinaryHeap::new();
-        let mut result = Vec::new();
-        if let Some(ref root) = self.root {
-            heap.push(BSPCandidate::Node(root, root.get_mbr().union(query).area()));
-        }
-        while let Some(candidate) = heap.pop() {
-            match candidate {
-                BSPCandidate::Leaf(obj, _) => {
-                    result.push(obj);
-                    if result.len() >= k {
-                        break;
-                    }
-                }
-                BSPCandidate::Node(node, _) => match node {
-                    BSPNode::Leaf { objects, .. } => {
-                        for obj in objects {
-                            let d = obj.mbr().union(query).area();
-                            heap.push(BSPCandidate::Leaf(obj, d));
-                        }
-                    }
-                    BSPNode::Node { left, right, .. } => {
-                        heap.push(BSPCandidate::Node(left, left.get_mbr().union(query).area()));
-                        heap.push(BSPCandidate::Node(
-                            right,
-                            right.get_mbr().union(query).area(),
-                        ));
-                    }
-                },
-            }
-        }
-        info!("kNN search completed; found {} objects.", result.len());
-        result
-    }
-
     pub fn delete(&mut self, object: &T) -> bool {
         info!("Attempting to delete object: {:?}", object);
         if let Some(root) = self.root.take() {
-            let (new_root, found) = Self::delete_rec(root, object);
-            self.root = Some(new_root);
+            let (new_root, found) = Self::delete_rec(root, object, self.max_objects);
+            self.root = new_root;
             if found {
                 info!("Object deleted successfully.");
             } else {
@@ -314,27 +279,30 @@ where
         }
     }
 
-    fn delete_rec(node: BSPNode<T>, object: &T) -> (BSPNode<T>, bool) {
+    fn delete_rec(node: BSPNode<T>, object: &T, max_objects: usize) -> (Option<BSPNode<T>>, bool) {
         match node {
-            BSPNode::Leaf { mut objects, mbr } => {
+            BSPNode::Leaf {
+                mut objects,
+                mbr: _,
+            } => {
                 let initial = objects.len();
                 objects.retain(|obj| obj != object);
                 let found = objects.len() != initial;
-                let new_mbr = if objects.is_empty() {
-                    mbr
+                if objects.is_empty() {
+                    (None, found)
                 } else {
-                    objects
+                    let new_mbr = objects
                         .iter()
                         .skip(1)
-                        .fold(objects[0].mbr(), |acc, obj| acc.union(&obj.mbr()))
-                };
-                (
-                    BSPNode::Leaf {
-                        objects,
-                        mbr: new_mbr,
-                    },
-                    found,
-                )
+                        .fold(objects[0].mbr(), |acc, obj| acc.union(&obj.mbr()));
+                    (
+                        Some(BSPNode::Leaf {
+                            objects,
+                            mbr: new_mbr,
+                        }),
+                        found,
+                    )
+                }
             }
             BSPNode::Node {
                 split_dim,
@@ -343,20 +311,59 @@ where
                 right,
                 mbr: _,
             } => {
-                let (new_left, found_left) = Self::delete_rec(*left, object);
-                let (new_right, found_right) = Self::delete_rec(*right, object);
+                let (new_left, found_left) = Self::delete_rec(*left, object, max_objects);
+                let (new_right, found_right) = Self::delete_rec(*right, object, max_objects);
                 let found = found_left || found_right;
-                let new_mbr = new_left.get_mbr().union(&new_right.get_mbr());
-                (
-                    BSPNode::Node {
-                        split_dim,
-                        split_val,
-                        left: Box::new(new_left),
-                        right: Box::new(new_right),
-                        mbr: new_mbr,
-                    },
-                    found,
-                )
+                match (new_left, new_right) {
+                    (None, None) => (None, found),
+                    (Some(child), None) | (None, Some(child)) => (Some(child), found),
+                    (Some(l), Some(r)) => {
+                        let merged_node = match (l.clone(), r.clone()) {
+                            (
+                                BSPNode::Leaf {
+                                    objects: mut objs_l,
+                                    mbr: mbr_l,
+                                },
+                                BSPNode::Leaf {
+                                    objects: objs_r,
+                                    mbr: mbr_r,
+                                },
+                            ) => {
+                                if objs_l.len() + objs_r.len() <= max_objects {
+                                    objs_l.extend(objs_r);
+                                    let new_mbr = objs_l
+                                        .iter()
+                                        .skip(1)
+                                        .fold(objs_l[0].mbr(), |acc, obj| acc.union(&obj.mbr()));
+                                    BSPNode::Leaf {
+                                        objects: objs_l,
+                                        mbr: new_mbr,
+                                    }
+                                } else {
+                                    let new_mbr = mbr_l.union(&mbr_r);
+                                    BSPNode::Node {
+                                        split_dim,
+                                        split_val,
+                                        left: Box::new(l),
+                                        right: Box::new(r),
+                                        mbr: new_mbr,
+                                    }
+                                }
+                            }
+                            (l_node, r_node) => {
+                                let new_mbr = l_node.get_mbr().union(&r_node.get_mbr());
+                                BSPNode::Node {
+                                    split_dim,
+                                    split_val,
+                                    left: Box::new(l_node),
+                                    right: Box::new(r_node),
+                                    mbr: new_mbr,
+                                }
+                            }
+                        };
+                        (Some(merged_node), found)
+                    }
+                }
             }
         }
     }
@@ -368,24 +375,24 @@ enum BSPCandidate<'a, T: BSPTreeObject> {
     Leaf(&'a T, f64),
 }
 
-impl<'a, T: BSPTreeObject> PartialEq for BSPCandidate<'a, T> {
+impl<T: BSPTreeObject> PartialEq for BSPCandidate<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.distance().eq(&other.distance())
     }
 }
-impl<'a, T: BSPTreeObject> Eq for BSPCandidate<'a, T> {}
-impl<'a, T: BSPTreeObject> PartialOrd for BSPCandidate<'a, T> {
+impl<T: BSPTreeObject> Eq for BSPCandidate<'_, T> {}
+impl<T: BSPTreeObject> PartialOrd for BSPCandidate<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.distance().partial_cmp(&self.distance())
     }
 }
-impl<'a, T: BSPTreeObject> Ord for BSPCandidate<'a, T> {
+impl<T: BSPTreeObject> Ord for BSPCandidate<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
 }
 
-impl<'a, T: BSPTreeObject> BSPCandidate<'a, T> {
+impl<T: BSPTreeObject> BSPCandidate<'_, T> {
     fn distance(&self) -> f64 {
         match self {
             BSPCandidate::Node(_, d) => *d,
@@ -427,5 +434,101 @@ impl<T: std::fmt::Debug + Clone> BSPTreeObject for Point3DBSP<T> {
             height: 0.0,
             depth: 0.0,
         }
+    }
+}
+
+impl<T> BSPTree<T>
+where
+    T: BSPTreeObject + PartialEq + std::fmt::Debug,
+    T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
+{
+    pub fn range_search(&self, query: &T, radius: f64) -> Vec<&T> {
+        let query_volume = T::B::from_point_radius(query, radius);
+        let candidates = self.range_search_bbox(&query_volume);
+        candidates
+            .into_iter()
+            .filter(|object| object.mbr().min_distance(query) <= radius)
+            .collect()
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> HasMinDistance<Point3DBSP<T>> for Cube {
+    fn min_distance(&self, query: &Point3DBSP<T>) -> f64 {
+        HasMinDistance::<Point3D<T>>::min_distance(self, &query.point)
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> BoundingVolumeFromPoint<Point3DBSP<T>> for Cube {
+    fn from_point_radius(query: &Point3DBSP<T>, radius: f64) -> Self {
+        Cube {
+            x: query.point.x - radius,
+            y: query.point.y - radius,
+            z: query.point.z - radius,
+            width: 2.0 * radius,
+            height: 2.0 * radius,
+            depth: 2.0 * radius,
+        }
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> HasMinDistance<Point2DBSP<T>> for Rectangle {
+    fn min_distance(&self, query: &Point2DBSP<T>) -> f64 {
+        HasMinDistance::<Point2D<T>>::min_distance(self, &query.point)
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> BoundingVolumeFromPoint<Point2DBSP<T>> for Rectangle {
+    fn from_point_radius(query: &Point2DBSP<T>, radius: f64) -> Self {
+        Rectangle {
+            x: query.point.x - radius,
+            y: query.point.y - radius,
+            width: 2.0 * radius,
+            height: 2.0 * radius,
+        }
+    }
+}
+
+impl<T: BSPTreeObject> BSPTree<T>
+where
+    T: PartialEq,
+{
+    pub fn knn_search<Q>(&self, query: &Q, k: usize) -> Vec<&T>
+    where
+        T::B: BoundingVolumeFromPoint<Q> + HasMinDistance<Q> + Clone,
+        Q: std::fmt::Debug,
+    {
+        info!("Starting kNN search with query: {:?}, k: {}", query, k);
+        let mut heap = BinaryHeap::new();
+        let mut result = Vec::new();
+        if let Some(ref root) = self.root {
+            let d = root.get_mbr().min_distance(query);
+            heap.push(BSPCandidate::Node(root, d));
+        }
+        while let Some(candidate) = heap.pop() {
+            match candidate {
+                BSPCandidate::Leaf(obj, _) => {
+                    result.push(obj);
+                    if result.len() >= k {
+                        break;
+                    }
+                }
+                BSPCandidate::Node(node, _) => match node {
+                    BSPNode::Leaf { objects, .. } => {
+                        for obj in objects {
+                            let d = obj.mbr().min_distance(query);
+                            heap.push(BSPCandidate::Leaf(obj, d));
+                        }
+                    }
+                    BSPNode::Node { left, right, .. } => {
+                        let d_left = left.get_mbr().min_distance(query);
+                        let d_right = right.get_mbr().min_distance(query);
+                        heap.push(BSPCandidate::Node(left, d_left));
+                        heap.push(BSPCandidate::Node(right, d_right));
+                    }
+                },
+            }
+        }
+        info!("kNN search completed; found {} objects.", result.len());
+        result
     }
 }

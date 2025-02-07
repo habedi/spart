@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 mod utils;
-use spart::bsp_tree::{BSPTreeObject, Point2DBSP, Point3DBSP};
+use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D, Rectangle};
 use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
 use tracing::info;
@@ -62,7 +62,7 @@ fn benchmark_knn_bsptree_2d(_c: &mut Criterion) {
     cc.bench_function("knn_bsptree_2d", |b| {
         b.iter(|| {
             info!("Running knn search on 2D BSPTree");
-            let res = tree.knn_search(&target.mbr(), BENCH_KNN_SIZE);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
             info!("Completed knn search on 2D BSPTree");
             black_box(res)
         })
@@ -146,7 +146,7 @@ fn benchmark_knn_bsptree_3d(_c: &mut Criterion) {
     cc.bench_function("knn_bsptree_3d", |b| {
         b.iter(|| {
             info!("Running knn search on 3D BSPTree");
-            let res = tree.knn_search(&target.mbr(), BENCH_KNN_SIZE);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
             info!("Completed knn search on 3D BSPTree");
             black_box(res)
         })

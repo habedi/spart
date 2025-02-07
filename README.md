@@ -9,28 +9,30 @@
 [<img alt="Docs" src="https://img.shields.io/badge/docs-latest-3776ab?style=for-the-badge&labelColor=555555&logo=readthedocs" height="20">](docs)
 [<img alt="License" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=for-the-badge&labelColor=555555&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
 
-Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that includes implementations of various
-space partitioning tree data structures for indexing and querying point data in 2D and 3D spaces.
+Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that provides implementations of various
+space partitioning tree data structures for efficient indexing and searching 2D and 3D point data.
 
 Currently, the following trees are implemented:
 
-| Index | Tree Type                                          | 2D | 3D | kNN query | Range query |
-|-------|----------------------------------------------------|----|----|-----------|-------------|
-| 1     | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓         | ✓           |
-| 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓         | ✓           |
-| 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓         | ✓           |
-| 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓         | ✓           |
-| 5     | [BSP-tree](https://en.wikipedia.org/wiki/BSP-tree) | ✓  | ✓  | ✓         | ✓           |
+| Index | Tree Type                                          | 2D | 3D | kNN search | Range search |
+|-------|----------------------------------------------------|----|----|------------|--------------|
+| 1     | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓          | ✓            |
+| 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
+| 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
+| 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
+| 5     | [BSP-tree](https://en.wikipedia.org/wiki/BSP-tree) | ✓  | ✓  | ✓          | ✓            |
 
-*Version requirement: Spart supports rustc 1.83 and newer.*
+## Installation
 
-[Release notes](https://github.com/habedi/spart/releases)
+```bash
+cargo add spart
+```
 
 ## Documentation
 
 The documentation for the latest release can be found [here](docs).
 
-Check out the [tests](tests/) directory for examples on how to use the library.
+Additionally, check out the [tests](tests/) directory for detailed examples for how to use the library.
 
 ## Contributing
 

@@ -143,44 +143,116 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
     }
 
+    fn children_mut(&mut self) -> Vec<&mut Octree<T>> {
+        let mut children = Vec::with_capacity(8);
+        if let Some(ref mut child) = self.front_top_left {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.front_top_right {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.front_bottom_left {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.front_bottom_right {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.back_top_left {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.back_top_right {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.back_bottom_left {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.back_bottom_right {
+            children.push(child.as_mut());
+        }
+        children
+    }
+
+    fn children(&self) -> Vec<&Octree<T>> {
+        let mut children = Vec::with_capacity(8);
+        if let Some(ref child) = self.front_top_left {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.front_top_right {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.front_bottom_left {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.front_bottom_right {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.back_top_left {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.back_top_right {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.back_bottom_left {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.back_bottom_right {
+            children.push(child.as_ref());
+        }
+        children
+    }
+
+    fn min_distance_sq(&self, target: &Point3D<T>) -> f64 {
+        let tx = target.x;
+        let ty = target.y;
+        let tz = target.z;
+        let cx = self.boundary.x;
+        let cy = self.boundary.y;
+        let cz = self.boundary.z;
+        let cw = self.boundary.width;
+        let ch = self.boundary.height;
+        let cd = self.boundary.depth;
+        let dx = if tx < cx {
+            cx - tx
+        } else if tx > cx + cw {
+            tx - (cx + cw)
+        } else {
+            0.0
+        };
+        let dy = if ty < cy {
+            cy - ty
+        } else if ty > cy + ch {
+            ty - (cy + ch)
+        } else {
+            0.0
+        };
+        let dz = if tz < cz {
+            cz - tz
+        } else if tz > cz + cd {
+            tz - (cz + cd)
+        } else {
+            0.0
+        };
+        dx * dx + dy * dy + dz * dz
+    }
+
     pub fn insert(&mut self, point: Point3D<T>) -> bool {
         if !self.boundary.contains(&point) {
             debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
         if self.divided {
-            return self
-                .front_top_left
-                .as_mut()
-                .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .front_top_right
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .front_bottom_left
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .front_bottom_right
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .back_top_left
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .back_top_right
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .back_bottom_left
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point.clone()))
-                || self
-                    .back_bottom_right
-                    .as_mut()
-                    .map_or(false, |child| child.insert(point));
+            let children = self.children_mut();
+            let n = children.len();
+            for (i, child) in children.into_iter().enumerate() {
+                if i < n - 1 {
+                    if child.insert(point.clone()) {
+                        return true;
+                    }
+                } else {
+                    return child.insert(point);
+                }
+            }
+            return false;
         }
         if self.points.len() < self.capacity {
             info!("Inserting point {:?} into Octree", point);
@@ -209,7 +281,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             let item = HeapItem {
                 neg_distance: OrderedFloat(-dist_sq),
                 point_2d: None,
-                point_3d: Option::from(point.clone()),
+                point_3d: Some(point.clone()),
             };
             heap.push(item);
             if heap.len() > k {
@@ -217,65 +289,31 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             }
         }
         if self.divided {
-            if let Some(child) = &self.front_top_left {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.front_top_right {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.front_bottom_left {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.front_bottom_right {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.back_top_left {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.back_top_right {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.back_bottom_left {
-                child.knn_search_helper(target, k, heap);
-            }
-            if let Some(child) = &self.back_bottom_right {
+            for child in self.children() {
+                if heap.len() == k {
+                    let current_farthest = -heap.peek().unwrap().neg_distance.into_inner();
+                    if child.min_distance_sq(target) > current_farthest {
+                        continue;
+                    }
+                }
                 child.knn_search_helper(target, k, heap);
             }
         }
     }
 
     pub fn range_search(&self, center: &Point3D<T>, radius: f64) -> Vec<Point3D<T>> {
-        info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
         let radius_sq = radius * radius;
+        if self.min_distance_sq(center) > radius_sq {
+            return found;
+        }
         for point in &self.points {
             if point.distance_sq(center) <= radius_sq {
                 found.push(point.clone());
             }
         }
         if self.divided {
-            if let Some(child) = &self.front_top_left {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.front_top_right {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.front_bottom_left {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.front_bottom_right {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.back_top_left {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.back_top_right {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.back_bottom_left {
-                found.extend(child.range_search(center, radius));
-            }
-            if let Some(child) = &self.back_bottom_right {
+            for child in self.children() {
                 found.extend(child.range_search(center, radius));
             }
         }
@@ -288,38 +326,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
         let mut deleted = false;
         if self.divided {
-            if let Some(child) = self.front_top_left.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.front_top_right.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.front_bottom_left.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.front_bottom_right.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.back_top_left.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.back_top_right.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.back_bottom_left.as_mut() {
-                deleted |= child.delete(point);
-            }
-            if let Some(child) = self.back_bottom_right.as_mut() {
-                deleted |= child.delete(point);
+            for child in self.children_mut() {
+                if child.delete(point) {
+                    deleted = true;
+                }
             }
             self.try_merge();
             return deleted;
-        } else {
-            if let Some(pos) = self.points.iter().position(|p| p == point) {
-                info!("Deleting point {:?} from Octree", point);
-                self.points.remove(pos);
-                return true;
-            }
+        }
+        if let Some(pos) = self.points.iter().position(|p| p == point) {
+            info!("Deleting point {:?} from Octree", point);
+            self.points.remove(pos);
+            return true;
         }
         false
     }
@@ -328,113 +346,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         if !self.divided {
             return;
         }
-        if let Some(child) = self.front_top_left.as_mut() {
+        for child in self.children_mut() {
             child.try_merge();
         }
-        if let Some(child) = self.front_top_right.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.front_bottom_left.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.front_bottom_right.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.back_top_left.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.back_top_right.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.back_bottom_left.as_mut() {
-            child.try_merge();
-        }
-        if let Some(child) = self.back_bottom_right.as_mut() {
-            child.try_merge();
-        }
-        let merge_possible = self
-            .front_top_left
-            .as_ref()
-            .map(|child| !child.divided)
-            .unwrap_or(true)
-            && self
-                .front_top_right
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .front_bottom_left
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .front_bottom_right
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .back_top_left
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .back_top_right
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .back_bottom_left
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .back_bottom_right
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true);
-        if merge_possible {
-            let total_points = self
-                .front_top_left
-                .as_ref()
-                .map(|child| child.points.len())
-                .unwrap_or(0)
-                + self
-                    .front_top_right
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .front_bottom_left
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .front_bottom_right
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .back_top_left
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .back_top_right
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .back_bottom_left
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .back_bottom_right
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0);
+        let children = self.children();
+        if children.iter().all(|child| !child.divided) {
+            let total_points: usize = children.iter().map(|child| child.points.len()).sum();
             if total_points <= self.capacity {
-                let mut merged_points = Vec::new();
+                let mut merged_points = Vec::with_capacity(total_points);
                 if let Some(child) = self.front_top_left.take() {
                     merged_points.extend(child.points);
                 }

@@ -1,4 +1,4 @@
-use spart::bsp_tree::{BSPTree, BSPTreeObject, Point2DBSP, Point3DBSP};
+use spart::bsp_tree::{BSPTree, Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D};
 mod utils;
 use tracing::{debug, info};
@@ -28,7 +28,7 @@ fn test_bsptree_2d() {
         },
     };
     info!("Performing 2D BSPTree kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target.mbr(), KNN_COUNT);
+    let knn_results = tree.knn_search(&target, KNN_COUNT);
     info!(
         "BSPTree 2D kNN search returned {} results",
         knn_results.len()
@@ -46,7 +46,7 @@ fn test_bsptree_2d() {
         "Performing 2D BSPTree range search with query rectangle: {:?}",
         rect
     );
-    let range_results = tree.range_search(&rect);
+    let range_results = tree.range_search_bbox(&rect);
     info!(
         "BSPTree 2D range search returned {} results",
         range_results.len()
@@ -70,6 +70,18 @@ fn test_bsptree_2d() {
         range_results.len()
     );
 
+    // Perform a 2D range search with a radius
+    let range_results = tree.range_search(&target, 5.0);
+    info!(
+        "BSPTree 2D range search with radius returned {} results",
+        range_results.len()
+    );
+    for pt in &range_results {
+        debug!("BSPTree 2D range result: {:?}", pt);
+        let d = distance_2d(&target.point, &pt.point);
+        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+    }
+
     let delete_point = Point2DBSP {
         point: Point2D::new(21.0, 21.0, Some("F")),
     };
@@ -82,7 +94,7 @@ fn test_bsptree_2d() {
         "Deleting non-existent BSPTree 2D point should return false"
     );
 
-    let knn_after = tree.knn_search(&target.mbr(), KNN_COUNT);
+    let knn_after = tree.knn_search(&target, KNN_COUNT);
     for pt in &knn_after {
         debug!("BSPTree 2D kNN after deletion: {:?}", pt);
         assert_ne!(
@@ -120,7 +132,7 @@ fn test_bsptree_3d() {
         },
     };
     info!("Performing 3D BSPTree kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target.mbr(), KNN_COUNT);
+    let knn_results = tree.knn_search(&target, KNN_COUNT);
     info!(
         "BSPTree 3D kNN search returned {} results",
         knn_results.len()
@@ -138,7 +150,7 @@ fn test_bsptree_3d() {
         "Performing 3D BSPTree range search with query cube: {:?}",
         cube
     );
-    let range_results = tree.range_search(&cube);
+    let range_results = tree.range_search_bbox(&cube);
     info!(
         "BSPTree 3D range search returned {} results",
         range_results.len()
@@ -164,6 +176,18 @@ fn test_bsptree_3d() {
         range_results.len()
     );
 
+    // Perform a 3D range search with a radius
+    let range_results = tree.range_search(&target, 5.0);
+    info!(
+        "BSPTree 3D range search with radius returned {} results",
+        range_results.len()
+    );
+    for pt in &range_results {
+        debug!("BSPTree 3D range result: {:?}", pt);
+        let d = distance_3d(&target.point, &pt.point);
+        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+    }
+
     let delete_point = Point3DBSP {
         point: Point3D::new(21.0, 21.0, 21.0, Some("F")),
     };
@@ -176,7 +200,7 @@ fn test_bsptree_3d() {
         "Deleting non-existent BSPTree 3D point should return false"
     );
 
-    let knn_after = tree.knn_search(&target.mbr(), KNN_COUNT);
+    let knn_after = tree.knn_search(&target, KNN_COUNT);
     for pt in &knn_after {
         debug!("BSPTree 3D kNN after deletion: {:?}", pt);
         assert_ne!(

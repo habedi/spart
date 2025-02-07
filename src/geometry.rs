@@ -40,10 +40,7 @@ impl Rectangle {
             && point.x <= self.x + self.width
             && point.y >= self.y
             && point.y <= self.y + self.height;
-        debug!(
-            "Rectangle::contains(): self: (x: {}, y: {}, w: {}, h: {}), point: (x: {}, y: {}), result: {}",
-            self.x, self.y, self.width, self.height, point.x, point.y, res
-        );
+        debug!("Rectangle::contains(): self: (x: {}, y: {}, w: {}, h: {}), point: (x: {}, y: {}), result: {}", self.x, self.y, self.width, self.height, point.x, point.y, res);
         res
     }
 
@@ -52,12 +49,7 @@ impl Rectangle {
             || other.x + other.width < self.x
             || other.y > self.y + self.height
             || other.y + other.height < self.y);
-        debug!(
-            "Rectangle::intersects(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: {}",
-            self.x, self.y, self.width, self.height,
-            other.x, other.y, other.width, other.height,
-            res
-        );
+        debug!("Rectangle::intersects(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: {}", self.x, self.y, self.width, self.height, other.x, other.y, other.width, other.height, res);
         res
     }
 
@@ -81,12 +73,7 @@ impl Rectangle {
             width: x2 - x1,
             height: y2 - y1,
         };
-        debug!(
-            "Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})",
-            self.x, self.y, self.width, self.height,
-            other.x, other.y, other.width, other.height,
-            union_rect.x, union_rect.y, union_rect.width, union_rect.height
-        );
+        debug!("Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})", self.x, self.y, self.width, self.height, other.x, other.y, other.width, other.height, union_rect.x, union_rect.y, union_rect.width, union_rect.height);
         union_rect
     }
 
@@ -120,10 +107,7 @@ impl<T> Point3D<T> {
     pub fn distance_sq(&self, other: &Point3D<T>) -> f64 {
         let dist =
             (self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2);
-        debug!(
-            "Point3D::distance_sq(): self: (x: {}, y: {}, z: {}), other: (x: {}, y: {}, z: {}), result: {}",
-            self.x, self.y, self.z, other.x, other.y, other.z, dist
-        );
+        debug!("Point3D::distance_sq(): self: (x: {}, y: {}, z: {}), other: (x: {}, y: {}, z: {}), result: {}", self.x, self.y, self.z, other.x, other.y, other.z, dist);
         dist
     }
 }
@@ -146,11 +130,7 @@ impl Cube {
             && point.y <= self.y + self.height
             && point.z >= self.z
             && point.z <= self.z + self.depth;
-        debug!(
-            "Cube::contains(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), point: (x: {}, y: {}, z: {}), result: {}",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            point.x, point.y, point.z, res
-        );
+        debug!("Cube::contains(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), point: (x: {}, y: {}, z: {}), result: {}", self.x, self.y, self.z, self.width, self.height, self.depth, point.x, point.y, point.z, res);
         res
     }
 
@@ -161,12 +141,7 @@ impl Cube {
             || other.y + other.height < self.y
             || other.z > self.z + self.depth
             || other.z + other.depth < self.z);
-        debug!(
-            "Cube::intersects(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: {}",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            other.x, other.y, other.z, other.width, other.height, other.depth,
-            res
-        );
+        debug!("Cube::intersects(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: {}", self.x, self.y, self.z, self.width, self.height, self.depth, other.x, other.y, other.z, other.width, other.height, other.depth, res);
         res
     }
 
@@ -194,12 +169,7 @@ impl Cube {
             height: y2 - y1,
             depth: z2 - z1,
         };
-        debug!(
-            "Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            other.x, other.y, other.z, other.width, other.height, other.depth,
-            union_cube.x, union_cube.y, union_cube.z, union_cube.width, union_cube.height, union_cube.depth
-        );
+        debug!("Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})", self.x, self.y, self.z, self.width, self.height, self.depth, other.x, other.y, other.z, other.width, other.height, other.depth, union_cube.x, union_cube.y, union_cube.z, union_cube.width, union_cube.height, union_cube.depth);
         union_cube
     }
 
@@ -336,5 +306,84 @@ impl<T: Clone> PartialOrd for HeapItem<T> {
 impl<T: Clone> Ord for HeapItem<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.neg_distance.cmp(&other.neg_distance)
+    }
+}
+
+pub trait HasMinDistance<Q> {
+    fn min_distance(&self, query: &Q) -> f64;
+}
+
+pub trait BoundingVolumeFromPoint<Q>: BoundingVolume {
+    fn from_point_radius(query: &Q, radius: f64) -> Self;
+}
+
+impl<T> HasMinDistance<Point2D<T>> for Rectangle {
+    fn min_distance(&self, point: &Point2D<T>) -> f64 {
+        let dx = if point.x < self.x {
+            self.x - point.x
+        } else if point.x > self.x + self.width {
+            point.x - (self.x + self.width)
+        } else {
+            0.0
+        };
+        let dy = if point.y < self.y {
+            self.y - point.y
+        } else if point.y > self.y + self.height {
+            point.y - (self.y + self.height)
+        } else {
+            0.0
+        };
+        (dx * dx + dy * dy).sqrt()
+    }
+}
+
+impl<T> BoundingVolumeFromPoint<Point2D<T>> for Rectangle {
+    fn from_point_radius(query: &Point2D<T>, radius: f64) -> Self {
+        Rectangle {
+            x: query.x - radius,
+            y: query.y - radius,
+            width: 2.0 * radius,
+            height: 2.0 * radius,
+        }
+    }
+}
+
+impl<T> HasMinDistance<Point3D<T>> for Cube {
+    fn min_distance(&self, point: &Point3D<T>) -> f64 {
+        let dx = if point.x < self.x {
+            self.x - point.x
+        } else if point.x > self.x + self.width {
+            point.x - (self.x + self.width)
+        } else {
+            0.0
+        };
+        let dy = if point.y < self.y {
+            self.y - point.y
+        } else if point.y > self.y + self.height {
+            point.y - (self.y + self.height)
+        } else {
+            0.0
+        };
+        let dz = if point.z < self.z {
+            self.z - point.z
+        } else if point.z > self.z + self.depth {
+            point.z - (self.z + self.depth)
+        } else {
+            0.0
+        };
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    }
+}
+
+impl<T> BoundingVolumeFromPoint<Point3D<T>> for Cube {
+    fn from_point_radius(query: &Point3D<T>, radius: f64) -> Self {
+        Cube {
+            x: query.x - radius,
+            y: query.y - radius,
+            z: query.z - radius,
+            width: 2.0 * radius,
+            height: 2.0 * radius,
+            depth: 2.0 * radius,
+        }
     }
 }

@@ -5,7 +5,7 @@ use spart::geometry::{Point2D, Point3D};
 use tracing::{debug, info};
 
 pub const BENCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-pub const BENCH_NUM_INSERT: i32 = 100;
+pub const BENCH_NUM_INSERT: i32 = 1000;
 pub const BENCH_NODE_CAPACITY: usize = 5;
 
 pub const BENCH_BOUNDARY: spart::geometry::Cube = spart::geometry::Cube {

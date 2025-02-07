@@ -76,9 +76,12 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             self.capacity,
         )));
         self.divided = true;
-        let points = std::mem::take(&mut self.points);
-        for point in points {
-            self.insert(point);
+        let old_points = std::mem::take(&mut self.points);
+        for point in old_points {
+            let inserted = self.insert(point);
+            if !inserted {
+                debug!("Failed to reinsert point during subdivision");
+            }
         }
     }
 
@@ -88,19 +91,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             return false;
         }
         if self.divided {
-            return self
-                .northeast
-                .as_mut()
-                .map_or(false, |qt| qt.insert(point.clone()))
-                || self
-                    .northwest
-                    .as_mut()
-                    .map_or(false, |qt| qt.insert(point.clone()))
-                || self
-                    .southeast
-                    .as_mut()
-                    .map_or(false, |qt| qt.insert(point.clone()))
-                || self.southwest.as_mut().map_or(false, |qt| qt.insert(point));
+            let children = self.children_mut();
+            let num_children = children.len();
+            for (i, child) in children.into_iter().enumerate() {
+                if i < num_children - 1 {
+                    if child.insert(point.clone()) {
+                        return true;
+                    }
+                } else {
+                    return child.insert(point);
+                }
+            }
+            return false;
         }
         if self.points.len() < self.capacity {
             info!("Inserting point {:?} into Quadtree", point);
@@ -109,6 +111,56 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
         self.subdivide();
         self.insert(point)
+    }
+
+    fn children_mut(&mut self) -> Vec<&mut Quadtree<T>> {
+        let mut children = Vec::with_capacity(4);
+        if let Some(ref mut child) = self.northeast {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.northwest {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.southeast {
+            children.push(child.as_mut());
+        }
+        if let Some(ref mut child) = self.southwest {
+            children.push(child.as_mut());
+        }
+        children
+    }
+
+    fn children(&self) -> Vec<&Quadtree<T>> {
+        let mut children = Vec::with_capacity(4);
+        if let Some(ref child) = self.northeast {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.northwest {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.southeast {
+            children.push(child.as_ref());
+        }
+        if let Some(ref child) = self.southwest {
+            children.push(child.as_ref());
+        }
+        children
+    }
+
+    fn min_distance_sq(&self, target: &Point2D<T>) -> f64 {
+        let mut dx = 0.0;
+        if target.x < self.boundary.x {
+            dx = self.boundary.x - target.x;
+        } else if target.x > self.boundary.x + self.boundary.width {
+            dx = target.x - (self.boundary.x + self.boundary.width);
+        }
+        let mut dy = 0.0;
+        if target.y < self.boundary.y {
+            dy = self.boundary.y - target.y;
+        } else if target.y > self.boundary.y + self.boundary.height {
+            dy = target.y - (self.boundary.y + self.boundary.height);
+        }
+        dx * dx + dy * dy
     }
 
     pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
@@ -128,7 +180,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             let dist_sq = point.distance_sq(target);
             let item = HeapItem {
                 neg_distance: OrderedFloat(-dist_sq),
-                point_2d: Option::from(point.clone()),
+                point_2d: Some(point.clone()),
                 point_3d: None,
             };
             heap.push(item);
@@ -137,42 +189,32 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             }
         }
         if self.divided {
-            if let Some(ref ne) = self.northeast {
-                ne.knn_search_helper(target, k, heap);
-            }
-            if let Some(ref nw) = self.northwest {
-                nw.knn_search_helper(target, k, heap);
-            }
-            if let Some(ref se) = self.southeast {
-                se.knn_search_helper(target, k, heap);
-            }
-            if let Some(ref sw) = self.southwest {
-                sw.knn_search_helper(target, k, heap);
+            for child in self.children() {
+                if heap.len() == k {
+                    let current_farthest = -heap.peek().unwrap().neg_distance.into_inner();
+                    if child.min_distance_sq(target) > current_farthest {
+                        continue;
+                    }
+                }
+                child.knn_search_helper(target, k, heap);
             }
         }
     }
 
     pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
-        info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
         let radius_sq = radius * radius;
+        if self.min_distance_sq(center) > radius_sq {
+            return found;
+        }
         for point in &self.points {
             if point.distance_sq(center) <= radius_sq {
                 found.push(point.clone());
             }
         }
         if self.divided {
-            if let Some(ne) = &self.northeast {
-                found.extend(ne.range_search(center, radius));
-            }
-            if let Some(nw) = &self.northwest {
-                found.extend(nw.range_search(center, radius));
-            }
-            if let Some(se) = &self.southeast {
-                found.extend(se.range_search(center, radius));
-            }
-            if let Some(sw) = &self.southwest {
-                found.extend(sw.range_search(center, radius));
+            for child in self.children() {
+                found.extend(child.range_search(center, radius));
             }
         }
         found
@@ -184,26 +226,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
         let mut deleted = false;
         if self.divided {
-            if let Some(ref mut child) = self.northeast {
-                deleted |= child.delete(point);
-            }
-            if let Some(ref mut child) = self.northwest {
-                deleted |= child.delete(point);
-            }
-            if let Some(ref mut child) = self.southeast {
-                deleted |= child.delete(point);
-            }
-            if let Some(ref mut child) = self.southwest {
-                deleted |= child.delete(point);
+            for child in self.children_mut() {
+                if child.delete(point) {
+                    deleted = true;
+                }
             }
             self.try_merge();
             return deleted;
-        } else {
-            if let Some(pos) = self.points.iter().position(|p| p == point) {
-                info!("Deleting point {:?} from Quadtree", point);
-                self.points.remove(pos);
-                return true;
-            }
+        }
+        if let Some(pos) = self.points.iter().position(|p| p == point) {
+            info!("Deleting point {:?} from Quadtree", point);
+            self.points.remove(pos);
+            return true;
         }
         false
     }
@@ -212,61 +246,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         if !self.divided {
             return;
         }
-        if let Some(ref mut ne) = self.northeast {
-            ne.try_merge();
+        for child in self.children_mut() {
+            child.try_merge();
         }
-        if let Some(ref mut nw) = self.northwest {
-            nw.try_merge();
-        }
-        if let Some(ref mut se) = self.southeast {
-            se.try_merge();
-        }
-        if let Some(ref mut sw) = self.southwest {
-            sw.try_merge();
-        }
-        let merge_possible = self
-            .northeast
-            .as_ref()
-            .map(|child| !child.divided)
-            .unwrap_or(true)
-            && self
-                .northwest
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .southeast
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true)
-            && self
-                .southwest
-                .as_ref()
-                .map(|child| !child.divided)
-                .unwrap_or(true);
-        if merge_possible {
-            let total_points = self
-                .northeast
-                .as_ref()
-                .map(|child| child.points.len())
-                .unwrap_or(0)
-                + self
-                    .northwest
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .southeast
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0)
-                + self
-                    .southwest
-                    .as_ref()
-                    .map(|child| child.points.len())
-                    .unwrap_or(0);
+        let children = self.children();
+        if children.iter().all(|child| !child.divided) {
+            let total_points: usize = children.iter().map(|child| child.points.len()).sum();
             if total_points <= self.capacity {
-                let mut merged_points = Vec::new();
+                let mut merged_points = Vec::with_capacity(total_points);
                 if let Some(child) = self.northeast.take() {
                     merged_points.extend(child.points);
                 }
@@ -284,7 +271,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     self.boundary,
                     merged_points.len()
                 );
-                self.points = merged_points;
+                self.points.extend(merged_points);
                 self.divided = false;
             }
         }
