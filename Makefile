@@ -2,8 +2,9 @@
 PKG = github.com/habedi/spart
 BINARY_NAME = $(or $(PROJ_BINARY), $(notdir $(PKG)))
 BINARY = target/release/$(BINARY_NAME)
-DEBUG_SPART = 0
 PATH := /snap/bin:$(PATH)
+CARGO_TERM_COLOR = always
+DEBUG_SPART = 0
 
 # Default target
 .DEFAULT_GOAL := help

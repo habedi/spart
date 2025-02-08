@@ -87,3 +87,4 @@ octree.dot
 quadtree.dot
 rtree_2d.dot
 rtree_3d.dot
+main.rs

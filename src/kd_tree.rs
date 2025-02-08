@@ -1,4 +1,5 @@
 use ordered_float::OrderedFloat;
+use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::info;
 
@@ -62,13 +63,13 @@ impl<P> PartialEq for HeapItem<P> {
 impl<P> Eq for HeapItem<P> {}
 
 impl<P> PartialOrd for HeapItem<P> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.dist.partial_cmp(&other.dist)
     }
 }
 
 impl<P> Ord for HeapItem<P> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.dist.cmp(&other.dist)
     }
 }
@@ -223,27 +224,54 @@ impl<P: KdPoint> KdTree<P> {
 
     pub fn delete(&mut self, point: &P) -> bool {
         info!("Attempting to delete point: {:?}", point);
-        let mut points = Vec::new();
-        Self::collect_points(&self.root, &mut points);
-        let initial_count = points.len();
-        points.retain(|p| p != point);
-        if points.len() == initial_count {
-            info!("Point not found; nothing deleted.");
-            return false;
-        }
-        self.root = None;
-        for p in points {
-            self.insert(p);
-        }
-        info!("Point deleted and tree rebuilt.");
-        true
+        let before = Self::collect_points(&self.root).len();
+        self.root = Self::delete_rec(self.root.take(), point, 0, self.k);
+        let after = Self::collect_points(&self.root).len();
+        before > after
     }
 
-    fn collect_points(node: &Option<Box<KdNode<P>>>, points: &mut Vec<P>) {
+    fn delete_rec(
+        node: Option<Box<KdNode<P>>>,
+        point: &P,
+        depth: usize,
+        k: usize,
+    ) -> Option<Box<KdNode<P>>> {
+        match node {
+            None => None,
+            Some(current) => {
+                if current.point == *point {
+                    let mut points = Self::collect_points(&current.left);
+                    points.extend(Self::collect_points(&current.right));
+                    Self::rebuild_subtree(points, depth, k)
+                } else {
+                    let axis = depth % k;
+                    let mut current = current;
+                    if point.coord(axis) < current.point.coord(axis) {
+                        current.left = Self::delete_rec(current.left, point, depth + 1, k);
+                    } else {
+                        current.right = Self::delete_rec(current.right, point, depth + 1, k);
+                    }
+                    Some(current)
+                }
+            }
+        }
+    }
+
+    fn rebuild_subtree(mut points: Vec<P>, depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
+        let mut subtree = None;
+        for p in points.drain(..) {
+            subtree = Some(Self::insert_rec(subtree, p, depth, k));
+        }
+        subtree
+    }
+
+    fn collect_points(node: &Option<Box<KdNode<P>>>) -> Vec<P> {
+        let mut points = Vec::new();
         if let Some(ref n) = node {
             points.push(n.point.clone());
-            Self::collect_points(&n.left, points);
-            Self::collect_points(&n.right, points);
+            points.extend(Self::collect_points(&n.left));
+            points.extend(Self::collect_points(&n.right));
         }
+        points
     }
 }

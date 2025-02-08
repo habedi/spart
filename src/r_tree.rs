@@ -1,4 +1,6 @@
-use crate::geometry::{BoundingVolume, Cube, Point2D, Point3D, Rectangle};
+use crate::geometry::{
+    BoundingVolume, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D, Rectangle,
+};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
@@ -85,7 +87,7 @@ impl<T: RTreeObject> RTree<T> {
         });
     }
 
-    pub fn range_search(&self, query: &T::B) -> Vec<&T> {
+    pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
         info!("Performing range search with query: {:?}", query);
         let mut result = Vec::new();
         search_node(&self.root, query, &mut result);
@@ -189,17 +191,17 @@ where
 {
     pub fn delete(&mut self, object: &T) -> bool {
         info!("Attempting to delete object: {:?}", object);
-        let found = delete_entry(&mut self.root, object);
+        let count = delete_entry(&mut self.root, object);
         if !self.root.is_leaf && self.root.entries.len() == 1 {
             if let RTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
                 self.root = *child;
             }
         }
-        found
+        count > 0
     }
 }
 
-fn delete_entry<T: RTreeObject>(node: &mut RTreeNode<T>, object: &T) -> bool
+fn delete_entry<T: RTreeObject>(node: &mut RTreeNode<T>, object: &T) -> usize
 where
     T: PartialEq,
 {
@@ -215,19 +217,17 @@ where
                 true
             }
         });
-        initial_len != node.entries.len()
+        initial_len - node.entries.len()
     } else {
-        let mut found = false;
+        let mut count = 0;
         for entry in &mut node.entries {
             if let RTreeEntry::Node { child, .. } = entry {
-                if delete_entry(child, object) {
-                    if !child.entries.is_empty() {
-                        let new_mbr = compute_group_mbr(&child.entries);
-                        if let RTreeEntry::Node { ref mut mbr, .. } = entry {
-                            *mbr = new_mbr;
-                        }
+                count += delete_entry(child, object);
+                if !child.entries.is_empty() {
+                    let new_mbr = compute_group_mbr(&child.entries);
+                    if let RTreeEntry::Node { ref mut mbr, .. } = entry {
+                        *mbr = new_mbr;
                     }
-                    found = true;
                 }
             }
         }
@@ -235,7 +235,7 @@ where
             RTreeEntry::Node { child, .. } => !child.entries.is_empty(),
             _ => true,
         });
-        found
+        count
     }
 }
 
@@ -285,6 +285,33 @@ impl Rectangle {
     }
 }
 
+impl Cube {
+    pub fn min_distance<T>(&self, point: &Point3D<T>) -> f64 {
+        let dx = if point.x < self.x {
+            self.x - point.x
+        } else if point.x > self.x + self.width {
+            point.x - (self.x + self.width)
+        } else {
+            0.0
+        };
+        let dy = if point.y < self.y {
+            self.y - point.y
+        } else if point.y > self.y + self.height {
+            point.y - (self.y + self.height)
+        } else {
+            0.0
+        };
+        let dz = if point.z < self.z {
+            self.z - point.z
+        } else if point.z > self.z + self.depth {
+            point.z - (self.z + self.depth)
+        } else {
+            0.0
+        };
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    }
+}
+
 #[derive(Debug)]
 struct Candidate2D<'a, T: std::fmt::Debug> {
     dist: f64,
@@ -297,18 +324,18 @@ enum CandidateEntry2D<'a, T: std::fmt::Debug> {
     Leaf(&'a Point2D<T>),
 }
 
-impl<'a, T: std::fmt::Debug> PartialEq for Candidate2D<'a, T> {
+impl<T: std::fmt::Debug> PartialEq for Candidate2D<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.dist.eq(&other.dist)
     }
 }
-impl<'a, T: std::fmt::Debug> Eq for Candidate2D<'a, T> {}
-impl<'a, T: std::fmt::Debug> PartialOrd for Candidate2D<'a, T> {
+impl<T: std::fmt::Debug> Eq for Candidate2D<'_, T> {}
+impl<T: std::fmt::Debug> PartialOrd for Candidate2D<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.dist.partial_cmp(&self.dist)
     }
 }
-impl<'a, T: std::fmt::Debug> Ord for Candidate2D<'a, T> {
+impl<T: std::fmt::Debug> Ord for Candidate2D<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
@@ -356,33 +383,6 @@ impl<T: std::fmt::Debug> RTree<Point2D<T>> {
     }
 }
 
-impl Cube {
-    pub fn min_distance<T>(&self, point: &Point3D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        let dz = if point.z < self.z {
-            self.z - point.z
-        } else if point.z > self.z + self.depth {
-            point.z - (self.z + self.depth)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    }
-}
-
 #[derive(Debug)]
 struct Candidate3D<'a, T: std::fmt::Debug> {
     dist: f64,
@@ -395,18 +395,18 @@ enum CandidateEntry3D<'a, T: std::fmt::Debug> {
     Leaf(&'a Point3D<T>),
 }
 
-impl<'a, T: std::fmt::Debug> PartialEq for Candidate3D<'a, T> {
+impl<T: std::fmt::Debug> PartialEq for Candidate3D<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.dist.eq(&other.dist)
     }
 }
-impl<'a, T: std::fmt::Debug> Eq for Candidate3D<'a, T> {}
-impl<'a, T: std::fmt::Debug> PartialOrd for Candidate3D<'a, T> {
+impl<T: std::fmt::Debug> Eq for Candidate3D<'_, T> {}
+impl<T: std::fmt::Debug> PartialOrd for Candidate3D<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         other.dist.partial_cmp(&self.dist)
     }
 }
-impl<'a, T: std::fmt::Debug> Ord for Candidate3D<'a, T> {
+impl<T: std::fmt::Debug> Ord for Candidate3D<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
@@ -452,5 +452,20 @@ impl<T: std::fmt::Debug> RTree<Point3D<T>> {
             }
         }
         result
+    }
+}
+
+impl<T> RTree<T>
+where
+    T: RTreeObject + PartialEq + std::fmt::Debug,
+    T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
+{
+    pub fn range_search(&self, query: &T, radius: f64) -> Vec<&T> {
+        let query_volume = T::B::from_point_radius(query, radius);
+        let candidates = self.range_search_bbox(&query_volume);
+        candidates
+            .into_iter()
+            .filter(|object| object.mbr().min_distance(query) <= radius)
+            .collect()
     }
 }

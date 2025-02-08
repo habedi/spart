@@ -1,10 +1,9 @@
 use ctor::ctor;
 use tracing::Level;
-use tracing_subscriber;
 
 #[ctor]
 fn set_debug_level() {
-    // If DEBUG_QUADTREE_ZNG is not set or set to false, disable logging. Otherwise, enable logging
+    // If DEBUG_SPART is not set or set to false, disable logging. Otherwise, enable logging
     if std::env::var("DEBUG_SPART").map_or(true, |v| v == "0" || v == "false" || v.is_empty()) {
         // Disable logging
     } else {
@@ -13,5 +12,5 @@ fn set_debug_level() {
             .init();
     }
 
-    println!("DEBUG_SPART: {:?}", std::env::var("DEBUG_SPART"));
+    // println!("DEBUG_SPART: {:?}", std::env::var("DEBUG_SPART"));
 }

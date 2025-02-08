@@ -41,7 +41,7 @@ fn test_rtree_2d() {
         "Performing 2D range search with query rectangle: {:?}",
         rect
     );
-    let range_results = tree.range_search(&rect);
+    let range_results = tree.range_search_bbox(&rect);
     info!("2D range search returned {} results", range_results.len());
     for pt in &range_results {
         debug!("RTree 2D range result: {:?}", pt);
@@ -60,6 +60,18 @@ fn test_rtree_2d() {
         "Expected at least 5 points in RTree 2D range, got {}",
         range_results.len()
     );
+
+    // Perform a 2D range search with a radius
+    let range_results = tree.range_search(&target, 5.0);
+    info!(
+        "2D range search with radius returned {} results",
+        range_results.len()
+    );
+    for pt in &range_results {
+        debug!("RTree 2D range result: {:?}", pt);
+        let d = distance_2d(&target, pt);
+        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+    }
 
     let delete_point = Point2D::new(21.0, 21.0, Some("F"));
     info!("Deleting point {:?}", delete_point);
@@ -118,7 +130,7 @@ fn test_rtree_3d() {
 
     let cube = query_cube();
     info!("Performing 3D range search with query cube: {:?}", cube);
-    let range_results = tree.range_search(&cube);
+    let range_results = tree.range_search_bbox(&cube);
     info!("3D range search returned {} results", range_results.len());
     for pt in &range_results {
         debug!("RTree 3D range result: {:?}", pt);
@@ -139,6 +151,18 @@ fn test_rtree_3d() {
         "Expected at least 5 points in RTree 3D range, got {}",
         range_results.len()
     );
+
+    // Perform a 3D range search with a radius
+    let range_results = tree.range_search(&target, 5.0);
+    info!(
+        "3D range search with radius returned {} results",
+        range_results.len()
+    );
+    for pt in &range_results {
+        debug!("RTree 3D range result: {:?}", pt);
+        let d = distance_3d(&target, pt);
+        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+    }
 
     let delete_point = Point3D::new(21.0, 21.0, 21.0, Some("F"));
     info!("Deleting 3D point {:?}", delete_point);
