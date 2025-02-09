@@ -1,6 +1,6 @@
 [package]
 name = "spart"
-version = "0.1.1"
+version = "0.1.2"
 description = "A collection of space partitioning tree data structures for Rust."
 repository = "https://github.com/habedi/spart"
 license = "MIT OR Apache-2.0"
@@ -26,5 +26,18 @@ ctor = "0.2.9"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]
-name = "insert_bench"
+name = "main"
 harness = false
+
+[profile.release]
+strip = "symbols"
+codegen-units = 1
+lto = true
+
+[profile.bench]
+debug = true
+
+[package.metadata.rustfmt]
+max_width = 100
+hard_tabs = false
+tab_spaces = 4

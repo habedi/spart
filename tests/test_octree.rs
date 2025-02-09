@@ -1,16 +1,19 @@
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
 use spart::octree::Octree;
-mod utils;
 use tracing::{debug, info};
-use utils::*;
 
-#[test]
-fn test_octree_3d() {
-    info!("Starting test_octree_3d");
+fn run_octree_3d_test() {
+    info!("Starting Octree 3D test");
 
+    // Create an octree with the shared cube boundary and capacity.
     let boundary = BOUNDARY_CUBE;
     let mut tree = Octree::new(&boundary, CAPACITY);
     info!("Created octree with boundary: {:?}", boundary);
 
+    // Insert common 3D points into the octree.
     let points = common_points_3d();
     for pt in &points {
         tree.insert(pt.clone());
@@ -18,6 +21,7 @@ fn test_octree_3d() {
     }
     info!("Finished inserting {} points", points.len());
 
+    // Perform a kNN search.
     let target = target_point_3d();
     info!("Performing 3D kNN search for target: {:?}", target);
     let knn_results = tree.knn_search(&target, KNN_COUNT);
@@ -40,6 +44,7 @@ fn test_octree_3d() {
         prev_dist = d;
     }
 
+    // Perform a range search using a query point and radius.
     let range_query = range_query_point_3d();
     info!(
         "Performing 3D range search for query point {:?} with radius {}",
@@ -64,5 +69,10 @@ fn test_octree_3d() {
         range_results.len()
     );
 
-    info!("test_octree_3d completed successfully");
+    info!("Octree 3D test completed successfully");
+}
+
+#[test]
+fn test_octree_3d() {
+    run_octree_3d_test();
 }

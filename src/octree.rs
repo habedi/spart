@@ -1,8 +1,46 @@
+//! Octree implementation.
+//!
+//! This module implements an octree for spatial indexing of 3D points. An octree recursively subdivides
+//! a cubic region (defined by a `Cube`) into eight smaller subcubes when the number of points exceeds a specified capacity.
+//! The octree provides operations for insertion, k-nearest neighbor (kNN) search, range search, and deletion.
+//!
+//! # Usage Example
+//!
+//! ```
+//! use spart::geometry::{Cube, Point3D};
+//! use spart::octree::Octree;
+//!
+//! // Define a cubic boundary for the octree.
+//! let boundary = Cube { x: 0.0, y: 0.0, z: 0.0, width: 100.0, height: 100.0, depth: 100.0 };
+//! // Create an octree with a capacity of 4 points per node.
+//! let mut octree = Octree::new(&boundary, 4);
+//!
+//! // Insert some points.
+//! let pt1: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
+//! let pt2: Point3D<()> = Point3D::new(50.0, 50.0, 50.0, None);
+//! octree.insert(pt1);
+//! octree.insert(pt2);
+//!
+//! // Perform a k-nearest neighbor search.
+//! let neighbors = octree.knn_search(&Point3D::new(12.0, 22.0, 32.0, None), 1);
+//! assert!(!neighbors.is_empty());
+//! ```
+
+use crate::exceptions::SpartError;
 use crate::geometry::{Cube, HeapItem, Point3D};
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
+/// An octree for spatial indexing of 3D points.
+///
+/// # Type Parameters
+///
+/// * `T`: The type of additional data stored in each point.
+///
+/// # Panics
+///
+/// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
 pub struct Octree<T: Clone + PartialEq> {
     boundary: Cube,
     points: Vec<Point3D<T>>,
@@ -19,7 +57,20 @@ pub struct Octree<T: Clone + PartialEq> {
 }
 
 impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
+    /// Creates a new `Octree` with the specified boundary and capacity.
+    ///
+    /// # Arguments
+    ///
+    /// * `boundary` - The cube defining the 3D region covered by this octree.
+    /// * `capacity` - The maximum number of points a node can hold before subdividing.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
     pub fn new(boundary: &Cube, capacity: usize) -> Self {
+        if capacity == 0 {
+            panic!("{}", SpartError::InvalidCapacity { capacity });
+        }
         info!(
             "Creating new Octree with boundary: {:?} and capacity: {}",
             boundary, capacity
@@ -40,7 +91,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
     }
 
-    pub fn subdivide(&mut self) {
+    /// Subdivides the current octree node into eight child octants.
+    ///
+    /// After subdivision, all existing points are reinserted into the appropriate children.
+    fn subdivide(&mut self) {
         info!("Subdividing Octree at boundary: {:?}", self.boundary);
         let x = self.boundary.x;
         let y = self.boundary.y;
@@ -48,6 +102,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         let w = self.boundary.width / 2.0;
         let h = self.boundary.height / 2.0;
         let d = self.boundary.depth / 2.0;
+
         self.front_top_left = Some(Box::new(Octree::new(
             &Cube {
                 x,
@@ -137,12 +192,15 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             self.capacity,
         )));
         self.divided = true;
+
+        // Reinsert existing points into the appropriate children.
         let points = std::mem::take(&mut self.points);
         for point in points {
             self.insert(point);
         }
     }
 
+    /// Returns mutable references to all eight child octants, if they exist.
     fn children_mut(&mut self) -> Vec<&mut Octree<T>> {
         let mut children = Vec::with_capacity(8);
         if let Some(ref mut child) = self.front_top_left {
@@ -172,6 +230,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         children
     }
 
+    /// Returns references to all eight child octants, if they exist.
     fn children(&self) -> Vec<&Octree<T>> {
         let mut children = Vec::with_capacity(8);
         if let Some(ref child) = self.front_top_left {
@@ -201,6 +260,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         children
     }
 
+    /// Computes the squared minimum distance from the given target point to the boundary of this node.
+    ///
+    /// This value is used to decide whether a subtree can be skipped during k-nearest neighbor search.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The target 3D point.
     fn min_distance_sq(&self, target: &Point3D<T>) -> f64 {
         let tx = target.x;
         let ty = target.y;
@@ -211,6 +277,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         let cw = self.boundary.width;
         let ch = self.boundary.height;
         let cd = self.boundary.depth;
+
         let dx = if tx < cx {
             cx - tx
         } else if tx > cx + cw {
@@ -218,6 +285,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         } else {
             0.0
         };
+
         let dy = if ty < cy {
             cy - ty
         } else if ty > cy + ch {
@@ -225,6 +293,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         } else {
             0.0
         };
+
         let dz = if tz < cz {
             cz - tz
         } else if tz > cz + cd {
@@ -232,9 +301,22 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         } else {
             0.0
         };
+
         dx * dx + dy * dy + dz * dz
     }
 
+    /// Inserts a 3D point into the octree.
+    ///
+    /// If the point is not within the boundary, it is ignored.
+    /// If the current node is full, the node subdivides and attempts to insert the point into a child.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The 3D point to insert.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point3D<T>) -> bool {
         if !self.boundary.contains(&point) {
             debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
@@ -263,6 +345,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         self.insert(point)
     }
 
+    /// Performs a k-nearest neighbor search for the target point.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The 3D point for which to find the k nearest neighbors.
+    /// * `k` - The number of nearest neighbors to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A vector of the k nearest 3D points, ordered from nearest to farthest.
     pub fn knn_search(&self, target: &Point3D<T>, k: usize) -> Vec<Point3D<T>> {
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper(target, k, &mut heap);
@@ -275,6 +367,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         result
     }
 
+    /// Helper method for recursively performing the k-nearest neighbor search.
     fn knn_search_helper(&self, target: &Point3D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
         for point in &self.points {
             let dist_sq = point.distance_sq(target);
@@ -301,6 +394,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
     }
 
+    /// Performs a range search, returning all points within the specified radius of the center point.
+    ///
+    /// # Arguments
+    ///
+    /// * `center` - The center of the search range.
+    /// * `radius` - The search radius.
+    ///
+    /// # Returns
+    ///
+    /// A vector of 3D points within the specified range.
     pub fn range_search(&self, center: &Point3D<T>, radius: f64) -> Vec<Point3D<T>> {
         let mut found = Vec::new();
         let radius_sq = radius * radius;
@@ -320,6 +423,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         found
     }
 
+    /// Deletes a point from the octree.
+    ///
+    /// Returns `true` if the point was found and deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The 3D point to delete.
     pub fn delete(&mut self, point: &Point3D<T>) -> bool {
         if !self.boundary.contains(point) {
             return false;
@@ -342,6 +452,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         false
     }
 
+    /// Attempts to merge child nodes back into the parent node if possible.
+    ///
+    /// If all children are not divided and their total number of points is within capacity,
+    /// the children are merged into the parent node.
     fn try_merge(&mut self) {
         if !self.divided {
             return;

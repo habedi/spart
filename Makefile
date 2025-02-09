@@ -1,10 +1,10 @@
 # Variables
-PKG = github.com/habedi/spart
-BINARY_NAME = $(or $(PROJ_BINARY), $(notdir $(PKG)))
-BINARY = target/release/$(BINARY_NAME)
+PKG := github.com/habedi/spart
+BINARY_NAME := $(or $(PROJ_BINARY), $(notdir $(PKG)))
+BINARY = :target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
-CARGO_TERM_COLOR = always
-DEBUG_SPART = 0
+CARGO_TERM_COLOR := always
+DEBUG_SPART := 0
 
 # Default target
 .DEFAULT_GOAL := help
@@ -16,64 +16,64 @@ help: ## Show this help message
 .PHONY: format
 format: ## Format Rust files
 	@echo "Formatting Rust files..."
-	cargo fmt
+	@cargo fmt
 
 .PHONY: test
 test: format ## Run tests
 	@echo "Running tests..."
-	DEBUG_SPART=$(DEBUG_SPART) cargo test -- --nocapture
+	@DEBUG_SPART=$(DEBUG_SPART) cargo test -- --nocapture
 
 .PHONY: coverage
 coverage: format ## Generate test coverage report
 	@echo "Generating test coverage report..."
-	DEBUG_SPART=$(DEBUG_SPART) cargo tarpaulin --out Xml --out Html
+	@DEBUG_SPART=$(DEBUG_SPART) cargo tarpaulin --out Xml --out Html
 
 .PHONY: build
 build: format ## Build the binary for the current platform
 	@echo "Building the project..."
-	DEBUG_SPART=$(DEBUG_SPART) cargo build --release
+	@DEBUG_SPART=$(DEBUG_SPART) cargo build --release
 
 .PHONY: run
 run: build ## Build and run the binary
 	@echo "Running the $(BINARY) binary..."
-	DEBUG_SPART=$(DEBUG_SPART) ./$(BINARY)
+	@DEBUG_SPART=$(DEBUG_SPART) ./$(BINARY)
 
 .PHONY: clean
 clean: ## Remove generated and temporary files
 	@echo "Cleaning up..."
-	cargo clean
+	@cargo clean
 
 .PHONY: install-snap
 install-snap: ## Install a few dependencies using Snapcraft
 	@echo "Installing the snap package..."
-	sudo apt-get update
-	sudo apt-get install -y snapd
-	sudo snap refresh
-	sudo snap install rustup --classic
+	@sudo apt-get update
+	@sudo apt-get install -y snapd
+	@sudo snap refresh
+	@sudo snap install rustup --classic
 
 .PHONY: install-deps
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
-	rustup component add rustfmt clippy
-	cargo install cargo-tarpaulin
-	cargo install cargo-audit
+	@rustup component add rustfmt clippy
+	@cargo install cargo-tarpaulin
+	@cargo install cargo-audit
 
 .PHONY: lint
 lint: format ## Run linters on Rust files
 	@echo "Linting Rust files..."
-	DEBUG_SPART=$(DEBUG_SPART) cargo clippy -- -D warnings
+	@DEBUG_SPART=$(DEBUG_SPART) cargo clippy -- -D warnings
 
 .PHONY: publish
 publish: ## Publish the package to crates.io (requires CARGO_REGISTRY_TOKEN to be set)
 	@echo "Publishing the package to Cargo registry..."
-	cargo publish --token $(CARGO_REGISTRY_TOKEN)
+	@cargo publish --token $(CARGO_REGISTRY_TOKEN)
 
 .PHONY: bench
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
-	DEBUG_SPART=$(DEBUG_SPART) cargo bench
+	@DEBUG_SPART=$(DEBUG_SPART) cargo bench
 
 .PHONY: audit
 audit: ## Run security audit on Rust dependencies
 	@echo "Running security audit..."
-	cargo audit
+	@cargo audit

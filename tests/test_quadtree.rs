@@ -1,11 +1,12 @@
-use spart::quadtree::Quadtree;
-mod utils;
-use tracing::{debug, info};
-use utils::*;
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
 
-#[test]
-fn test_quadtree_2d() {
-    info!("Starting test_quadtree_2d");
+use spart::quadtree::Quadtree;
+use tracing::{debug, info};
+
+fn run_quadtree_2d_test() {
+    info!("Starting Quadtree 2D test");
 
     let boundary = BOUNDARY_RECT;
     let mut tree = Quadtree::new(&boundary, CAPACITY);
@@ -18,6 +19,7 @@ fn test_quadtree_2d() {
     }
     info!("Finished inserting {} points", points.len());
 
+    // kNN search test
     let target = target_point_2d();
     info!("Performing kNN search for target: {:?}", target);
     let knn_results = tree.knn_search(&target, KNN_COUNT);
@@ -40,6 +42,7 @@ fn test_quadtree_2d() {
         prev_dist = d;
     }
 
+    // Range search test
     let range_query = range_query_point_2d();
     info!(
         "Performing range search for query point {:?} with radius {}",
@@ -64,5 +67,10 @@ fn test_quadtree_2d() {
         range_results.len()
     );
 
-    info!("test_quadtree_2d completed successfully");
+    info!("Quadtree 2D test completed successfully");
+}
+
+#[test]
+fn test_quadtree_2d() {
+    run_quadtree_2d_test();
 }

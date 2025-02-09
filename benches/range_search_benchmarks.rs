@@ -1,13 +1,39 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-mod utils;
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
+use criterion::{black_box, criterion_group, Criterion};
 use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
 use tracing::info;
-use utils::*;
 
+// Configure Criterion with our benchmark timeout.
 pub fn configure_criterion() -> Criterion {
     Criterion::default().measurement_time(BENCH_TIMEOUT)
+}
+
+/// A generic helper function for range search benchmarks.
+///
+/// The lifetime `'a` ties the lifetime of the tree reference and the return value.
+/// The closure `search_fn` must return a value whose lifetime is at least `'a`.
+fn bench_range_search<'a, T, Q, R>(
+    name: &str,
+    tree: &'a T,
+    query: &Q,
+    search_fn: impl Fn(&'a T, &Q, f64) -> R,
+    cc: &mut Criterion,
+) where
+    R: 'a,
+{
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running range search benchmark: {}", name);
+            let res = search_fn(tree, query, BENCH_RANGE_RADIUS);
+            info!("Completed range search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
@@ -19,14 +45,13 @@ fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
     }
     let query = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    cc.bench_function("range_kdtree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D KdTree");
-            let res = tree.range_search(&query, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 2D KdTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_kdtree_2d",
+        &tree,
+        &query,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bbox_rtree_2d(_c: &mut Criterion) {
@@ -43,14 +68,13 @@ fn benchmark_range_bbox_rtree_2d(_c: &mut Criterion) {
         height: 2.0 * BENCH_RANGE_RADIUS,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_rtree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D RTree");
-            let res = tree.range_search_bbox(&query_rect);
-            info!("Completed range search on 2D RTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_rtree_bbox_2d",
+        &tree,
+        &query_rect,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_rtree_2d(_c: &mut Criterion) {
@@ -66,14 +90,13 @@ fn benchmark_range_rtree_2d(_c: &mut Criterion) {
         data: None,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_rtree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D RTree");
-            let res = tree.range_search(&query_point, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 2D RTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_rtree_2d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bbox_bsptree_2d(_c: &mut Criterion) {
@@ -90,14 +113,13 @@ fn benchmark_range_bbox_bsptree_2d(_c: &mut Criterion) {
         height: 2.0 * BENCH_RANGE_RADIUS,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_bsptree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D BSPTree");
-            let res = tree.range_search_bbox(&query_rect);
-            info!("Completed range search on 2D BSPTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_bsptree_bbox_2d",
+        &tree,
+        &query_rect,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bsptree_2d(_c: &mut Criterion) {
@@ -107,7 +129,7 @@ fn benchmark_range_bsptree_2d(_c: &mut Criterion) {
     for point in points.iter() {
         tree.insert(point.clone());
     }
-    let quuery_point = Point2DBSP {
+    let query_point = Point2DBSP {
         point: Point2D {
             x: 35.0,
             y: 45.0,
@@ -115,14 +137,13 @@ fn benchmark_range_bsptree_2d(_c: &mut Criterion) {
         },
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_bsptree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D BSPTree");
-            let res = tree.range_search(&quuery_point, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 2D BSPTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_bsptree_2d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
@@ -140,14 +161,13 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
     }
     let query = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    cc.bench_function("range_quadtree_2d", |b| {
-        b.iter(|| {
-            info!("Running range search on 2D Quadtree");
-            let res = tree.range_search(&query, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 2D Quadtree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_quadtree_2d",
+        &tree,
+        &query,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
@@ -159,14 +179,13 @@ fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
     }
     let query = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    cc.bench_function("range_kdtree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D KdTree");
-            let res = tree.range_search(&query, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 3D KdTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_kdtree_3d",
+        &tree,
+        &query,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bbox_rtree_3d(_c: &mut Criterion) {
@@ -185,14 +204,13 @@ fn benchmark_range_bbox_rtree_3d(_c: &mut Criterion) {
         depth: 2.0 * BENCH_RANGE_RADIUS,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_rtree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D RTree");
-            let res = tree.range_search_bbox(&query_cube);
-            info!("Completed range search on 3D RTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_rtree_bbox_3d",
+        &tree,
+        &query_cube,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_rtree_3d(_c: &mut Criterion) {
@@ -209,14 +227,13 @@ fn benchmark_range_rtree_3d(_c: &mut Criterion) {
         data: None,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_rtree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D RTree");
-            let res = tree.range_search(&query_point, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 3D RTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_rtree_3d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bbox_bsptree_3d(_c: &mut Criterion) {
@@ -235,14 +252,13 @@ fn benchmark_range_bbox_bsptree_3d(_c: &mut Criterion) {
         depth: 2.0 * BENCH_RANGE_RADIUS,
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_bsptree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D BSPTree");
-            let res = tree.range_search_bbox(&query_cube);
-            info!("Completed range search on 3D BSPTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_bsptree_bbox_3d",
+        &tree,
+        &query_cube,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_bsptree_3d(_c: &mut Criterion) {
@@ -261,14 +277,13 @@ fn benchmark_range_bsptree_3d(_c: &mut Criterion) {
         },
     };
     let mut cc = configure_criterion();
-    cc.bench_function("range_bsptree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D BSPTree");
-            let res = tree.range_search(&query_point, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 3D BSPTree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_bsptree_3d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 fn benchmark_range_octree_3d(_c: &mut Criterion) {
@@ -281,14 +296,13 @@ fn benchmark_range_octree_3d(_c: &mut Criterion) {
     }
     let query = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    cc.bench_function("range_octree_3d", |b| {
-        b.iter(|| {
-            info!("Running range search on 3D Octree");
-            let res = tree.range_search(&query, BENCH_RANGE_RADIUS);
-            info!("Completed range search on 3D Octree");
-            black_box(res)
-        })
-    });
+    bench_range_search(
+        "range_octree_3d",
+        &tree,
+        &query,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
 }
 
 criterion_group!(
@@ -306,4 +320,3 @@ criterion_group!(
     benchmark_range_bbox_bsptree_3d,
     benchmark_range_octree_3d,
 );
-criterion_main!(benches);

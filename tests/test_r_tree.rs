@@ -1,12 +1,13 @@
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
 use spart::geometry::{Point2D, Point3D};
 use spart::r_tree::RTree;
-mod utils;
 use tracing::{debug, info};
-use utils::*;
 
-#[test]
-fn test_rtree_2d() {
-    info!("Starting test_rtree_2d");
+fn run_rtree_2d_test() {
+    info!("Starting RTree 2D test");
 
     let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
 
@@ -32,7 +33,10 @@ fn test_rtree_2d() {
     for pt in &knn_results {
         let d = distance_2d(&target, pt);
         debug!("RTree 2D kNN: Point {:?} at distance {}", pt, d);
-        assert!(d >= prev_dist, "RTree 2D kNN results not sorted");
+        assert!(
+            d >= prev_dist,
+            "RTree 2D kNN results not sorted by increasing distance"
+        );
         prev_dist = d;
     }
 
@@ -41,9 +45,12 @@ fn test_rtree_2d() {
         "Performing 2D range search with query rectangle: {:?}",
         rect
     );
-    let range_results = tree.range_search_bbox(&rect);
-    info!("2D range search returned {} results", range_results.len());
-    for pt in &range_results {
+    let range_results_bbox = tree.range_search_bbox(&rect);
+    info!(
+        "2D range search (bbox) returned {} results",
+        range_results_bbox.len()
+    );
+    for pt in &range_results_bbox {
         debug!("RTree 2D range result: {:?}", pt);
         assert!(
             pt.x >= rect.x
@@ -56,19 +63,19 @@ fn test_rtree_2d() {
         );
     }
     assert!(
-        range_results.len() >= 5,
+        range_results_bbox.len() >= 5,
         "Expected at least 5 points in RTree 2D range, got {}",
-        range_results.len()
+        range_results_bbox.len()
     );
 
-    // Perform a 2D range search with a radius
-    let range_results = tree.range_search(&target, 5.0);
+    // Perform a range search using a radius.
+    let range_results_radius = tree.range_search(&target, 5.0);
     info!(
-        "2D range search with radius returned {} results",
-        range_results.len()
+        "2D range search (radius) returned {} results",
+        range_results_radius.len()
     );
-    for pt in &range_results {
-        debug!("RTree 2D range result: {:?}", pt);
+    for pt in &range_results_radius {
+        debug!("RTree 2D range (radius) result: {:?}", pt);
         let d = distance_2d(&target, pt);
         assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
     }
@@ -93,12 +100,11 @@ fn test_rtree_2d() {
         );
     }
 
-    info!("test_rtree_2d completed successfully");
+    info!("RTree 2D test completed successfully");
 }
 
-#[test]
-fn test_rtree_3d() {
-    info!("Starting test_rtree_3d");
+fn run_rtree_3d_test() {
+    info!("Starting RTree 3D test");
 
     let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY);
 
@@ -124,15 +130,21 @@ fn test_rtree_3d() {
     for pt in &knn_results {
         let d = distance_3d(&target, pt);
         debug!("RTree 3D kNN: Point {:?} at distance {}", pt, d);
-        assert!(d >= prev_dist, "RTree 3D kNN results not sorted");
+        assert!(
+            d >= prev_dist,
+            "RTree 3D kNN results not sorted by increasing distance"
+        );
         prev_dist = d;
     }
 
     let cube = query_cube();
     info!("Performing 3D range search with query cube: {:?}", cube);
-    let range_results = tree.range_search_bbox(&cube);
-    info!("3D range search returned {} results", range_results.len());
-    for pt in &range_results {
+    let range_results_bbox = tree.range_search_bbox(&cube);
+    info!(
+        "3D range search (bbox) returned {} results",
+        range_results_bbox.len()
+    );
+    for pt in &range_results_bbox {
         debug!("RTree 3D range result: {:?}", pt);
         assert!(
             pt.x >= cube.x
@@ -147,18 +159,18 @@ fn test_rtree_3d() {
         );
     }
     assert!(
-        range_results.len() >= 5,
+        range_results_bbox.len() >= 5,
         "Expected at least 5 points in RTree 3D range, got {}",
-        range_results.len()
+        range_results_bbox.len()
     );
 
-    // Perform a 3D range search with a radius
-    let range_results = tree.range_search(&target, 5.0);
+    // Perform a range search using a radius.
+    let range_results_radius = tree.range_search(&target, 5.0);
     info!(
-        "3D range search with radius returned {} results",
-        range_results.len()
+        "3D range search (radius) returned {} results",
+        range_results_radius.len()
     );
-    for pt in &range_results {
+    for pt in &range_results_radius {
         debug!("RTree 3D range result: {:?}", pt);
         let d = distance_3d(&target, pt);
         assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
@@ -180,9 +192,19 @@ fn test_rtree_3d() {
         assert_ne!(
             pt.data,
             Some("F"),
-            "Deleted point still returned in RTree 3D kNN search"
+            "Deleted 3D point still present in RTree 3D kNN search"
         );
     }
 
-    info!("test_rtree_3d completed successfully");
+    info!("RTree 3D test completed successfully");
+}
+
+#[test]
+fn test_rtree_2d() {
+    run_rtree_2d_test();
+}
+
+#[test]
+fn test_rtree_3d() {
+    run_rtree_3d_test();
 }

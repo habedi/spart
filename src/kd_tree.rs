@@ -1,11 +1,51 @@
+//! KD‑tree implementation.
+//!
+//! This module provides a KD‑Tree implementation for spatial indexing of points in k‑dimensional space.
+//! Points must implement the `KdPoint` trait which provides access to coordinates and distance calculations.
+//! The tree supports insertion, k‑nearest neighbor search, range search, and deletion.
+//!
+//! # Examples
+//!
+//! ```
+//! use spart::geometry::{Point2D, Point3D};
+//! use spart::kd_tree::{KdTree, KdPoint};
+//!
+//! // Create a 2D KD‑Tree and insert some points.
+//! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2);
+//! tree2d.insert(Point2D::new(1.0, 2.0, None));
+//! tree2d.insert(Point2D::new(3.0, 4.0, None));
+//! let neighbors2d = tree2d.knn_search(&Point2D::new(2.0, 3.0, None), 1);
+//! assert!(!neighbors2d.is_empty());
+//!
+//! // Create a 3D KD‑Tree and insert some points.
+//! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3);
+//! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None));
+//! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None));
+//! let neighbors3d = tree3d.knn_search(&Point3D::new(2.0, 3.0, 4.0, None), 1);
+//! assert!(!neighbors3d.is_empty());
+//! ```
+
+use crate::exceptions::SpartError;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::info;
 
+/// Trait representing a point that can be used in a KD‑Tree.
+///
+/// A type implementing `KdPoint` must provide the number of dimensions,
+/// a method to access a coordinate along a given axis, and a method to compute
+/// the squared Euclidean distance to another point.
 pub trait KdPoint: Clone + PartialEq + std::fmt::Debug {
+    /// Returns the number of dimensions of the point.
     fn dims(&self) -> usize;
+    /// Returns the coordinate along the specified axis.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `SpartError::InvalidDimension` if the axis is invalid.
     fn coord(&self, axis: usize) -> f64;
+    /// Computes the squared Euclidean distance to another point.
     fn distance_sq(&self, other: &Self) -> f64;
 }
 
@@ -20,7 +60,13 @@ where
         match axis {
             0 => self.x,
             1 => self.y,
-            _ => panic!("Point2D has only 2 dimensions; axis {} is invalid", axis),
+            _ => panic!(
+                "{}",
+                SpartError::InvalidDimension {
+                    requested: axis,
+                    available: 2
+                }
+            ),
         }
     }
     fn distance_sq(&self, other: &Self) -> f64 {
@@ -40,7 +86,13 @@ where
             0 => self.x,
             1 => self.y,
             2 => self.z,
-            _ => panic!("Point3D has only 3 dimensions; axis {} is invalid", axis),
+            _ => panic!(
+                "{}",
+                SpartError::InvalidDimension {
+                    requested: axis,
+                    available: 3
+                }
+            ),
         }
     }
     fn distance_sq(&self, other: &Self) -> f64 {
@@ -48,6 +100,7 @@ where
     }
 }
 
+/// Internal structure used to store items in the k‑nearest neighbor heap.
 #[derive(Debug)]
 struct HeapItem<P> {
     dist: OrderedFloat<f64>,
@@ -64,7 +117,7 @@ impl<P> Eq for HeapItem<P> {}
 
 impl<P> PartialOrd for HeapItem<P> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.dist.partial_cmp(&other.dist)
+        Some(self.cmp(other))
     }
 }
 
@@ -74,6 +127,7 @@ impl<P> Ord for HeapItem<P> {
     }
 }
 
+/// A node in the KD‑Tree.
 #[derive(Debug)]
 struct KdNode<P: KdPoint> {
     point: P,
@@ -82,6 +136,7 @@ struct KdNode<P: KdPoint> {
 }
 
 impl<P: KdPoint> KdNode<P> {
+    /// Creates a new KD‑Tree node with the given point.
     fn new(point: P) -> Self {
         KdNode {
             point,
@@ -91,6 +146,10 @@ impl<P: KdPoint> KdNode<P> {
     }
 }
 
+/// KD‑Tree for points implementing `KdPoint`.
+///
+/// The tree stores points in k‑dimensional space (where `k` is provided during creation)
+/// and supports insertion, k‑nearest neighbor search, range search, and deletion.
 #[derive(Debug)]
 pub struct KdTree<P: KdPoint> {
     root: Option<Box<KdNode<P>>>,
@@ -98,18 +157,45 @@ pub struct KdTree<P: KdPoint> {
 }
 
 impl<P: KdPoint> KdTree<P> {
+    /// Creates a new KD‑Tree for points in `k` dimensions.
+    ///
+    /// # Arguments
+    ///
+    /// * `k` - The number of dimensions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `k` is zero.
     pub fn new(k: usize) -> Self {
-        assert!(k > 0, "Dimension must be greater than zero.");
+        if k == 0 {
+            panic!(
+                "{}",
+                SpartError::InvalidDimension {
+                    requested: 0,
+                    available: 0
+                }
+            );
+        }
         KdTree { root: None, k }
     }
 
+    /// Inserts a point into the KD‑Tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The point to insert.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the point's dimension does not match the tree's dimension.
     pub fn insert(&mut self, point: P) {
-        assert!(
-            point.dims() == self.k,
-            "Point dimension {} does not match KDTree dimension {}",
-            point.dims(),
-            self.k
-        );
+        if point.dims() != self.k {
+            panic!(
+                "Point dimension {} does not match KDTree dimension {}",
+                point.dims(),
+                self.k
+            );
+        }
         info!("Inserting point: {:?}", point);
         self.root = Some(Self::insert_rec(self.root.take(), point, 0, self.k));
     }
@@ -133,9 +219,19 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Performs a k‑nearest neighbor search for the given target point.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The point to search around.
+    /// * `k_neighbors` - The number of nearest neighbors to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A vector of the nearest points, ordered from nearest to farthest.
     pub fn knn_search(&self, target: &P, k_neighbors: usize) -> Vec<P> {
         info!(
-            "Performing k-NN search for target {:?} with k={}",
+            "Performing k‑NN search for target {:?} with k={}",
             target, k_neighbors
         );
         let mut heap: BinaryHeap<HeapItem<P>> = BinaryHeap::new();
@@ -189,6 +285,16 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Performs a range search, returning all points within the specified radius of the center.
+    ///
+    /// # Arguments
+    ///
+    /// * `center` - The center of the search.
+    /// * `radius` - The search radius.
+    ///
+    /// # Returns
+    ///
+    /// A vector of points within the specified radius.
     pub fn range_search(&self, center: &P, radius: f64) -> Vec<P> {
         info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
@@ -222,6 +328,15 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Deletes a point from the KD‑Tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The point to delete.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the point was found and deleted, otherwise `false`.
     pub fn delete(&mut self, point: &P) -> bool {
         info!("Attempting to delete point: {:?}", point);
         let before = Self::collect_points(&self.root).len();
