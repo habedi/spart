@@ -14,7 +14,7 @@ space partitioning tree data structures for efficient indexing and searching 2D 
 
 Currently, the following trees are implemented:
 
-| Index | Tree Type                                          | 2D | 3D | kNN search | Range search |
+| Index | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
 |-------|----------------------------------------------------|----|----|------------|--------------|
 | 1     | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓          | ✓            |
 | 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |

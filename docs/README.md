@@ -1,6 +1,5 @@
 ## Spart Documentation
 
-Spart provides a set of spatial data structures for indexing and querying point data.
 The basic building blocks of Spart are **point** and **tree**.
 
 ### Point
@@ -320,7 +319,7 @@ let point5 = Point3DBSP {
         data: Some("Wrapped Point5"),
 }};
 
-// Insert points into the tree
+// Insert points into the BSP-tree
 tree.insert(point1.clone());
 tree.insert(point2.clone());
 tree.insert(point3.clone());

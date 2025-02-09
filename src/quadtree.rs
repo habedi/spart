@@ -33,7 +33,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
     }
 
-    pub fn subdivide(&mut self) {
+    fn subdivide(&mut self) {
         info!("Subdividing Quadtree at boundary: {:?}", self.boundary);
         let x = self.boundary.x;
         let y = self.boundary.y;

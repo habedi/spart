@@ -40,7 +40,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
     }
 
-    pub fn subdivide(&mut self) {
+    fn subdivide(&mut self) {
         info!("Subdividing Octree at boundary: {:?}", self.boundary);
         let x = self.boundary.x;
         let y = self.boundary.y;
