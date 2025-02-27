@@ -1,13 +1,13 @@
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
 use spart::bsp_tree::{BSPTree, Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D};
-mod utils;
 use tracing::{debug, info};
-use utils::*;
 
-#[test]
-fn test_bsptree_2d() {
-    info!("Starting test_bsptree_2d");
-
+fn run_bsp_tree_2d_test() {
+    info!("Starting BSPTree 2D test");
     let mut tree: BSPTree<Point2DBSP<&str>> = BSPTree::new(CAPACITY);
 
     let points: Vec<Point2DBSP<&str>> = common_points_2d()
@@ -27,7 +27,8 @@ fn test_bsptree_2d() {
             data: Some("Target"),
         },
     };
-    info!("Performing 2D BSPTree kNN search for target: {:?}", target);
+
+    // kNN search test
     let knn_results = tree.knn_search(&target, KNN_COUNT);
     info!(
         "BSPTree 2D kNN search returned {} results",
@@ -41,17 +42,18 @@ fn test_bsptree_2d() {
         knn_results.len()
     );
 
+    // Range search using bounding rectangle
     let rect = query_rect();
     info!(
-        "Performing 2D BSPTree range search with query rectangle: {:?}",
+        "Performing 2D range search with query rectangle: {:?}",
         rect
     );
-    let range_results = tree.range_search_bbox(&rect);
+    let range_results_bbox = tree.range_search_bbox(&rect);
     info!(
-        "BSPTree 2D range search returned {} results",
-        range_results.len()
+        "BSPTree 2D range search (bbox) returned {} results",
+        range_results_bbox.len()
     );
-    for pt in &range_results {
+    for pt in &range_results_bbox {
         let p = &pt.point;
         debug!("BSPTree 2D range result: {:?}", p);
         assert!(
@@ -65,23 +67,28 @@ fn test_bsptree_2d() {
         );
     }
     assert!(
-        range_results.len() >= 5,
-        "Expected at least 5 points in BSPTree 2D range, got {}",
-        range_results.len()
+        range_results_bbox.len() >= 5,
+        "Expected at least 5 points in BSPTree 2D range (bbox), got {}",
+        range_results_bbox.len()
     );
 
-    // Perform a 2D range search with a radius
-    let range_results = tree.range_search(&target, 5.0);
+    // Range search using radius
+    let range_results_radius = tree.range_search(&target, 5.0);
     info!(
-        "BSPTree 2D range search with radius returned {} results",
-        range_results.len()
+        "BSPTree 2D range search (radius) returned {} results",
+        range_results_radius.len()
     );
-    for pt in &range_results {
-        debug!("BSPTree 2D range result: {:?}", pt);
+    for pt in &range_results_radius {
         let d = distance_2d(&target.point, &pt.point);
-        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+        assert!(
+            d <= 5.0,
+            "Point {:?} is outside the radius 5.0 (distance {})",
+            pt,
+            d
+        );
     }
 
+    // Deletion test
     let delete_point = Point2DBSP {
         point: Point2D::new(21.0, 21.0, Some("F")),
     };
@@ -103,14 +110,11 @@ fn test_bsptree_2d() {
             "Deleted BSPTree 2D point still returned in kNN search"
         );
     }
-
-    info!("test_bsptree_2d completed successfully");
+    info!("BSPTree 2D test completed successfully");
 }
 
-#[test]
-fn test_bsptree_3d() {
-    info!("Starting test_bsptree_3d");
-
+fn run_bsp_tree_3d_test() {
+    info!("Starting BSPTree 3D test");
     let mut tree: BSPTree<Point3DBSP<&str>> = BSPTree::new(CAPACITY);
 
     let points: Vec<Point3DBSP<&str>> = common_points_3d()
@@ -131,7 +135,8 @@ fn test_bsptree_3d() {
             data: Some("Target"),
         },
     };
-    info!("Performing 3D BSPTree kNN search for target: {:?}", target);
+
+    // kNN search test
     let knn_results = tree.knn_search(&target, KNN_COUNT);
     info!(
         "BSPTree 3D kNN search returned {} results",
@@ -145,17 +150,15 @@ fn test_bsptree_3d() {
         knn_results.len()
     );
 
+    // Range search using bounding cube
     let cube = query_cube();
+    info!("Performing 3D range search with query cube: {:?}", cube);
+    let range_results_bbox = tree.range_search_bbox(&cube);
     info!(
-        "Performing 3D BSPTree range search with query cube: {:?}",
-        cube
+        "BSPTree 3D range search (bbox) returned {} results",
+        range_results_bbox.len()
     );
-    let range_results = tree.range_search_bbox(&cube);
-    info!(
-        "BSPTree 3D range search returned {} results",
-        range_results.len()
-    );
-    for pt in &range_results {
+    for pt in &range_results_bbox {
         let p = &pt.point;
         debug!("BSPTree 3D range result: {:?}", p);
         assert!(
@@ -171,23 +174,28 @@ fn test_bsptree_3d() {
         );
     }
     assert!(
-        range_results.len() >= 5,
-        "Expected at least 5 points in BSPTree 3D range, got {}",
-        range_results.len()
+        range_results_bbox.len() >= 5,
+        "Expected at least 5 points in BSPTree 3D range (bbox), got {}",
+        range_results_bbox.len()
     );
 
-    // Perform a 3D range search with a radius
-    let range_results = tree.range_search(&target, 5.0);
+    // Range search using radius
+    let range_results_radius = tree.range_search(&target, 5.0);
     info!(
-        "BSPTree 3D range search with radius returned {} results",
-        range_results.len()
+        "BSPTree 3D range search (radius) returned {} results",
+        range_results_radius.len()
     );
-    for pt in &range_results {
-        debug!("BSPTree 3D range result: {:?}", pt);
+    for pt in &range_results_radius {
         let d = distance_3d(&target.point, &pt.point);
-        assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
+        assert!(
+            d <= 5.0,
+            "Point {:?} is outside the radius 5.0 (distance {})",
+            pt,
+            d
+        );
     }
 
+    // Deletion test
     let delete_point = Point3DBSP {
         point: Point3D::new(21.0, 21.0, 21.0, Some("F")),
     };
@@ -209,6 +217,15 @@ fn test_bsptree_3d() {
             "Deleted BSPTree 3D point still returned in kNN search"
         );
     }
+    info!("BSPTree 3D test completed successfully");
+}
 
-    info!("test_bsptree_3d completed successfully");
+#[test]
+fn test_bsptree_2d() {
+    run_bsp_tree_2d_test();
+}
+
+#[test]
+fn test_bsptree_3d() {
+    run_bsp_tree_3d_test();
 }

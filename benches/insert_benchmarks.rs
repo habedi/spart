@@ -1,13 +1,28 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-mod utils;
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
+use criterion::{black_box, criterion_group, Criterion};
 use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D, Rectangle};
 use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
 use tracing::info;
-use utils::*;
 
-pub fn configure_criterion() -> Criterion {
-    Criterion::default().measurement_time(BENCH_TIMEOUT)
+/// A generic helper that benchmarks an insertion function.
+///
+/// # Arguments
+///
+/// * `bench_name` - The name of the benchmark.
+/// * `points` - A slice of points to be inserted.
+/// * `insert_fn` - A closure that takes a slice of points and performs insertion.
+/// * `cc` - A mutable reference to a configured Criterion instance.
+fn bench_insert<P>(bench_name: &str, points: &[P], insert_fn: impl Fn(&[P]), cc: &mut Criterion) {
+    cc.bench_function(bench_name, |b| {
+        b.iter(|| {
+            // Use black_box to avoid optimizations.
+            insert_fn(black_box(points))
+        })
+    });
 }
 
 fn insert_2d_quadtree(points: &[Point2D<i32>]) {
@@ -93,72 +108,56 @@ fn bench_insert_quadtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
     info!("Benchmark 'insert_2d_quadtree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_2d_quadtree", |b| {
-        b.iter(|| insert_2d_quadtree(black_box(&points)))
-    });
+    bench_insert("insert_2d_quadtree", &points, insert_2d_quadtree, &mut cc);
 }
 
 fn bench_insert_octree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
     info!("Benchmark 'insert_3d_octree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_3d_octree", |b| {
-        b.iter(|| insert_3d_octree(black_box(&points)))
-    });
+    bench_insert("insert_3d_octree", &points, insert_3d_octree, &mut cc);
 }
 
 fn bench_insert_kdtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
     info!("Benchmark 'insert_2d_kdtree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_2d_kdtree", |b| {
-        b.iter(|| insert_2d_kdtree(black_box(&points)))
-    });
+    bench_insert("insert_2d_kdtree", &points, insert_2d_kdtree, &mut cc);
 }
 
 fn bench_insert_kdtree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
     info!("Benchmark 'insert_3d_kdtree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_3d_kdtree", |b| {
-        b.iter(|| insert_3d_kdtree(black_box(&points)))
-    });
+    bench_insert("insert_3d_kdtree", &points, insert_3d_kdtree, &mut cc);
 }
 
 fn bench_insert_rtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
     info!("Benchmark 'insert_2d_rtree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_2d_rtree", |b| {
-        b.iter(|| insert_2d_rtree(black_box(&points)))
-    });
+    bench_insert("insert_2d_rtree", &points, insert_2d_rtree, &mut cc);
 }
 
 fn bench_insert_rtree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
     info!("Benchmark 'insert_3d_rtree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_3d_rtree", |b| {
-        b.iter(|| insert_3d_rtree(black_box(&points)))
-    });
+    bench_insert("insert_3d_rtree", &points, insert_3d_rtree, &mut cc);
 }
 
 fn bench_insert_bsptree_2d(_c: &mut Criterion) {
     let points = generate_2d_data_wrapped();
     info!("Benchmark 'insert_2d_bsptree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_2d_bsptree", |b| {
-        b.iter(|| insert_2d_bsptree(black_box(&points)))
-    });
+    bench_insert("insert_2d_bsptree", &points, insert_2d_bsptree, &mut cc);
 }
 
 fn bench_insert_bsptree_3d(_c: &mut Criterion) {
     let points = generate_3d_data_wrapped();
     info!("Benchmark 'insert_3d_bsptree' started");
     let mut cc = configure_criterion();
-    cc.bench_function("insert_3d_bsptree", |b| {
-        b.iter(|| insert_3d_bsptree(black_box(&points)))
-    });
+    bench_insert("insert_3d_bsptree", &points, insert_3d_bsptree, &mut cc);
 }
 
 criterion_group!(
@@ -172,4 +171,3 @@ criterion_group!(
     bench_insert_bsptree_2d,
     bench_insert_bsptree_3d
 );
-criterion_main!(benches);

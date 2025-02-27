@@ -1,12 +1,13 @@
+#[path = "shared.rs"]
+mod shared;
+use shared::*;
+
 use spart::geometry::{Point2D, Point3D};
 use spart::kd_tree::KdTree;
-mod utils;
 use tracing::{debug, info};
-use utils::*;
 
-#[test]
-fn test_kdtree_2d() {
-    info!("Starting test_kdtree_2d");
+fn run_kdtree_2d_test() {
+    info!("Starting KDTree 2D test");
 
     let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
 
@@ -83,12 +84,11 @@ fn test_kdtree_2d() {
         );
     }
 
-    info!("test_kdtree_2d completed successfully");
+    info!("KDTree 2D test completed successfully");
 }
 
-#[test]
-fn test_kdtree_3d() {
-    info!("Starting test_kdtree_3d");
+fn run_kdtree_3d_test() {
+    info!("Starting KDTree 3D test");
 
     let mut tree: KdTree<Point3D<&str>> = KdTree::new(3);
 
@@ -165,5 +165,15 @@ fn test_kdtree_3d() {
         );
     }
 
-    info!("test_kdtree_3d completed successfully");
+    info!("KDTree 3D test completed successfully");
+}
+
+#[test]
+fn test_kdtree_2d() {
+    run_kdtree_2d_test();
+}
+
+#[test]
+fn test_kdtree_3d() {
+    run_kdtree_3d_test();
 }

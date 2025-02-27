@@ -1,8 +1,47 @@
+//! Quadtree implementation.
+//!
+//! This module implements a quadtree for spatial indexing of 2D points. The quadtree partitions a
+//! rectangular region (defined by a `Rectangle`) into four quadrants (northeast, northwest, southeast,
+//! and southwest) when the number of points in a region exceeds a specified capacity. It provides
+//! operations for insertion, k-nearest neighbor (kNN) search, range search, and deletion.
+//!
+//! # Usage Example
+//!
+//! ```
+//! use spart::geometry::{Point2D, Rectangle};
+//! use spart::quadtree::Quadtree;
+//!
+//! // Define a boundary for the quadtree.
+//! let boundary = Rectangle { x: 0.0, y: 0.0, width: 100.0, height: 100.0 };
+//! // Create a quadtree with capacity 4.
+//! let mut qt = Quadtree::new(&boundary, 4);
+//!
+//! // Insert some points.
+//! let pt1: Point2D<()> = Point2D::new(10.0, 20.0, None);
+//! let pt2: Point2D<()> = Point2D::new(50.0, 50.0, None);
+//! qt.insert(pt1);
+//! qt.insert(pt2);
+//!
+//! // Perform a k-nearest neighbor search.
+//! let neighbors = qt.knn_search(&Point2D::new(12.0, 22.0, None), 1);
+//! assert!(!neighbors.is_empty());
+//! ```
+
+use crate::exceptions::SpartError;
 use crate::geometry::{HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
+/// A quadtree for spatial indexing of 2D points.
+///
+/// # Type Parameters
+///
+/// * `T`: The type of additional data stored in each point.
+///
+/// # Panics
+///
+/// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
 #[derive(Debug)]
 pub struct Quadtree<T: Clone + PartialEq> {
     boundary: Rectangle,
@@ -16,7 +55,20 @@ pub struct Quadtree<T: Clone + PartialEq> {
 }
 
 impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
+    /// Creates a new `Quadtree` with the specified boundary and capacity.
+    ///
+    /// # Arguments
+    ///
+    /// * `boundary` - The rectangular region covered by this quadtree.
+    /// * `capacity` - The maximum number of points a node can hold before subdividing.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
     pub fn new(boundary: &Rectangle, capacity: usize) -> Self {
+        if capacity == 0 {
+            panic!("{}", SpartError::InvalidCapacity { capacity });
+        }
         info!(
             "Creating new Quadtree with boundary: {:?} and capacity: {}",
             boundary, capacity
@@ -33,7 +85,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
     }
 
-    pub fn subdivide(&mut self) {
+    /// Subdivides the current quadtree node into four child quadrants.
+    ///
+    /// After subdivision, all existing points are reinserted into the appropriate children.
+    fn subdivide(&mut self) {
         info!("Subdividing Quadtree at boundary: {:?}", self.boundary);
         let x = self.boundary.x;
         let y = self.boundary.y;
@@ -76,6 +131,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             self.capacity,
         )));
         self.divided = true;
+        // Reinsert existing points into the appropriate children.
         let old_points = std::mem::take(&mut self.points);
         for point in old_points {
             let inserted = self.insert(point);
@@ -85,6 +141,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
     }
 
+    /// Inserts a point into the quadtree.
+    ///
+    /// If the point is not within the boundary, it is ignored.
+    /// If the current node is full, the node subdivides and attempts to insert the point into a child.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The point to insert.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point2D<T>) -> bool {
         if !self.boundary.contains(&point) {
             debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
@@ -94,6 +162,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             let children = self.children_mut();
             let num_children = children.len();
             for (i, child) in children.into_iter().enumerate() {
+                // Insert into each child until one accepts the point.
                 if i < num_children - 1 {
                     if child.insert(point.clone()) {
                         return true;
@@ -113,6 +182,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         self.insert(point)
     }
 
+    /// Returns mutable references to the four child quadrants, if they exist.
     fn children_mut(&mut self) -> Vec<&mut Quadtree<T>> {
         let mut children = Vec::with_capacity(4);
         if let Some(ref mut child) = self.northeast {
@@ -130,6 +200,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         children
     }
 
+    /// Returns references to the four child quadrants, if they exist.
     fn children(&self) -> Vec<&Quadtree<T>> {
         let mut children = Vec::with_capacity(4);
         if let Some(ref child) = self.northeast {
@@ -147,6 +218,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         children
     }
 
+    /// Computes the squared minimum distance from the given target point to the boundary of this node.
+    ///
+    /// This is used to decide if a subtree can be skipped during k-nearest neighbor search.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The target point.
     fn min_distance_sq(&self, target: &Point2D<T>) -> f64 {
         let mut dx = 0.0;
         if target.x < self.boundary.x {
@@ -163,6 +241,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         dx * dx + dy * dy
     }
 
+    /// Performs a k-nearest neighbor search for the target point.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The point for which to find the k nearest neighbors.
+    /// * `k` - The number of nearest neighbors to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// A vector of the k nearest points, ordered from nearest to farthest.
     pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper(target, k, &mut heap);
@@ -175,6 +263,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         results
     }
 
+    /// Helper method for performing the recursive k-nearest neighbor search.
     fn knn_search_helper(&self, target: &Point2D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
         for point in &self.points {
             let dist_sq = point.distance_sq(target);
@@ -201,6 +290,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         }
     }
 
+    /// Performs a range search, returning all points within the specified radius of the center point.
+    ///
+    /// # Arguments
+    ///
+    /// * `center` - The center of the search range.
+    /// * `radius` - The search radius.
+    ///
+    /// # Returns
+    ///
+    /// A vector of points within the range.
     pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
         let mut found = Vec::new();
         let radius_sq = radius * radius;
@@ -220,6 +319,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         found
     }
 
+    /// Deletes a point from the quadtree.
+    ///
+    /// Returns `true` if the point was found and deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `point` - The point to delete.
     pub fn delete(&mut self, point: &Point2D<T>) -> bool {
         if !self.boundary.contains(point) {
             return false;
@@ -242,6 +348,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         false
     }
 
+    /// Attempts to merge child nodes back into the parent node if possible.
+    ///
+    /// If all children are not divided and their total number of points is within capacity,
+    /// the children are merged into the parent node.
     fn try_merge(&mut self) {
         if !self.divided {
             return;

@@ -1,25 +1,42 @@
 #![allow(dead_code)]
 
+//! Shared utilities for benchmarks in Spart.
+//!
+//! This module provides common constants, sample data generators, and helper functions
+//! used in benchmark tests. It includes benchmark parameters (e.g. number of insertions,
+//! node capacity), boundary definitions, and functions for generating 2D and 3D data,
+//! both in raw and BSP‑wrapped formats.
+
+use criterion::Criterion;
 use spart::bsp_tree::{Point2DBSP, Point3DBSP};
-use spart::geometry::{Point2D, Point3D};
+use spart::geometry::{Cube, Point2D, Point3D};
 use tracing::{debug, info};
 
+//
+// Benchmark Parameters
+//
 pub const BENCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-pub const BENCH_NUM_INSERT: i32 = 1000;
+pub const BENCH_NUM_INSERT: i32 = 10;
 pub const BENCH_NODE_CAPACITY: usize = 5;
-
-pub const BENCH_BOUNDARY: spart::geometry::Cube = spart::geometry::Cube {
-    x: 0.0,
-    y: 0.0,
-    z: 0.0,
-    width: 1000.0,
-    height: 1000.0,
-    depth: 1000.0,
-};
 
 pub const BENCH_KNN_SIZE: usize = 3;
 pub const BENCH_RANGE_RADIUS: f64 = 30.0;
 
+//
+// Boundary Definitions
+//
+pub const BENCH_BOUNDARY: Cube = Cube {
+    x: 0.0,
+    y: 0.0,
+    z: 0.0,
+    width: 100.0,
+    height: 100.0,
+    depth: 100.0,
+};
+
+//
+// Data Generation Functions (Raw Data)
+//
 pub fn generate_2d_data() -> Vec<Point2D<i32>> {
     info!("Generating 2D data with {} points", BENCH_NUM_INSERT);
     let data: Vec<Point2D<i32>> = (0..BENCH_NUM_INSERT)
@@ -46,6 +63,9 @@ pub fn generate_3d_data() -> Vec<Point3D<i32>> {
     data
 }
 
+//
+// Data Generation Functions (Wrapped for BSPTree)
+//
 pub fn generate_2d_data_wrapped() -> Vec<Point2DBSP<i32>> {
     info!(
         "Generating wrapped 2D data for BSPTree with {} points",
@@ -86,4 +106,9 @@ pub fn generate_3d_data_wrapped() -> Vec<Point3DBSP<i32>> {
         data.len()
     );
     data
+}
+
+// Configure Criterion with a timeout for benchmarks
+pub fn configure_criterion() -> Criterion {
+    Criterion::default().measurement_time(BENCH_TIMEOUT)
 }

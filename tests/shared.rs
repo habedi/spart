@@ -1,7 +1,16 @@
 #![allow(dead_code)]
 
+//! Shared test utilities for Spart.
+//!
+//! This module provides common constants, sample data, and helper functions that are used
+//! across multiple tests. It includes test parameters (e.g. capacity, radius), functions that
+//! return target or query points for 2D and 3D tests, and distance functions for comparing points.
+
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 
+//
+// Constants
+//
 pub const CAPACITY: usize = 4;
 
 pub const BOUNDARY_RECT: Rectangle = Rectangle {
@@ -23,6 +32,9 @@ pub const BOUNDARY_CUBE: Cube = Cube {
 pub const RADIUS: f64 = 30.0;
 pub const KNN_COUNT: usize = 2;
 
+//
+// Query Points
+//
 pub fn target_point_2d() -> Point2D<&'static str> {
     Point2D {
         x: 35.0,
@@ -57,6 +69,9 @@ pub fn range_query_point_3d() -> Point3D<&'static str> {
     }
 }
 
+//
+// Query Volumes
+//
 pub fn query_rect() -> Rectangle {
     Rectangle {
         x: 20.0 - RADIUS,
@@ -77,6 +92,9 @@ pub fn query_cube() -> Cube {
     }
 }
 
+//
+// Common Points
+//
 pub fn common_points_2d() -> Vec<Point2D<&'static str>> {
     vec![
         Point2D::new(11.0, 11.0, Some("A")),
@@ -109,6 +127,9 @@ pub fn common_points_3d() -> Vec<Point3D<&'static str>> {
     ]
 }
 
+//
+// Distance Functions
+//
 pub fn distance_2d(a: &Point2D<impl std::fmt::Debug>, b: &Point2D<impl std::fmt::Debug>) -> f64 {
     ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()
 }

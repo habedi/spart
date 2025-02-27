@@ -1,3 +1,30 @@
+//! BSP‑tree implementation.
+//!
+//! This module implements a Binary Space Partitioning (BSP) tree for spatial indexing of objects.
+//! Objects stored in the tree must implement the `BSPTreeObject` trait, which requires an
+//! associated bounding volume type (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
+//! The tree supports insertion, range search, deletion, and k‑nearest neighbor search.
+//!
+//! The splitting of leaf nodes is based on the dimension with the largest extent (as determined
+//! by the bounding volume’s `extent` method) and uses the median of object centers along that dimension.
+//!
+//! # Examples
+//!
+//! ```
+//! use spart::geometry::{Point2D, Rectangle};
+//! use spart::bsp_tree::{BSPTree, BSPTreeObject, Point2DBSP};
+//!
+//! // Create a BSPTree for 2D points (wrapped in a BSP object).
+//! let mut tree: BSPTree<Point2DBSP<()>> = BSPTree::new(4);
+//! let pt = Point2D::new(10.0, 20.0, None);
+//! tree.insert(Point2DBSP { point: pt });
+//!
+//! // Perform a range search using a query object and radius.
+//! let results = tree.range_search(&Point2DBSP { point: Point2D::new(10.0, 20.0, None) }, 5.0);
+//! assert!(!results.is_empty());
+//! ```
+
+use crate::exceptions::SpartError;
 use crate::geometry::{
     BSPBounds, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D, Rectangle,
 };
@@ -5,44 +32,56 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
+/// A local redefinition of a bounding volume trait for BSP‑tree purposes.
+/// (This mirrors the trait defined in `geometry.rs`.)
 pub trait BoundingVolume: Clone {
+    /// Returns the area (or volume for 3D objects) of the bounding volume.
     fn area(&self) -> f64;
+    /// Returns the union of this volume with another.
     fn union(&self, other: &Self) -> Self;
+    /// Returns the enlargement (additional area/volume) required to contain `other`.
     fn enlargement(&self, other: &Self) -> f64 {
         self.union(other).area() - self.area()
     }
+    /// Determines whether this volume intersects with another.
     fn intersects(&self, other: &Self) -> bool;
 }
 
 impl BoundingVolume for Rectangle {
     fn area(&self) -> f64 {
-        self.area()
+        Rectangle::area(self)
     }
     fn union(&self, other: &Self) -> Self {
-        self.union(other)
+        Rectangle::union(self, other)
     }
     fn intersects(&self, other: &Self) -> bool {
-        self.intersects(other)
+        Rectangle::intersects(self, other)
     }
 }
 
 impl BoundingVolume for Cube {
     fn area(&self) -> f64 {
-        self.area()
+        Cube::area(self)
     }
     fn union(&self, other: &Self) -> Self {
-        self.union(other)
+        Cube::union(self, other)
     }
     fn intersects(&self, other: &Self) -> bool {
-        self.intersects(other)
+        Cube::intersects(self, other)
     }
 }
 
+/// Trait for objects that can be stored in a BSP tree.
+///
+/// Each object must be debuggable and clonable, and must provide a minimum bounding volume.
 pub trait BSPTreeObject: std::fmt::Debug + Clone {
+    /// The type of bounding volume (e.g. `Rectangle` for 2D, `Cube` for 3D).
     type B: BoundingVolume + BSPBounds + Clone + std::fmt::Debug;
+    /// Returns the minimum bounding volume (MBR) of the object.
     fn mbr(&self) -> Self::B;
 }
 
+/// Internal BSP tree node.
 #[derive(Debug, Clone)]
 enum BSPNode<T: BSPTreeObject> {
     Leaf {
@@ -59,6 +98,7 @@ enum BSPNode<T: BSPTreeObject> {
 }
 
 impl<T: BSPTreeObject> BSPNode<T> {
+    /// Returns the node’s minimum bounding volume.
     fn get_mbr(&self) -> T::B {
         match self {
             BSPNode::Leaf { mbr, .. } => mbr.clone(),
@@ -67,6 +107,7 @@ impl<T: BSPTreeObject> BSPNode<T> {
     }
 }
 
+/// BSP tree for spatial indexing of objects.
 #[derive(Debug)]
 pub struct BSPTree<T: BSPTreeObject> {
     root: Option<BSPNode<T>>,
@@ -77,7 +118,19 @@ impl<T: BSPTreeObject> BSPTree<T>
 where
     T: PartialEq,
 {
+    /// Creates a new BSP tree with the specified maximum number of objects per leaf.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_objects` - The maximum number of objects allowed in a leaf node.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `SpartError::InvalidCapacity` if `max_objects` is zero.
     pub fn new(max_objects: usize) -> Self {
+        if max_objects == 0 {
+            panic!("{}", SpartError::InvalidCapacity { capacity: 0 });
+        }
         info!("Creating new BSPTree with max_objects: {}", max_objects);
         BSPTree {
             root: None,
@@ -85,6 +138,11 @@ where
         }
     }
 
+    /// Inserts an object into the BSP tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - The object to insert.
     pub fn insert(&mut self, object: T) {
         let obj_mbr = object.mbr();
         info!("Inserting object with mbr: {:?}", obj_mbr);
@@ -103,6 +161,7 @@ where
         };
     }
 
+    /// Recursively inserts an object into the BSP tree.
     fn insert_rec(node: BSPNode<T>, object: T, obj_mbr: T::B, max_objects: usize) -> BSPNode<T> {
         match node {
             BSPNode::Leaf { mut objects, mbr } => {
@@ -164,6 +223,10 @@ where
         }
     }
 
+    /// Splits a leaf node that has exceeded the maximum number of objects.
+    ///
+    /// The splitting dimension is chosen as the one with the largest extent. Objects are partitioned
+    /// by the median of their centers along that dimension.
     fn split_leaf(objects: Vec<T>, mbr: T::B) -> BSPNode<T> {
         info!("Splitting leaf node.");
         let dims = <T::B as BSPBounds>::DIM;
@@ -230,6 +293,15 @@ where
         }
     }
 
+    /// Performs a range search using a bounding volume query.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The bounding volume used for the search.
+    ///
+    /// # Returns
+    ///
+    /// A vector of references to objects whose bounding volumes intersect the query.
     pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
         info!("Starting range search with query: {:?}", query);
         let mut result = Vec::new();
@@ -240,6 +312,7 @@ where
         result
     }
 
+    /// Recursive helper for range search.
     fn range_search_rec<'a>(node: &'a BSPNode<T>, query: &T::B, result: &mut Vec<&'a T>) {
         match node {
             BSPNode::Leaf { objects, mbr } => {
@@ -262,6 +335,15 @@ where
         }
     }
 
+    /// Deletes an object from the BSP tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - The object to delete.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the object was found and deleted, otherwise `false`.
     pub fn delete(&mut self, object: &T) -> bool {
         info!("Attempting to delete object: {:?}", object);
         if let Some(root) = self.root.take() {
@@ -279,6 +361,7 @@ where
         }
     }
 
+    /// Recursively deletes an object from the BSP tree.
     fn delete_rec(node: BSPNode<T>, object: &T, max_objects: usize) -> (Option<BSPNode<T>>, bool) {
         match node {
             BSPNode::Leaf {
@@ -369,6 +452,7 @@ where
     }
 }
 
+/// Candidate wrapper for k‑NN search in the BSP tree.
 #[derive(Debug)]
 enum BSPCandidate<'a, T: BSPTreeObject> {
     Node(&'a BSPNode<T>, f64),
@@ -401,6 +485,7 @@ impl<T: BSPTreeObject> BSPCandidate<'_, T> {
     }
 }
 
+/// Wrapper for a 2D point for use in the BSP tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point2DBSP<T> {
     pub point: Point2D<T>,
@@ -418,6 +503,7 @@ impl<T: std::fmt::Debug + Clone> BSPTreeObject for Point2DBSP<T> {
     }
 }
 
+/// Wrapper for a 3D point for use in the BSP tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point3DBSP<T> {
     pub point: Point3D<T>,
@@ -437,11 +523,27 @@ impl<T: std::fmt::Debug + Clone> BSPTreeObject for Point3DBSP<T> {
     }
 }
 
+// -----------------------------------------------------------------------
+// Convenience: add a `range_search` method that accepts a query object
+// and a radius. This converts the query into a bounding volume, calls
+// `range_search_bbox`, and filters the results based on the exact distance.
+// -----------------------------------------------------------------------
+
 impl<T> BSPTree<T>
 where
     T: BSPTreeObject + PartialEq + std::fmt::Debug,
     T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
 {
+    /// Performs a range search on the BSP tree using a query object and a radius.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The query object.
+    /// * `radius` - The search radius.
+    ///
+    /// # Returns
+    ///
+    /// A vector of references to objects within the specified radius.
     pub fn range_search(&self, query: &T, radius: f64) -> Vec<&T> {
         let query_volume = T::B::from_point_radius(query, radius);
         let candidates = self.range_search_bbox(&query_volume);
@@ -452,13 +554,36 @@ where
     }
 }
 
-impl<T: Clone + std::fmt::Debug> HasMinDistance<Point3DBSP<T>> for Cube {
+// -----------------------------------------------------------------------
+// Implementations to support queries using the BSP wrapper types.
+// These impls allow a query of type Point2DBSP<T> or Point3DBSP<T> to be used
+// with the BSP tree’s k‑NN and range search methods.
+// -----------------------------------------------------------------------
+
+impl<T: Clone + std::fmt::Debug + 'static> HasMinDistance<Point2DBSP<T>> for Rectangle {
+    fn min_distance(&self, query: &Point2DBSP<T>) -> f64 {
+        HasMinDistance::<Point2D<T>>::min_distance(self, &query.point)
+    }
+}
+
+impl<T: Clone + std::fmt::Debug + 'static> BoundingVolumeFromPoint<Point2DBSP<T>> for Rectangle {
+    fn from_point_radius(query: &Point2DBSP<T>, radius: f64) -> Self {
+        Rectangle {
+            x: query.point.x - radius,
+            y: query.point.y - radius,
+            width: 2.0 * radius,
+            height: 2.0 * radius,
+        }
+    }
+}
+
+impl<T: Clone + std::fmt::Debug + 'static> HasMinDistance<Point3DBSP<T>> for Cube {
     fn min_distance(&self, query: &Point3DBSP<T>) -> f64 {
         HasMinDistance::<Point3D<T>>::min_distance(self, &query.point)
     }
 }
 
-impl<T: Clone + std::fmt::Debug> BoundingVolumeFromPoint<Point3DBSP<T>> for Cube {
+impl<T: Clone + std::fmt::Debug + 'static> BoundingVolumeFromPoint<Point3DBSP<T>> for Cube {
     fn from_point_radius(query: &Point3DBSP<T>, radius: f64) -> Self {
         Cube {
             x: query.point.x - radius,
@@ -471,27 +596,20 @@ impl<T: Clone + std::fmt::Debug> BoundingVolumeFromPoint<Point3DBSP<T>> for Cube
     }
 }
 
-impl<T: Clone + std::fmt::Debug> HasMinDistance<Point2DBSP<T>> for Rectangle {
-    fn min_distance(&self, query: &Point2DBSP<T>) -> f64 {
-        HasMinDistance::<Point2D<T>>::min_distance(self, &query.point)
-    }
-}
-
-impl<T: Clone + std::fmt::Debug> BoundingVolumeFromPoint<Point2DBSP<T>> for Rectangle {
-    fn from_point_radius(query: &Point2DBSP<T>, radius: f64) -> Self {
-        Rectangle {
-            x: query.point.x - radius,
-            y: query.point.y - radius,
-            width: 2.0 * radius,
-            height: 2.0 * radius,
-        }
-    }
-}
-
 impl<T: BSPTreeObject> BSPTree<T>
 where
     T: PartialEq,
 {
+    /// Performs a k‑nearest neighbor search on the BSP tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The query object.
+    /// * `k` - The number of nearest neighbors to return.
+    ///
+    /// # Returns
+    ///
+    /// A vector of references to the k nearest objects.
     pub fn knn_search<Q>(&self, query: &Q, k: usize) -> Vec<&T>
     where
         T::B: BoundingVolumeFromPoint<Q> + HasMinDistance<Q> + Clone,
