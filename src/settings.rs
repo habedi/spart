@@ -1,4 +1,4 @@
-//! Internal settings for Spart.
+//! Internal settings for Spart
 //!
 //! This module initializes the logging configuration for Spart at startup.
 //! The logging behavior is controlled by the `DEBUG_SPART` environment variable.

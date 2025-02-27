@@ -1,4 +1,4 @@
-//! Geometric primitives and operations for 2D and 3D spaces.
+//! Geometric primitives and operations for 2D and 3D spaces
 //!
 //! This module provides fundamental geometric primitives and operations for both 2D and 3D spaces.
 //! It defines types such as `Point2D`, `Rectangle`, `Point3D`, and `Cube` along with their associated

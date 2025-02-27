@@ -1,8 +1,6 @@
-//! Custom error types for the Spart.
+//! Custom error types for the Spart
 //!
-//! This module defines custom errors used throughout Spart for consistent error reporting.
-//! The errors in this module are intended to provide clear messages when
-//! invalid operations are attempted.
+//! This module defines custom errors used internally by Spart.
 
 use std::error::Error;
 use std::fmt;
