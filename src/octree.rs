@@ -1,4 +1,4 @@
-//! Octree implementation.
+//! Octree implementation
 //!
 //! This module implements an octree for spatial indexing of 3D points. An octree recursively subdivides
 //! a cubic region (defined by a `Cube`) into eight smaller subcubes when the number of points exceeds a specified capacity.

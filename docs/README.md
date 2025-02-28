@@ -70,55 +70,63 @@ Check out the [tests](../tests/) directory for more detailed examples.
 use spart::geometry::{Point2D, Rectangle};
 use spart::quadtree::Quadtree;
 
-// Define the bounding area for the Quadtree
-let boundary = Rectangle {
-x: 0.0, y: 0.0,
-width: 10.0, height: 10.0,
-};
+fn main() {
+    // Define the bounding area for the Quadtree.
+    let boundary = Rectangle {
+        x: 0.0,
+        y: 0.0,
+        width: 10.0,
+        height: 10.0,
+    };
 
-// Create a new Quadtree with a maximum capacity of 3 points per node
-let mut tree = Quadtree::new(&boundary, 3);
+    // Create a new Quadtree with a maximum capacity of 3 points per node.
+    let mut tree = Quadtree::new(&boundary, 3);
 
-let point1 = Point2D {
-x: 1.0, y: 2.0,
-data: Some("Point1"),
-};
+    // Define some 2D points.
+    let point1 = Point2D {
+        x: 1.0,
+        y: 2.0,
+        data: Some("Point1"),
+    };
+    let point2 = Point2D {
+        x: 3.0,
+        y: 4.0,
+        data: Some("Point2"),
+    };
+    let point3 = Point2D {
+        x: 5.0,
+        y: 6.0,
+        data: Some("Point3"),
+    };
+    let point4 = Point2D {
+        x: 7.0,
+        y: 8.0,
+        data: Some("Point4"),
+    };
+    let point5 = Point2D {
+        x: 2.0,
+        y: 3.0,
+        data: Some("Point5"),
+    };
 
-let point2 = Point2D {
-x: 3.0, y: 4.0,
-data: Some("Point2"),
-};
+    // Insert points into the Quadtree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
 
-let point3 = Point2D {
-x: 5.0, y: 6.0,
-data: Some("Point3"),
-};
+    // Perform a k-nearest neighbor (kNN) search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
 
-let point4 = Point2D {
-x: 7.0, y: 8.0,
-data: Some("Point4"),
-};
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
 
-let point5 = Point2D {
-x: 2.0, y: 3.0,
-data: Some("Point5"),
-};
-
-// Insert points into the Quadtree
-tree.insert(point1.clone());
-tree.insert(point2.clone());
-tree.insert(point3.clone());
-tree.insert(point4.clone());
-tree.insert(point5.clone());
-
-let neighbors = tree.knn_search(&point1, 2);
-println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-let range_points = tree.range_search(&point1, 5.0);
-println!("Range search results for {:?}: {:?}", point1, range_points);
-
-// Remove a point from the tree
-tree.delete(&point1);
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
 ```
 
 #### Octree (3D)
@@ -127,55 +135,70 @@ tree.delete(&point1);
 use spart::geometry::{Cube, Point3D};
 use spart::octree::Octree;
 
-// Define the bounding area for the Octree
-let boundary = Cube {
-x: 0.0, y: 0.0, z: 0.0,
-width: 10.0, height: 10.0, depth: 10.0,
-};
+fn main() {
+    // Define the bounding area for the Octree.
+    let boundary = Cube {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        width: 10.0,
+        height: 10.0,
+        depth: 10.0,
+    };
 
-// Create a new Octree with a maximum capacity of 3 points per node
-let mut tree = Octree::new(&boundary, 3);
+    // Create a new Octree with a maximum capacity of 3 points per node.
+    let mut tree = Octree::new(&boundary, 3);
 
-let point1 = Point3D {
-x: 1.0, y: 2.0, z: 3.0,
-data: Some("Point1"),
-};
+    // Define some 3D points.
+    let point1 = Point3D {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        data: Some("Point1"),
+    };
+    let point2 = Point3D {
+        x: 3.0,
+        y: 4.0,
+        z: 5.0,
+        data: Some("Point2"),
+    };
+    let point3 = Point3D {
+        x: 5.0,
+        y: 6.0,
+        z: 7.0,
+        data: Some("Point3"),
+    };
+    let point4 = Point3D {
+        x: 7.0,
+        y: 8.0,
+        z: 9.0,
+        data: Some("Point4"),
+    };
+    let point5 = Point3D {
+        x: 2.0,
+        y: 3.0,
+        z: 4.0,
+        data: Some("Point5"),
+    };
 
-let point2 = Point3D {
-x: 3.0, y: 4.0, z: 5.0,
-data: Some("Point2"),
-};
+    // Insert points into the Octree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
 
-let point3 = Point3D {
-x: 5.0, y: 6.0, z: 7.0,
-data: Some("Point3"),
-};
+    // Perform a kNN search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
 
-let point4 = Point3D {
-x: 7.0, y: 8.0, z: 9.0,
-data: Some("Point4"),
-};
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
 
-let point5 = Point3D {
-x: 2.0, y: 3.0, z: 4.0,
-data: Some("Point5"),
-};
-
-// Insert points into the Octree
-tree.insert(point1.clone());
-tree.insert(point2.clone());
-tree.insert(point3.clone());
-tree.insert(point4.clone());
-tree.insert(point5.clone());
-
-let neighbors = tree.knn_search(&point1, 2);
-println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-let range_points = tree.range_search(&point1, 5.0);
-println!("Range search results for {:?}: {:?}", point1, range_points);
-
-// Remove a point from the tree
-tree.delete(&point1);
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
 ```
 
 #### Kd-tree (3D)
@@ -184,49 +207,60 @@ tree.delete(&point1);
 use spart::geometry::Point3D;
 use spart::kd_tree::KdTree;
 
-// Create a new Kd-tree for 3D points
-let mut tree = KdTree::new(3);
+fn main() {
+    // Create a new Kd-tree for 3D points.
+    let mut tree = KdTree::new(3);
 
-let point1 = Point3D {
-x: 1.0, y: 2.0, z: 3.0,
-data: Some("Point1"),
-};
+    // Define some 3D points.
+    let point1 = Point3D {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        data: Some("Point1"),
+    };
+    let point2 = Point3D {
+        x: 3.0,
+        y: 4.0,
+        z: 5.0,
+        data: Some("Point2"),
+    };
+    let point3 = Point3D {
+        x: 5.0,
+        y: 6.0,
+        z: 7.0,
+        data: Some("Point3"),
+    };
+    let point4 = Point3D {
+        x: 7.0,
+        y: 8.0,
+        z: 9.0,
+        data: Some("Point4"),
+    };
+    let point5 = Point3D {
+        x: 2.0,
+        y: 3.0,
+        z: 4.0,
+        data: Some("Point5"),
+    };
 
-let point2 = Point3D {
-x: 3.0, y: 4.0, z: 5.0,
-data: Some("Point2"),
-};
+    // Insert points into the Kd-tree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
 
-let point3 = Point3D {
-x: 5.0, y: 6.0, z: 7.0,
-data: Some("Point3"),
-};
+    // Perform a kNN search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
 
-let point4 = Point3D {
-x: 7.0, y: 8.0, z: 9.0,
-data: Some("Point4"),
-};
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
 
-let point5 = Point3D {
-x: 2.0, y: 3.0, z: 4.0,
-data: Some("Point5"),
-};
-
-// Insert points into the Kd-tree
-tree.insert(point1.clone());
-tree.insert(point2.clone());
-tree.insert(point3.clone());
-tree.insert(point4.clone());
-tree.insert(point5.clone());
-
-let neighbors = tree.knn_search(&point1, 2);
-println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-let range_points = tree.range_search(&point1, 5.0);
-println!("Range search results for {:?}: {:?}", point1, range_points);
-
-// Remove a point from the tree
-tree.delete(&point1);
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
 ```
 
 #### R-tree (3D)
@@ -235,49 +269,60 @@ tree.delete(&point1);
 use spart::geometry::Point3D;
 use spart::r_tree::RTree;
 
-// Create a new R-tree with a maximum capacity of 4 points per node
-let mut tree = RTree::new(4);
+fn main() {
+    // Create a new R-tree with a maximum capacity of 4 points per node.
+    let mut tree = RTree::new(4);
 
-let point1 = Point3D {
-    x: 1.0, y: 2.0, z: 3.0,
-    data: Some("Point1"),
-};
+    // Define some 3D points.
+    let point1 = Point3D {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        data: Some("Point1"),
+    };
+    let point2 = Point3D {
+        x: 3.0,
+        y: 4.0,
+        z: 5.0,
+        data: Some("Point2"),
+    };
+    let point3 = Point3D {
+        x: 5.0,
+        y: 6.0,
+        z: 7.0,
+        data: Some("Point3"),
+    };
+    let point4 = Point3D {
+        x: 7.0,
+        y: 8.0,
+        z: 9.0,
+        data: Some("Point4"),
+    };
+    let point5 = Point3D {
+        x: 2.0,
+        y: 3.0,
+        z: 4.0,
+        data: Some("Point5"),
+    };
 
-let point2 = Point3D {
-    x: 3.0, y: 4.0, z: 5.0,
-    data: Some("Point2"),
-};
+    // Insert points into the R-tree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
 
-let point3 = Point3D {
-    x: 5.0, y: 6.0, z: 7.0,
-    data: Some("Point3"),
-};
+    // Perform a kNN search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
 
-let point4 = Point3D {
-    x: 7.0, y: 8.0, z: 9.0,
-    data: Some("Point4"),
-};
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
 
-let point5 = Point3D {
-    x: 2.0, y: 3.0, z: 4.0,
-    data: Some("Point5"),
-};
-
-// Insert points into the R-tree
-tree.insert(point1.clone());
-tree.insert(point2.clone());
-tree.insert(point3.clone());
-tree.insert(point4.clone());
-tree.insert(point5.clone());
-
-let neighbors = tree.knn_search(&point1, 2);
-println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-let range_points = tree.range_search(&point1, 5.0);
-println!("Range search results for {:?}: {:?}", point1, range_points);
-
-// Remove a point from the tree
-tree.delete(&point1);
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
 ```
 
 #### BSP-tree (3D)
@@ -286,54 +331,70 @@ tree.delete(&point1);
 use spart::bsp_tree::{BSPTree, Point3DBSP};
 use spart::geometry::Point3D;
 
-// Create a new BSP-tree with a capacity of 3 points per node
-let mut tree: BSPTree<Point3DBSP<&str>> = BSPTree::new(3);
+fn main() {
+    // Create a new BSP-tree with a capacity of 3 points per node.
+    let mut tree: BSPTree<Point3DBSP<&str>> = BSPTree::new(3);
 
-let point1 = Point3DBSP {
-    point: Point3D {
-        x: 1.0, y: 2.0, z: 3.0,
-        data: Some("Wrapped Point1"),
-}};
+    // Define some wrapped 3D points.
+    let point1 = Point3DBSP {
+        point: Point3D {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            data: Some("Wrapped Point1"),
+        },
+    };
+    let point2 = Point3DBSP {
+        point: Point3D {
+            x: 3.0,
+            y: 4.0,
+            z: 5.0,
+            data: Some("Wrapped Point2"),
+        },
+    };
+    let point3 = Point3DBSP {
+        point: Point3D {
+            x: 5.0,
+            y: 6.0,
+            z: 7.0,
+            data: Some("Wrapped Point3"),
+        },
+    };
+    let point4 = Point3DBSP {
+        point: Point3D {
+            x: 7.0,
+            y: 8.0,
+            z: 9.0,
+            data: Some("Wrapped Point4"),
+        },
+    };
+    let point5 = Point3DBSP {
+        point: Point3D {
+            x: 2.0,
+            y: 3.0,
+            z: 4.0,
+            data: Some("Wrapped Point5"),
+        },
+    };
 
-let point2 = Point3DBSP {
-    point: Point3D {
-        x: 3.0, y: 4.0, z: 5.0,
-        data: Some("Wrapped Point2"),
-}};
+    // Insert points into the BSP-tree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
 
-let point3 = Point3DBSP {
-    point: Point3D {
-        x: 5.0, y: 6.0, z: 7.0,
-        data: Some("Wrapped Point3"),
-}};
+    // Perform a kNN search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
 
-let point4 = Point3DBSP {
-    point: Point3D {
-        x: 7.0, y: 8.0, z: 9.0,
-        data: Some("Wrapped Point4"),
-}};
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
 
-let point5 = Point3DBSP {
-    point: Point3D {
-        x: 2.0, y: 3.0, z: 4.0,
-        data: Some("Wrapped Point5"),
-}};
-
-// Insert points into the BSP-tree
-tree.insert(point1.clone());
-tree.insert(point2.clone());
-tree.insert(point3.clone());
-tree.insert(point4.clone());
-tree.insert(point5.clone());
-
-let neighbors = tree.knn_search(&point1, 2);
-println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-let range_points = tree.range_search(&point1, 5.0);
-println!("Range search results for {:?}: {:?}", point1, range_points);
-
-// Remove a point from the tree
-tree.delete(&point1);
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
 ```
 
 ### Debugging Mode

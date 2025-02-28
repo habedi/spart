@@ -1,4 +1,4 @@
-//! BSP‑tree implementation.
+//! BSP‑tree implementation
 //!
 //! This module implements a Binary Space Partitioning (BSP) tree for spatial indexing of objects.
 //! Objects stored in the tree must implement the `BSPTreeObject` trait, which requires an
@@ -26,50 +26,12 @@
 
 use crate::exceptions::SpartError;
 use crate::geometry::{
-    BSPBounds, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D, Rectangle,
+    BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D,
+    Rectangle,
 };
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
-
-/// A local redefinition of a bounding volume trait for BSP‑tree purposes.
-/// (This mirrors the trait defined in `geometry.rs`.)
-pub trait BoundingVolume: Clone {
-    /// Returns the area (or volume for 3D objects) of the bounding volume.
-    fn area(&self) -> f64;
-    /// Returns the union of this volume with another.
-    fn union(&self, other: &Self) -> Self;
-    /// Returns the enlargement (additional area/volume) required to contain `other`.
-    fn enlargement(&self, other: &Self) -> f64 {
-        self.union(other).area() - self.area()
-    }
-    /// Determines whether this volume intersects with another.
-    fn intersects(&self, other: &Self) -> bool;
-}
-
-impl BoundingVolume for Rectangle {
-    fn area(&self) -> f64 {
-        Rectangle::area(self)
-    }
-    fn union(&self, other: &Self) -> Self {
-        Rectangle::union(self, other)
-    }
-    fn intersects(&self, other: &Self) -> bool {
-        Rectangle::intersects(self, other)
-    }
-}
-
-impl BoundingVolume for Cube {
-    fn area(&self) -> f64 {
-        Cube::area(self)
-    }
-    fn union(&self, other: &Self) -> Self {
-        Cube::union(self, other)
-    }
-    fn intersects(&self, other: &Self) -> bool {
-        Cube::intersects(self, other)
-    }
-}
 
 /// Trait for objects that can be stored in a BSP tree.
 ///
@@ -138,6 +100,12 @@ where
         }
     }
 
+    /// Returns true if the given bounding volume is degenerate (all extents are zero).
+    fn is_degenerate(b: &T::B) -> bool {
+        let dims = <T::B as BSPBounds>::DIM;
+        (0..dims).all(|dim| b.extent(dim) == 0.0)
+    }
+
     /// Inserts an object into the BSP tree.
     ///
     /// # Arguments
@@ -165,6 +133,7 @@ where
     fn insert_rec(node: BSPNode<T>, object: T, obj_mbr: T::B, max_objects: usize) -> BSPNode<T> {
         match node {
             BSPNode::Leaf { mut objects, mbr } => {
+                // Update the leaf's bounding volume to include the new object.
                 let new_mbr = mbr.union(&obj_mbr);
                 debug!(
                     "Inserting into leaf. Old mbr: {:?}, new object mbr: {:?}, new mbr: {:?}",
@@ -172,6 +141,16 @@ where
                 );
                 objects.push(object);
                 if objects.len() > max_objects {
+                    // Check for degenerate bounding volume to avoid infinite splitting.
+                    if Self::is_degenerate(&new_mbr) {
+                        info!(
+                            "Degenerate bounding volume detected in leaf; not splitting further."
+                        );
+                        return BSPNode::Leaf {
+                            objects,
+                            mbr: new_mbr,
+                        };
+                    }
                     info!(
                         "Leaf exceeded max_objects ({} objects); splitting leaf.",
                         objects.len()
@@ -239,17 +218,27 @@ where
                 best_dim = dim;
             }
         }
-        info!(
-            "Chosen split dimension: {} with extent: {}",
-            best_dim, max_extent
-        );
+
+        // If the bounding volume is degenerate (all objects share the same coordinate along every dimension),
+        // avoid splitting further to prevent infinite recursion.
+        if max_extent == 0.0 {
+            info!("Degenerate bounding volume detected; not splitting further.");
+            return BSPNode::Leaf { objects, mbr };
+        }
+
+        // Compute the median along the best dimension.
         let mut centers: Vec<f64> = objects
             .iter()
             .map(|obj| obj.mbr().center(best_dim))
             .collect();
         centers.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let median = centers[centers.len() / 2];
+        info!(
+            "Chosen split dimension: {} with extent: {}",
+            best_dim, max_extent
+        );
         info!("Computed median value: {}", median);
+
         let (mut left_objs, mut right_objs) = (Vec::new(), Vec::new());
         for obj in objects {
             let c = obj.mbr().center(best_dim);
@@ -467,12 +456,12 @@ impl<T: BSPTreeObject> PartialEq for BSPCandidate<'_, T> {
 impl<T: BSPTreeObject> Eq for BSPCandidate<'_, T> {}
 impl<T: BSPTreeObject> PartialOrd for BSPCandidate<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.distance().partial_cmp(&self.distance())
+        Some(self.cmp(other))
     }
 }
 impl<T: BSPTreeObject> Ord for BSPCandidate<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        other.distance().partial_cmp(&self.distance()).unwrap()
     }
 }
 

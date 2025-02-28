@@ -1,4 +1,4 @@
-//! Quadtree implementation.
+//! Quadtree implementation
 //!
 //! This module implements a quadtree for spatial indexing of 2D points. The quadtree partitions a
 //! rectangular region (defined by a `Rectangle`) into four quadrants (northeast, northwest, southeast,

@@ -1,8 +1,8 @@
-//! R‑tree implementation.
+//! R‑tree implementation
 //!
-//! This module implements an R‑Tree, a spatial index structure that efficiently organizes
+//! This module implements an R‑tree, a spatial index structure that efficiently organizes
 //! multi-dimensional geometric objects. It supports insertion, deletion, range search, and k‑nearest
-//! neighbor (k‑NN) search. Objects stored in the R‑Tree must implement the `RTreeObject` trait,
+//! neighbor (kNN) search. Objects stored in the R‑tree must implement the `RTreeObject` trait,
 //! which requires an implementation of a method to obtain a minimum bounding rectangle (for 2D)
 //! or cube (for 3D).
 //!
@@ -12,7 +12,7 @@
 //! use spart::geometry::{Point2D, Rectangle, Point3D, Cube};
 //! use spart::r_tree::{RTree, RTreeObject};
 //!
-//! // Create an R‑Tree for 2D points.
+//! // Create an R‑tree for 2D points.
 //! let mut tree2d: RTree<Point2D<()>> = RTree::new(4);
 //! let pt2d: Point2D<()> = Point2D::new(10.0, 20.0, None);
 //! tree2d.insert(pt2d);
@@ -20,7 +20,7 @@
 //! let results = tree2d.range_search_bbox(&query_rect);
 //! assert!(!results.is_empty());
 //!
-//! // Create an R‑Tree for 3D points.
+//! // Create an R‑tree for 3D points.
 //! let mut tree3d: RTree<Point3D<()>> = RTree::new(4);
 //! let pt3d: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
 //! tree3d.insert(pt3d);
@@ -37,7 +37,10 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
-/// Trait for objects that can be stored in an R‑Tree.
+// Epsilon value for zero-sizes bounding boxes/cubes.
+const EPSILON: f64 = 1e-10;
+
+/// Trait for objects that can be stored in an R‑tree.
 ///
 /// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
 pub trait RTreeObject: std::fmt::Debug {
@@ -47,7 +50,7 @@ pub trait RTreeObject: std::fmt::Debug {
     fn mbr(&self) -> Self::B;
 }
 
-/// An entry in the R‑Tree, which can be either a leaf containing an object or a node pointing
+/// An entry in the R‑tree, which can be either a leaf containing an object or a node pointing
 /// to a child.
 #[derive(Debug, Clone)]
 pub enum RTreeEntry<T: RTreeObject> {
@@ -65,7 +68,7 @@ impl<T: RTreeObject> RTreeEntry<T> {
     }
 }
 
-/// A node in the R‑Tree.
+/// A node in the R‑tree.
 #[derive(Debug, Clone)]
 pub struct RTreeNode<T: RTreeObject> {
     /// The entries stored in this node.
@@ -74,7 +77,7 @@ pub struct RTreeNode<T: RTreeObject> {
     pub is_leaf: bool,
 }
 
-/// R‑Tree data structure for spatial indexing.
+/// R‑tree data structure for spatial indexing.
 ///
 /// The tree is initialized with a maximum number of entries per node. If a node exceeds this
 /// number, it will split. The tree supports insertion, deletion, and range searches.
@@ -85,7 +88,7 @@ pub struct RTree<T: RTreeObject> {
 }
 
 impl<T: RTreeObject> RTree<T> {
-    /// Creates a new R‑Tree with the specified maximum number of entries per node.
+    /// Creates a new R‑tree with the specified maximum number of entries per node.
     ///
     /// # Arguments
     ///
@@ -108,7 +111,7 @@ impl<T: RTreeObject> RTree<T> {
         }
     }
 
-    /// Inserts an object into the R‑Tree.
+    /// Inserts an object into the R‑tree.
     ///
     /// # Arguments
     ///
@@ -263,7 +266,7 @@ impl<T: RTreeObject> RTree<T>
 where
     T: PartialEq,
 {
-    /// Deletes an object from the R‑Tree.
+    /// Deletes an object from the R‑tree.
     ///
     /// # Arguments
     ///
@@ -325,8 +328,8 @@ impl<T: std::fmt::Debug> RTreeObject for Point2D<T> {
         Rectangle {
             x: self.x,
             y: self.y,
-            width: 0.0,
-            height: 0.0,
+            width: EPSILON,
+            height: EPSILON,
         }
     }
 }
@@ -338,9 +341,9 @@ impl<T: std::fmt::Debug> RTreeObject for Point3D<T> {
             x: self.x,
             y: self.y,
             z: self.z,
-            width: 0.0,
-            height: 0.0,
-            depth: 0.0,
+            width: EPSILON,
+            height: EPSILON,
+            depth: EPSILON,
         }
     }
 }
@@ -412,19 +415,25 @@ impl<T: std::fmt::Debug> PartialEq for Candidate2D<'_, T> {
     }
 }
 impl<T: std::fmt::Debug> Eq for Candidate2D<'_, T> {}
-impl<T: std::fmt::Debug> PartialOrd for Candidate2D<'_, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.dist.partial_cmp(&self.dist)
-    }
-}
+
 impl<T: std::fmt::Debug> Ord for Candidate2D<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        // Reverse order: lower distances are "greater" so they come out first from the heap.
+        other
+            .dist
+            .partial_cmp(&self.dist)
+            .unwrap_or(Ordering::Equal)
+    }
+}
+
+impl<T: std::fmt::Debug> PartialOrd for Candidate2D<'_, T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
 impl<T: std::fmt::Debug> RTree<Point2D<T>> {
-    /// Performs a k‑nearest neighbor search on an R‑Tree of 2D points.
+    /// Performs a k‑nearest neighbor search on an R‑tree of 2D points.
     ///
     /// # Arguments
     ///
@@ -493,19 +502,25 @@ impl<T: std::fmt::Debug> PartialEq for Candidate3D<'_, T> {
     }
 }
 impl<T: std::fmt::Debug> Eq for Candidate3D<'_, T> {}
-impl<T: std::fmt::Debug> PartialOrd for Candidate3D<'_, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.dist.partial_cmp(&self.dist)
-    }
-}
+
 impl<T: std::fmt::Debug> Ord for Candidate3D<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        // Reverse order: lower distances are "greater" so they come out first from the heap.
+        other
+            .dist
+            .partial_cmp(&self.dist)
+            .unwrap_or(Ordering::Equal)
+    }
+}
+
+impl<T: std::fmt::Debug> PartialOrd for Candidate3D<'_, T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
 impl<T: std::fmt::Debug> RTree<Point3D<T>> {
-    /// Performs a k‑nearest neighbor search on an R‑Tree of 3D points.
+    /// Performs a k‑nearest neighbor search on an R‑tree of 3D points.
     ///
     /// # Arguments
     ///
@@ -562,7 +577,7 @@ where
     T: RTreeObject + PartialEq + std::fmt::Debug,
     T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
 {
-    /// Performs a range search on the R‑Tree using a query object and radius.
+    /// Performs a range search on the R‑tree using a query object and radius.
     ///
     /// The query object is wrapped into a bounding volume using `from_point_radius`.
     ///

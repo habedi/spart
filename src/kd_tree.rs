@@ -1,8 +1,8 @@
-//! KD‑tree implementation.
+//! Kd‑tree implementation
 //!
-//! This module provides a KD‑Tree implementation for spatial indexing of points in k‑dimensional space.
+//! This module provides a Kd‑tree implementation for spatial indexing of points in k‑dimensional space.
 //! Points must implement the `KdPoint` trait which provides access to coordinates and distance calculations.
-//! The tree supports insertion, k‑nearest neighbor search, range search, and deletion.
+//! The tree supports insertion, k‑nearest neighbor search (kNN), range search, and deletion.
 //!
 //! # Examples
 //!
@@ -10,14 +10,14 @@
 //! use spart::geometry::{Point2D, Point3D};
 //! use spart::kd_tree::{KdTree, KdPoint};
 //!
-//! // Create a 2D KD‑Tree and insert some points.
+//! // Create a 2D Kd‑tree and insert some points.
 //! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2);
 //! tree2d.insert(Point2D::new(1.0, 2.0, None));
 //! tree2d.insert(Point2D::new(3.0, 4.0, None));
 //! let neighbors2d = tree2d.knn_search(&Point2D::new(2.0, 3.0, None), 1);
 //! assert!(!neighbors2d.is_empty());
 //!
-//! // Create a 3D KD‑Tree and insert some points.
+//! // Create a 3D Kd‑tree and insert some points.
 //! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3);
 //! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None));
 //! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None));
@@ -31,7 +31,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::info;
 
-/// Trait representing a point that can be used in a KD‑Tree.
+/// Trait representing a point that can be used in a Kd‑tree.
 ///
 /// A type implementing `KdPoint` must provide the number of dimensions,
 /// a method to access a coordinate along a given axis, and a method to compute
@@ -127,7 +127,7 @@ impl<P> Ord for HeapItem<P> {
     }
 }
 
-/// A node in the KD‑Tree.
+/// A node in the Kd‑tree.
 #[derive(Debug)]
 struct KdNode<P: KdPoint> {
     point: P,
@@ -136,7 +136,7 @@ struct KdNode<P: KdPoint> {
 }
 
 impl<P: KdPoint> KdNode<P> {
-    /// Creates a new KD‑Tree node with the given point.
+    /// Creates a new Kd‑tree node with the given point.
     fn new(point: P) -> Self {
         KdNode {
             point,
@@ -146,7 +146,7 @@ impl<P: KdPoint> KdNode<P> {
     }
 }
 
-/// KD‑Tree for points implementing `KdPoint`.
+/// Kd‑tree for points implementing `KdPoint`.
 ///
 /// The tree stores points in k‑dimensional space (where `k` is provided during creation)
 /// and supports insertion, k‑nearest neighbor search, range search, and deletion.
@@ -157,7 +157,7 @@ pub struct KdTree<P: KdPoint> {
 }
 
 impl<P: KdPoint> KdTree<P> {
-    /// Creates a new KD‑Tree for points in `k` dimensions.
+    /// Creates a new Kd‑tree for points in `k` dimensions.
     ///
     /// # Arguments
     ///
@@ -179,7 +179,7 @@ impl<P: KdPoint> KdTree<P> {
         KdTree { root: None, k }
     }
 
-    /// Inserts a point into the KD‑Tree.
+    /// Inserts a point into the Kd‑tree.
     ///
     /// # Arguments
     ///
@@ -328,7 +328,7 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
-    /// Deletes a point from the KD‑Tree.
+    /// Deletes a point from the Kd‑tree.
     ///
     /// # Arguments
     ///
