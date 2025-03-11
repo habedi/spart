@@ -1,10 +1,10 @@
-//! Kd‑tree implementation
+//! ## Kd‑tree Implementation
 //!
-//! This module provides a Kd‑tree implementation for spatial indexing of points in k‑dimensional space.
+//! This module provides a Kd‑tree implementation for spatial indexing of points in 2D and 3D spaces.
 //! Points must implement the `KdPoint` trait which provides access to coordinates and distance calculations.
 //! The tree supports insertion, k‑nearest neighbor search (kNN), range search, and deletion.
 //!
-//! # Examples
+//! ### Example
 //!
 //! ```
 //! use spart::geometry::{Point2D, Point3D};
@@ -31,7 +31,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::info;
 
-/// Trait representing a point that can be used in a Kd‑tree.
+/// Trait representing a point that can be stored in the Kd‑tree implementation.
 ///
 /// A type implementing `KdPoint` must provide the number of dimensions,
 /// a method to access a coordinate along a given axis, and a method to compute
@@ -127,7 +127,7 @@ impl<P> Ord for HeapItem<P> {
     }
 }
 
-/// A node in the Kd‑tree.
+/// A node in the Kd‑tree containing a point and references to its children.
 #[derive(Debug)]
 struct KdNode<P: KdPoint> {
     point: P,

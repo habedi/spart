@@ -1,10 +1,10 @@
-//! Octree implementation
+//! ## Octree Implementation
 //!
-//! This module implements an octree for spatial indexing of 3D points. An octree recursively subdivides
+//! This module implements an Octree for indexing of 3D points. An octree recursively subdivides
 //! a cubic region (defined by a `Cube`) into eight smaller subcubes when the number of points exceeds a specified capacity.
 //! The octree provides operations for insertion, k-nearest neighbor (kNN) search, range search, and deletion.
 //!
-//! # Usage Example
+//! # Example
 //!
 //! ```
 //! use spart::geometry::{Cube, Point3D};
@@ -32,7 +32,7 @@ use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
-/// An octree for spatial indexing of 3D points.
+/// An octree for indexing of 3D points.
 ///
 /// # Type Parameters
 ///

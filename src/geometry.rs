@@ -1,10 +1,10 @@
-//! Geometric primitives and operations for 2D and 3D spaces
+//! ## Geometric Primitives and Operations for 2D and 3D Spaces
 //!
-//! This module provides fundamental geometric primitives and operations for both 2D and 3D spaces.
+//! This module provides geometric primitives and operations for both 2D and 3D spaces.
 //! It defines types such as `Point2D`, `Rectangle`, `Point3D`, and `Cube` along with their associated
 //! operations. These types form the basis for spatial indexing and query algorithms used in Spart.
 //!
-//! In addition to the basic types, the module defines several traits for spatial operations such as
+//! In addition to the basic types, the module defines several traits for operations such as
 //! bounding volume calculations and minimum distance computations.
 
 use ordered_float::OrderedFloat;
@@ -16,7 +16,7 @@ use crate::exceptions::SpartError;
 
 /// Represents a 2D point with an optional payload.
 ///
-/// # Examples
+/// ### Example
 ///
 /// ```
 /// use spart::geometry::Point2D;

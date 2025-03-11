@@ -1,10 +1,10 @@
-//! R‑tree implementation
+//! ## R‑tree Implementation
 //!
-//! This module implements an R‑tree, a spatial index structure that efficiently organizes
-//! multi-dimensional geometric objects. It supports insertion, deletion, range search, and k‑nearest
-//! neighbor (kNN) search. Objects stored in the R‑tree must implement the `RTreeObject` trait,
-//! which requires an implementation of a method to obtain a minimum bounding rectangle (for 2D)
-//! or cube (for 3D).
+//! This module implements an R‑tree for indexing 2D and 3D points.
+//! The implementation supports insertion, deletion, range search, and k‑nearest
+//! neighbor (kNN) search. Points stored in the R‑tree must implement the `RTreeObject` trait,
+//! which requires an implementation of a method to get a minimum bounding rectangle (for 2D)
+//! or cube (for 3D) around the point.
 //!
 //! # Examples
 //!
@@ -40,7 +40,7 @@ use tracing::{debug, info};
 // Epsilon value for zero-sizes bounding boxes/cubes.
 const EPSILON: f64 = 1e-10;
 
-/// Trait for objects that can be stored in an R‑tree.
+/// Trait for points stored in an R‑tree.
 ///
 /// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
 pub trait RTreeObject: std::fmt::Debug {
@@ -50,8 +50,7 @@ pub trait RTreeObject: std::fmt::Debug {
     fn mbr(&self) -> Self::B;
 }
 
-/// An entry in the R‑tree, which can be either a leaf containing an object or a node pointing
-/// to a child.
+/// An entry in the R‑tree, which can be either a leaf or a node.
 #[derive(Debug, Clone)]
 pub enum RTreeEntry<T: RTreeObject> {
     Leaf { mbr: T::B, object: T },
@@ -77,7 +76,7 @@ pub struct RTreeNode<T: RTreeObject> {
     pub is_leaf: bool,
 }
 
-/// R‑tree data structure for spatial indexing.
+/// R‑tree data structure for indexing 2D or 3D points.
 ///
 /// The tree is initialized with a maximum number of entries per node. If a node exceeds this
 /// number, it will split. The tree supports insertion, deletion, and range searches.
