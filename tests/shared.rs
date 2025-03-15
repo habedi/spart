@@ -128,7 +128,7 @@ pub fn common_points_3d() -> Vec<Point3D<&'static str>> {
 }
 
 //
-// Distance Functions
+// Distance functions (Euclidean) for comparing points in 2D and 3D
 //
 pub fn distance_2d(a: &Point2D<impl std::fmt::Debug>, b: &Point2D<impl std::fmt::Debug>) -> f64 {
     ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()

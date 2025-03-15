@@ -1,6 +1,6 @@
 ## Spart Documentation
 
-The basic building blocks of Spart are **point** and **tree**.
+The basic building blocks of Spart are *point* and *tree*.
 
 ### Point
 
@@ -12,15 +12,22 @@ Example of 2D and 3D points:
 ```rust
 use spart::geometry::{Point2D, Point3D};
 
-let point_2d = Point2D {
-x:1.0, y:2.0,
-data: Some("A 2D Point")
-};
-
-let point_3d = Point3D {
-x:1.0, y:2.0, z:3.0,
-data: Some("A 3D Point")
-};
+fn main() {
+    // 2D point with coordinates (1.0, 2.0) and data "A 2D Point".
+    let point_2d = Point2D {
+        x: 1.0,
+        y: 2.0,
+        data: Some("A 2D Point"),
+    };
+    
+    // 3D point with coordinates (1.0, 2.0, 3.0) and data "A 3D Point".
+    let point_3d = Point3D {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        data: Some("A 3D Point"),
+    };
+}
 ```
 
 > [!NOTE]
@@ -32,6 +39,7 @@ data: Some("A 3D Point")
 A tree is a spatial data structure that indexes points and provides methods for querying them.
 
 Currently, the following trees are implemented:
+
 - Quadtree (2D)
 - Octree (3D)
 - Kd-tree (2D and 3D)
@@ -54,9 +62,10 @@ A tree provides at least the following methods:
 > [!NOTE]
 > Currently, the following properties hold for all trees:
 > - Duplicates are allowed: inserting a duplicate point will add another copy to the tree.
-> - Searches return duplicates: both knn_search and range_search can return duplicate points if they were previously inserted.
+> - Searches return duplicates: both knn_search and range_search can return duplicate points if they were previously
+    inserted.
 > - Deletion removes duplicates: the delete operation removes all instances of the point from the tree.
-> 
+>
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance.
 
 ### Examples
@@ -412,5 +421,5 @@ $env:DEBUG_SPART = "true"
 ```
 
 > [!NOTE]
-> When debugging mode is enabled, Spart will be very verbose and print a lot of debug information to the console.
-> So, it is recommended to use this only for debugging purposes.
+> When debugging mode is enabled, Spart will be very verbose.
+> It is recommended to use this only for debugging purposes.
