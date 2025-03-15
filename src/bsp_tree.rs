@@ -1,14 +1,14 @@
-//! BSP‑tree implementation
+//! ## BSP‑tree implementation
 //!
-//! This module implements a Binary Space Partitioning (BSP) tree for spatial indexing of objects.
+//! This module implements a binary space partitioning (BSP) tree for indexing spatial objects.
 //! Objects stored in the tree must implement the `BSPTreeObject` trait, which requires an
 //! associated bounding volume type (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
-//! The tree supports insertion, range search, deletion, and k‑nearest neighbor search.
+//! The tree supports insertion, range search, deletion, and k‑nearest neighbor (kNN) search.
 //!
 //! The splitting of leaf nodes is based on the dimension with the largest extent (as determined
 //! by the bounding volume’s `extent` method) and uses the median of object centers along that dimension.
 //!
-//! # Examples
+//! ### Examples
 //!
 //! ```
 //! use spart::geometry::{Point2D, Rectangle};
