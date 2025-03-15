@@ -1,6 +1,6 @@
 //! ## Kd‑tree Implementation
 //!
-//! This module provides a Kd‑tree implementation for spatial indexing of points in 2D and 3D spaces.
+//! This module provides a Kd‑tree implementation for indexing of points in 2D and 3D spaces.
 //! Points must implement the `KdPoint` trait which provides access to coordinates and distance calculations.
 //! The tree supports insertion, k‑nearest neighbor search (kNN), range search, and deletion.
 //!

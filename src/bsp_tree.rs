@@ -1,4 +1,4 @@
-//! ## BSP‑tree implementation
+//! ## BSP‑tree Implementation
 //!
 //! This module implements a binary space partitioning (BSP) tree for indexing 2D and 3D points.
 //! Points stored in the tree must implement the `BSPTreeObject` trait, which requires an

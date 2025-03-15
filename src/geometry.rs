@@ -2,7 +2,7 @@
 //!
 //! This module provides geometric primitives and operations for both 2D and 3D spaces.
 //! It defines types such as `Point2D`, `Rectangle`, `Point3D`, and `Cube` along with their associated
-//! operations. These types form the basis for spatial indexing and query algorithms used in Spart.
+//! operations. These types form the basis for indexing and query algorithms in Spart.
 //!
 //! In addition to the basic types, the module defines several traits for operations such as
 //! bounding volume calculations and minimum distance computations.
@@ -540,7 +540,7 @@ impl BSPBounds for Cube {
 
 /// Trait representing a bounding volume, such as a rectangle or cube.
 ///
-/// This trait abstracts common operations for geometric volumes used in spatial indexing.
+/// This trait abstracts common operations for geometric volumes used in indexing.
 pub trait BoundingVolume: Clone {
     /// Returns the area (or volume for 3D objects) of the bounding volume.
     fn area(&self) -> f64;
