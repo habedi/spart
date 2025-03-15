@@ -1,14 +1,14 @@
 use criterion::criterion_main;
 
-mod delete_benchmarks;
-mod insert_benchmarks;
-mod knn_search_benchmarks;
-mod range_search_benchmarks;
+mod bench_delete;
+mod bench_insert;
+mod bench_knn_search;
+mod bench_range_search;
 
 // Main entry point for running the benchmarks
 criterion_main!(
-    delete_benchmarks::benches,
-    insert_benchmarks::benches,
-    knn_search_benchmarks::benches,
-    range_search_benchmarks::benches
+    bench_delete::benches,
+    bench_insert::benches,
+    bench_knn_search::benches,
+    bench_range_search::benches
 );
