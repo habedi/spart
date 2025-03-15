@@ -1,11 +1,11 @@
-//! Custom error types for the Spart
+//! ## Custom Errors for Spart
 //!
-//! This module defines custom errors used internally by Spart.
+//! This module defines custom errors and exceptions that are used internally by Spart.
 
 use std::error::Error;
 use std::fmt;
 
-/// Represents errors specific to Spart.
+/// Represents errors specific to invalid operations or parameters in Spart.
 #[derive(Debug)]
 pub enum SpartError {
     /// Occurs when an invalid dimension is requested.
