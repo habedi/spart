@@ -1,14 +1,14 @@
-//! BSP‑tree implementation
+//! ## BSP‑tree Implementation
 //!
-//! This module implements a Binary Space Partitioning (BSP) tree for spatial indexing of objects.
-//! Objects stored in the tree must implement the `BSPTreeObject` trait, which requires an
+//! This module implements a binary space partitioning (BSP) tree for indexing 2D and 3D points.
+//! Points stored in the tree must implement the `BSPTreeObject` trait, which requires an
 //! associated bounding volume type (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
-//! The tree supports insertion, range search, deletion, and k‑nearest neighbor search.
+//! The tree supports insertion, range search, deletion, and k‑nearest neighbor (kNN) search.
 //!
 //! The splitting of leaf nodes is based on the dimension with the largest extent (as determined
-//! by the bounding volume’s `extent` method) and uses the median of object centers along that dimension.
+//! by the bounding volume’s `extent` method) and uses the median of points centers along that dimension.
 //!
-//! # Examples
+//! ### Example
 //!
 //! ```
 //! use spart::geometry::{Point2D, Rectangle};
@@ -19,7 +19,7 @@
 //! let pt = Point2D::new(10.0, 20.0, None);
 //! tree.insert(Point2DBSP { point: pt });
 //!
-//! // Perform a range search using a query object and radius.
+//! // Perform a range search using a query point and radius.
 //! let results = tree.range_search(&Point2DBSP { point: Point2D::new(10.0, 20.0, None) }, 5.0);
 //! assert!(!results.is_empty());
 //! ```
@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
-/// Trait for objects that can be stored in a BSP tree.
+/// Trait for points that can be stored in a BSP tree and indexed by a bounding volume.
 ///
 /// Each object must be debuggable and clonable, and must provide a minimum bounding volume.
 pub trait BSPTreeObject: std::fmt::Debug + Clone {
@@ -43,7 +43,7 @@ pub trait BSPTreeObject: std::fmt::Debug + Clone {
     fn mbr(&self) -> Self::B;
 }
 
-/// Internal BSP tree node.
+/// Internal BSP tree node representation.
 #[derive(Debug, Clone)]
 enum BSPNode<T: BSPTreeObject> {
     Leaf {
@@ -69,7 +69,7 @@ impl<T: BSPTreeObject> BSPNode<T> {
     }
 }
 
-/// BSP tree for spatial indexing of objects.
+/// BSP tree implementation.
 #[derive(Debug)]
 pub struct BSPTree<T: BSPTreeObject> {
     root: Option<BSPNode<T>>,
@@ -441,7 +441,7 @@ where
     }
 }
 
-/// Candidate wrapper for k‑NN search in the BSP tree.
+/// Candidate wrapper for kNN search in the BSP tree.
 #[derive(Debug)]
 enum BSPCandidate<'a, T: BSPTreeObject> {
     Node(&'a BSPNode<T>, f64),
@@ -474,7 +474,7 @@ impl<T: BSPTreeObject> BSPCandidate<'_, T> {
     }
 }
 
-/// Wrapper for a 2D point for use in the BSP tree.
+/// Wrapper for a 2D point for use in the tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point2DBSP<T> {
     pub point: Point2D<T>,
@@ -492,7 +492,7 @@ impl<T: std::fmt::Debug + Clone> BSPTreeObject for Point2DBSP<T> {
     }
 }
 
-/// Wrapper for a 3D point for use in the BSP tree.
+/// Wrapper for a 3D point for use in the tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point3DBSP<T> {
     pub point: Point3D<T>,

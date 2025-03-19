@@ -1,11 +1,11 @@
-//! Quadtree implementation
+//! ## Quadtree Implementation
 //!
-//! This module implements a quadtree for spatial indexing of 2D points. The quadtree partitions a
+//! This module implements a quadtree for indexing of 2D points. The quadtree partitions a
 //! rectangular region (defined by a `Rectangle`) into four quadrants (northeast, northwest, southeast,
 //! and southwest) when the number of points in a region exceeds a specified capacity. It provides
 //! operations for insertion, k-nearest neighbor (kNN) search, range search, and deletion.
 //!
-//! # Usage Example
+//! ### Example
 //!
 //! ```
 //! use spart::geometry::{Point2D, Rectangle};
@@ -33,7 +33,7 @@ use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
-/// A quadtree for spatial indexing of 2D points.
+/// A Quadtree for indexing of 2D points.
 ///
 /// # Type Parameters
 ///

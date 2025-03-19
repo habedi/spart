@@ -8,8 +8,9 @@
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-spart-66c2a5?label=docs.rs&style=flat&logo=docs.rs" height="20">](https://docs.rs/spart)
 [<img alt="downloads" src="https://img.shields.io/crates/d/spart?label=downloads&style=flat&logo=rust" height="20">](https://crates.io/crates/spart)
 [<img alt="msrv" src="https://img.shields.io/badge/msrv-1.83.0-orange?label=msrv&style=flat&logo=rust" height="20">](https://github.com/rust-lang/rust/releases/tag/1.83.0)
+[<img alt="dependencies" src="https://deps.rs/repo/github/habedi/spart/status.svg">](https://deps.rs/repo/github/habedi/spart)
 [<img alt="docs" src="https://img.shields.io/badge/docs-latest-3776ab?label=docs&style=flat&logo=readthedocs" height="20">](docs)
-[<img alt="license" src="https://img.shields.io/badge/license-mit%2Fapache--2.0-007ec6?label=license&style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
+[<img alt="license" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?label=license&style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
 
 Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that provides implementations of various
 space partitioning tree data structures for efficient indexing and searching 2D and 3D point data.

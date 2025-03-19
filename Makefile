@@ -1,17 +1,18 @@
 # Variables
-PKG := github.com/habedi/spart
-BINARY_NAME := $(or $(PROJ_BINARY), $(notdir $(PKG)))
+PROJ_REPO := github.com/habedi/spart
+BINARY_NAME := $(or $(PROJ_BINARY), $(notdir $(PROJ_REPO)))
 BINARY = :target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
-CARGO_TERM_COLOR := always
+RUST_BACKTRACE := 0
 DEBUG_SPART := 0
 
 # Default target
 .DEFAULT_GOAL := help
 
 .PHONY: help
-help: ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+help: ## Show the help message for each target
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; \
+ 	{printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: format
 format: ## Format Rust files
@@ -19,9 +20,9 @@ format: ## Format Rust files
 	@cargo fmt
 
 .PHONY: test
-test: format ## Run tests
+test: format ## Run the tests
 	@echo "Running tests..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo test -- --nocapture
+	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo test -- --nocapture
 
 .PHONY: coverage
 coverage: format ## Generate test coverage report
@@ -57,6 +58,7 @@ install-deps: install-snap ## Install development dependencies
 	@rustup component add rustfmt clippy
 	@cargo install cargo-tarpaulin
 	@cargo install cargo-audit
+	@cargo install nextest
 
 .PHONY: lint
 lint: format ## Run linters on Rust files
@@ -77,3 +79,18 @@ bench: ## Run benchmarks
 audit: ## Run security audit on Rust dependencies
 	@echo "Running security audit..."
 	@cargo audit
+
+.PHONY: nextest
+nextest: ## Run tests using nextest
+	@echo "Running tests using nextest..."
+	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo nextest run
+
+.PHONY: doc
+doc: format ## Generate the documentation
+	@echo "Generating documentation..."
+	@cargo doc --no-deps --document-private-items
+
+.PHONY: fix-lint
+fix-lint: ## Fix the linter warnings
+	@echo "Fixing linter warnings..."
+	@cargo clippy --fix --allow-dirty --allow-staged --all-targets --workspace --all-features -- -D warnings
