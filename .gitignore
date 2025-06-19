@@ -89,3 +89,5 @@ rtree_2d.dot
 rtree_3d.dot
 src/main.rs
 .benchmarks
+*.log
+*_output.txt
