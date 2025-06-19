@@ -12,7 +12,7 @@
 [<img alt="docs" src="https://img.shields.io/badge/docs-latest-3776ab?label=docs&style=flat&logo=readthedocs" height="20">](docs)
 [<img alt="license" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?label=license&style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
 
-Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that provides implementations of various
+Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that provides implementations of popular
 space partitioning tree data structures for efficient indexing and searching 2D and 3D point data.
 
 Currently, the following trees are implemented:
@@ -23,7 +23,6 @@ Currently, the following trees are implemented:
 | 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
 | 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
 | 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
-| 5     | [BSP-tree](https://en.wikipedia.org/wiki/BSP-tree) | ✓  | ✓  | ✓          | ✓            |
 
 ### Installation
 

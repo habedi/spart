@@ -3,10 +3,9 @@ mod shared;
 use shared::*;
 
 use criterion::{black_box, criterion_group, Criterion};
-use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
 use tracing::info;
+use spart::{kd_tree, octree, quadtree, r_tree};
 
 /// Helper function that benchmarks a deletion function on a given dataset.
 ///
@@ -110,32 +109,6 @@ fn delete_3d_rtree(points: &[Point3D<i32>]) {
     info!("Finished deletion for 3D RTree");
 }
 
-/// Deletes all points from a 2D BSPTree.
-fn delete_2d_bsptree(points: &[Point2DBSP<i32>]) {
-    info!("Starting deletion for 2D BSPTree");
-    let mut tree = bsp_tree::BSPTree::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    for point in points.iter() {
-        tree.delete(&point.clone());
-    }
-    info!("Finished deletion for 2D BSPTree");
-}
-
-/// Deletes all points from a 3D BSPTree.
-fn delete_3d_bsptree(points: &[Point3DBSP<i32>]) {
-    info!("Starting deletion for 3D BSPTree");
-    let mut tree = bsp_tree::BSPTree::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    for point in points.iter() {
-        tree.delete(&point.clone());
-    }
-    info!("Finished deletion for 3D BSPTree");
-}
-
 fn benchmark_delete_quadtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
     info!("Benchmark 'delete_2d_quadtree' started");
@@ -172,18 +145,6 @@ fn benchmark_delete_rtree_3d(_c: &mut Criterion) {
     bench_delete_tree("delete_3d_rtree", &points, delete_3d_rtree);
 }
 
-fn benchmark_delete_bsptree_2d(_c: &mut Criterion) {
-    let points = generate_2d_data_wrapped();
-    info!("Benchmark 'delete_2d_bsptree' started");
-    bench_delete_tree("delete_2d_bsptree", &points, delete_2d_bsptree);
-}
-
-fn benchmark_delete_bsptree_3d(_c: &mut Criterion) {
-    let points = generate_3d_data_wrapped();
-    info!("Benchmark 'delete_3d_bsptree' started");
-    bench_delete_tree("delete_3d_bsptree", &points, delete_3d_bsptree);
-}
-
 criterion_group!(
     benches,
     benchmark_delete_quadtree_2d,
@@ -191,7 +152,5 @@ criterion_group!(
     benchmark_delete_kdtree_2d,
     benchmark_delete_kdtree_3d,
     benchmark_delete_rtree_2d,
-    benchmark_delete_rtree_3d,
-    benchmark_delete_bsptree_2d,
-    benchmark_delete_bsptree_3d
+    benchmark_delete_rtree_3d
 );

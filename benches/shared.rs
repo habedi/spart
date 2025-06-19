@@ -8,7 +8,6 @@
 //! both in raw and BSP‑wrapped formats.
 
 use criterion::Criterion;
-use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Cube, Point2D, Point3D};
 use tracing::{debug, info};
 
@@ -60,51 +59,6 @@ pub fn generate_3d_data() -> Vec<Point3D<i32>> {
         })
         .collect();
     info!("Finished generating 3D data ({} points)", data.len());
-    data
-}
-
-//
-// Data Generation Functions (Wrapped for BSPTree)
-//
-pub fn generate_2d_data_wrapped() -> Vec<Point2DBSP<i32>> {
-    info!(
-        "Generating wrapped 2D data for BSPTree with {} points",
-        BENCH_NUM_INSERT
-    );
-    let data: Vec<Point2DBSP<i32>> = (0..BENCH_NUM_INSERT)
-        .map(|i| {
-            let pt = Point2DBSP {
-                point: Point2D::new(i as f64, i as f64, Some(i)),
-            };
-            debug!("Generated wrapped 2D point: {:?}", pt);
-            pt
-        })
-        .collect();
-    info!(
-        "Finished generating wrapped 2D data ({} points)",
-        data.len()
-    );
-    data
-}
-
-pub fn generate_3d_data_wrapped() -> Vec<Point3DBSP<i32>> {
-    info!(
-        "Generating wrapped 3D data for BSPTree with {} points",
-        BENCH_NUM_INSERT
-    );
-    let data: Vec<Point3DBSP<i32>> = (0..BENCH_NUM_INSERT)
-        .map(|i| {
-            let pt = Point3DBSP {
-                point: Point3D::new(i as f64, i as f64, i as f64, Some(i)),
-            };
-            debug!("Generated wrapped 3D point: {:?}", pt);
-            pt
-        })
-        .collect();
-    info!(
-        "Finished generating wrapped 3D data ({} points)",
-        data.len()
-    );
     data
 }
 

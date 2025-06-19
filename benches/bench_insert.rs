@@ -3,10 +3,9 @@ mod shared;
 use shared::*;
 
 use criterion::{black_box, criterion_group, Criterion};
-use spart::bsp_tree::{Point2DBSP, Point3DBSP};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
 use tracing::info;
+use spart::{kd_tree, octree, quadtree, r_tree};
 
 /// A generic helper that benchmarks an insertion function.
 ///
@@ -86,24 +85,6 @@ fn insert_3d_rtree(points: &[Point3D<i32>]) {
     info!("Finished insertion for 3D RTree");
 }
 
-fn insert_2d_bsptree(points: &[Point2DBSP<i32>]) {
-    info!("Starting insertion for 2D BSPTree");
-    let mut tree = bsp_tree::BSPTree::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    info!("Finished insertion for 2D BSPTree");
-}
-
-fn insert_3d_bsptree(points: &[Point3DBSP<i32>]) {
-    info!("Starting insertion for 3D BSPTree");
-    let mut tree = bsp_tree::BSPTree::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    info!("Finished insertion for 3D BSPTree");
-}
-
 fn bench_insert_quadtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
     info!("Benchmark 'insert_2d_quadtree' started");
@@ -146,20 +127,6 @@ fn bench_insert_rtree_3d(_c: &mut Criterion) {
     bench_insert("insert_3d_rtree", &points, insert_3d_rtree, &mut cc);
 }
 
-fn bench_insert_bsptree_2d(_c: &mut Criterion) {
-    let points = generate_2d_data_wrapped();
-    info!("Benchmark 'insert_2d_bsptree' started");
-    let mut cc = configure_criterion();
-    bench_insert("insert_2d_bsptree", &points, insert_2d_bsptree, &mut cc);
-}
-
-fn bench_insert_bsptree_3d(_c: &mut Criterion) {
-    let points = generate_3d_data_wrapped();
-    info!("Benchmark 'insert_3d_bsptree' started");
-    let mut cc = configure_criterion();
-    bench_insert("insert_3d_bsptree", &points, insert_3d_bsptree, &mut cc);
-}
-
 criterion_group!(
     benches,
     bench_insert_quadtree_2d,
@@ -167,7 +134,5 @@ criterion_group!(
     bench_insert_kdtree_2d,
     bench_insert_kdtree_3d,
     bench_insert_rtree_2d,
-    bench_insert_rtree_3d,
-    bench_insert_bsptree_2d,
-    bench_insert_bsptree_3d
+    bench_insert_rtree_3d
 );
