@@ -11,7 +11,7 @@ DEBUG_SPART := 0
 
 .PHONY: help
 help: ## Show the help message for each target
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; \
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; \
  	{printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: format

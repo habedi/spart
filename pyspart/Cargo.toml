@@ -1,0 +1,15 @@
+[package]
+name = "pyspart"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "pyspart"
+crate-type = ["cdylib"]
+doc = false
+
+[dependencies]
+pyo3 = { version = "0.25.1", features = ["abi3-py310", "extension-module", "auto-initialize"] }
+spart = { path = ".." }
+

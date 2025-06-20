@@ -1,7 +1,7 @@
 name: Run Benchmarks
 
 on:
-  workflow_dispatch: { } # Allow manual execution
+  workflow_dispatch:
 
 jobs:
   build:

@@ -4,8 +4,8 @@ use shared::*;
 
 use criterion::{black_box, criterion_group, Criterion};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use tracing::info;
 use spart::{kd_tree, octree, quadtree, r_tree};
+use tracing::info;
 
 /// Helper function that benchmarks a deletion function on a given dataset.
 ///

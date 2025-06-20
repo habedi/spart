@@ -1,10 +1,10 @@
 name: Publish to Crates.io
 
 on:
-  workflow_dispatch: { } # Allow manual execution
+  workflow_dispatch:
   push:
     tags:
-      - 'v*' # Trigger on version tags
+      - 'v*'
 
 jobs:
 

@@ -11,7 +11,7 @@ would like to work on or if it has already been resolved.
 ### Reporting Bugs
 
 1. Open an issue on the [issue tracker](https://github.com/habedi/spart/issues).
-2. Include information such as steps to reproduce, expected/actual behavior, and relevant logs or screenshots.
+2. Include information such as steps to reproduce the bug, expected behavior, and actual behavior.
 
 ### Suggesting Features
 
