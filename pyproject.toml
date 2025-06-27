@@ -1,28 +1,7 @@
 [project]
-name = "pyspart"
-version = "0.1.0b1"
-description = "Python bindings for Spart library"
-readme = "README.md"
-license = { text = "MIT" }
-authors = [
-    { name = "Hassan Abedi", email = "hassan.abedi.t+pyspart@gmail.com" }
-]
-maintainers = [
-    { name = "Hassan Abedi", email = "hassan.abedi.t+pyspart@gmail.com" }
-]
-keywords = ["quadtree", "kdtree", "r-tree", "octree", "spatial-index"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Libraries",
-    "Topic :: Software Development :: Libraries :: Python Modules"
-]
+name = "spart"
+version = "0.1.0"
+description = "Python environment for Spart library"
 
 requires-python = ">=3.10,<4.0"
 dependencies = []
@@ -37,27 +16,14 @@ dev = [
     "ruff>=0.9.3",
     "pre-commit (>=4.2.0,<5.0.0)",
     "griffe (>=1.7.3,<2.0.0)",
-    "mkdocs (>=1.6.1,<2.0.0)",
-    "mkdocstrings-python (>=1.16.10,<2.0.0)",
-    "mkdocs-material (>=9.6.14,<10.0.0)",
-    "types-requests (>=2.32.0.20250515,<3.0.0.0)"
+    "types-requests (>=2.32.0.20250515,<3.0.0.0)",
+    "maturin[zig]>=1.9.0",
+    "twine>=6.1.0",
 ]
 
-[project.urls]
-Repository = "https://github.com/habedi/pyspart"
-Documentation = "https://github.com/habedi/spart/tree/main/pyspart"
-
-[tool.poetry]
-include = ["README.md"]
-packages = [{ include = "library" }]
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.pytest.ini_options]
-pythonpath = ["library"]
-testpaths = ["tests"]
+pythonpath = ["pyspart"]
+testpaths = ["pyspart/tests"]
 addopts = [
     "--tb=short",
     #"--disable-warnings",
@@ -74,8 +40,8 @@ asyncio_default_test_loop_scope = "function"
 [tool.coverage.run]
 branch = true
 parallel = true
-source = ["."]
-omit = ["tests/*"]
+source = ["pyspart"]
+omit = ["pyspart/tests/*"]
 
 [tool.coverage.report]
 show_missing = false
@@ -92,19 +58,18 @@ check_untyped_defs = true
 warn_return_any = true
 strict_optional = true
 warn_redundant_casts = true
-exclude = "^(benches/|examples/|tests/)"
+exclude = "pyspart/tests"
 
 [tool.ruff]
 exclude = [
     ".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache",
     ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv",
     "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules",
-    "venv",
-    "tests"
+    "venv", "pyspart/tests"
 ]
 line-length = 100
 indent-width = 4
-src = ["library"]
+src = ["pyspart"]
 target-version = "py310"
 unsafe-fixes = false
 
@@ -125,4 +90,4 @@ line-ending = "auto"
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = []
+"pyspart/tests/*.py" = []
