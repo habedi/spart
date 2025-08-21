@@ -358,13 +358,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     pub fn knn_search(&self, target: &Point3D<T>, k: usize) -> Vec<Point3D<T>> {
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper(target, k, &mut heap);
-        let mut result: Vec<Point3D<T>> = heap
-            .into_sorted_vec()
+        heap.into_sorted_vec()
             .into_iter()
             .filter_map(|item| item.point_3d)
-            .collect();
-        result.reverse();
-        result
+            .collect()
     }
 
     /// Helper method for recursively performing the k-nearest neighbor search.

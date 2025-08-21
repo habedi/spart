@@ -700,7 +700,7 @@ impl<T: Clone> PartialOrd for HeapItem<T> {
 
 impl<T: Clone> Ord for HeapItem<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.neg_distance.cmp(&other.neg_distance)
+        other.neg_distance.cmp(&self.neg_distance)
     }
 }
 

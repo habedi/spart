@@ -407,15 +407,15 @@ struct KnnCandidate<'a, T: RTreeObject> {
     entry: &'a RTreeEntry<T>,
 }
 
-impl<'a, T: RTreeObject> PartialEq for KnnCandidate<'a, T> {
+impl<T: RTreeObject> PartialEq for KnnCandidate<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.dist.eq(&other.dist)
     }
 }
 
-impl<'a, T: RTreeObject> Eq for KnnCandidate<'a, T> {}
+impl<T: RTreeObject> Eq for KnnCandidate<'_, T> {}
 
-impl<'a, T: RTreeObject> Ord for KnnCandidate<'a, T> {
+impl<T: RTreeObject> Ord for KnnCandidate<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         other
             .dist
@@ -424,7 +424,7 @@ impl<'a, T: RTreeObject> Ord for KnnCandidate<'a, T> {
     }
 }
 
-impl<'a, T: RTreeObject> PartialOrd for KnnCandidate<'a, T> {
+impl<T: RTreeObject> PartialOrd for KnnCandidate<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
