@@ -22,17 +22,13 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install uv
+      - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip make
-          pip install poetry
-
-      - name: Install Python Dependencies
-        run: |
-          poetry install --no-root
+          pip install -U pip
+          pip install uv
+          uv sync --all-extras
 
       - name: Build and Publish Package
         run: |
-          poetry run make wheel-manylinux
-          PYPI_TOKEN=${{ secrets.PYPI_API_TOKEN }} poetry run make publish-py
+          make wheel-manylinux
+          env PYPI_TOKEN=${{ secrets.PYPI_API_TOKEN }} make publish-py

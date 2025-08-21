@@ -2,6 +2,9 @@ name: Run Benchmarks
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   benchmarks:
@@ -24,7 +27,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make
+          sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
       - name: Run Benchmarks

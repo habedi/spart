@@ -67,9 +67,8 @@ install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
 	@rustup component add rustfmt clippy
 	@cargo install cargo-tarpaulin
-	@cargo install cargo-audit
-	@cargo install nextest
-	@sudo apt-get install python3-pip
+	@cargo install --locked cargo-nextest --version 0.9.97-b.2
+	@sudo apt-get install -y python3-pip
 	@pip install $(PY_DEP_MNGR)
 
 .PHONY: lint
