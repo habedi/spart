@@ -8,10 +8,10 @@
 [<img alt="msrv" src="https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&logo=rust" height="20">](https://www.rust-lang.org)
 [<img alt="license" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?label=license&style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
 
-Spart (**s**[pace] **par**[titioning] **t**[rees] is a Rust library that provides implementations of popular
-space partitioning tree data structures for efficient indexing and searching 2D and 3D point data.
+Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of popular
+space partitioning tree data structures for efficient indexing and searching of 2D and 3D point data.
 
-Currently, the following trees are implemented:
+Currently, the following data structures are implemented:
 
 | Index | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
 |-------|----------------------------------------------------|----|----|------------|--------------|
@@ -20,19 +20,33 @@ Currently, the following trees are implemented:
 | 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
 | 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
 
+---
+
 ### Installation
 
 ```bash
 cargo add spart
-```
+````
 
 *Spart requires Rust 1.83.0 or later.*
 
+#### Python Bindings
+
+You can use the `PySpart` Python library to use Spart in your Python project.
+Check out the [pyspart](pyspart) directory for more information, including installation and Python examples.
+
+---
+
 ### Documentation
 
-The documentation for the latest release can be found [here](docs).
+The documentation for the latest release can be found [here](docs/README.md).
+The API documentation is available on [docs.rs/spart](https://docs.rs/spart).
 
-Additionally, check out the [examples](examples/) directory for examples.
+#### Examples
+
+Check out the [examples](examples) directory for examples.
+
+-----
 
 ### Contributing
 
