@@ -1,12 +1,12 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use spart::geometry::{Point2D, Point3D, Rectangle, Cube};
-use spart::quadtree::Quadtree;
-use spart::octree::Octree;
+use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
+use spart::octree::Octree;
+use spart::quadtree::Quadtree;
 use spart::r_tree::RTree;
 
 // A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.

@@ -1,5 +1,6 @@
 from pyspart import Quadtree, Point2D
 
+
 def main():
     # Create a new quadtree with a bounding box that spans from (0, 0) to (100, 100)
     boundary = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
@@ -15,7 +16,8 @@ def main():
     results = quadtree.knn_search(query_point, 2)
 
     # Print the results
-    print(f"2 nearest neighbors to query point: {[ (p.x, p.y, p.data) for p in results]}")
+    print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.data) for p in results]}")
+
 
 if __name__ == "__main__":
     main()

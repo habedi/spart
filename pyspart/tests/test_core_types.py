@@ -1,5 +1,7 @@
 import pytest
+
 from pyspart import Point2D, Point3D, Quadtree, Octree, KdTree2D, KdTree3D, RTree2D, RTree3D
+
 
 def test_point2d_creation():
     p = Point2D(1.0, 2.0, {"some": "data"})
@@ -7,12 +9,14 @@ def test_point2d_creation():
     assert p.y == 2.0
     assert p.data == {"some": "data"}
 
+
 def test_point3d_creation():
     p = Point3D(1.0, 2.0, 3.0, {"some": "data"})
     assert p.x == 1.0
     assert p.y == 2.0
     assert p.z == 3.0
     assert p.data == {"some": "data"}
+
 
 def test_quadtree():
     boundary = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
@@ -41,6 +45,7 @@ def test_quadtree():
     assert len(results) == 1
     assert results[0].data != "p2"
 
+
 def test_octree():
     boundary = {"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0}
     ot = Octree(boundary, 4)
@@ -68,6 +73,7 @@ def test_octree():
     assert len(results) == 1
     assert results[0].data != "p2"
 
+
 def test_kdtree2d():
     kd = KdTree2D()
     p1 = Point2D(1.0, 2.0, "p1")
@@ -92,6 +98,7 @@ def test_kdtree2d():
     results = kd.knn_search(Point2D(5.0, 5.0, None), 1)
     assert len(results) == 1
     assert results[0].data != "p2"
+
 
 def test_kdtree3d():
     kd = KdTree3D()
@@ -118,6 +125,7 @@ def test_kdtree3d():
     assert len(results) == 1
     assert results[0].data != "p2"
 
+
 def test_rtree2d():
     rt = RTree2D(4)
     p1 = Point2D(10.0, 20.0, "p1")
@@ -137,6 +145,7 @@ def test_rtree2d():
     assert rt.delete(p2)
     results = rt.range_search(Point2D(50.0, 50.0, None), 1.0)
     assert len(results) == 0
+
 
 def test_rtree3d():
     rt = RTree3D(4)

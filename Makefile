@@ -155,7 +155,7 @@ publish-py: wheel-manylinux ## Publish the PySpart wheel to PyPI (requires PYPI_
 	   exit 1; \
 	fi
 	@echo "Found wheel file: $(WHEEL_FILE)"
-	@twine upload -u __token__ -p $(PYPI_TOKEN) $(WHEEL_FILE)
+	@twine upload -u __token__ -p $(PYPI_TOKEN) dist $(WHEEL_FILE)
 
 .PHONY: generate-ci
 generate-ci: ## Generate CI configuration files (GitHub Actions workflow)

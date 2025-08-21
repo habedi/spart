@@ -474,7 +474,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.0.0 {
                         break;
                     }
                 }
@@ -485,7 +485,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
                     let d_sq = query.distance_sq(object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                    } else if d_sq < results.peek().unwrap().0.0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -493,7 +493,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
@@ -554,7 +554,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.0.0 {
                         break;
                     }
                 }
@@ -565,7 +565,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
                     let d_sq = query.distance_sq(object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                    } else if d_sq < results.peek().unwrap().0.0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -573,7 +573,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,

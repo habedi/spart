@@ -1,5 +1,6 @@
 from pyspart import RTree2D, RTree3D, Point2D, Point3D
 
+
 def main():
     # --- 2D RTree Example ---
     print("--- 2D RTree Example ---")
@@ -16,7 +17,7 @@ def main():
     results_2d = tree2d.range_search(query_point_2d, 10.0)
 
     # Print the results
-    print(f"Points within 10 units of query point: {[ (p.x, p.y, p.data) for p in results_2d]}")
+    print(f"Points within 10 units of query point: {[(p.x, p.y, p.data) for p in results_2d]}")
 
     # --- 3D RTree Example ---
     print("\n--- 3D RTree Example ---")
@@ -32,7 +33,8 @@ def main():
     results_3d = tree3d.range_search(query_point_3d, 10.0)
 
     # Print the results
-    print(f"Points within 10 units of query point: {[ (p.x, p.y, p.z, p.data) for p in results_3d]}")
+    print(f"Points within 10 units of query point: {[(p.x, p.y, p.z, p.data) for p in results_3d]}")
+
 
 if __name__ == "__main__":
     main()

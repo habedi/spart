@@ -1,5 +1,6 @@
 from pyspart import Octree, Point3D
 
+
 def main():
     # Create a new octree with a bounding box that spans from (0, 0, 0) to (100, 100, 100)
     boundary = {
@@ -22,7 +23,8 @@ def main():
     results = octree.knn_search(query_point, 2)
 
     # Print the results
-    print(f"2 nearest neighbors to query point: {[ (p.x, p.y, p.z, p.data) for p in results]}")
+    print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.z, p.data) for p in results]}")
+
 
 if __name__ == "__main__":
     main()

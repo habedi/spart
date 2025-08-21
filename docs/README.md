@@ -19,7 +19,7 @@ fn main() {
         y: 2.0,
         data: Some("A 2D Point"),
     };
-    
+
     // 3D point with coordinates (1.0, 2.0, 3.0) and data "A 3D Point".
     let point_3d = Point3D {
         x: 1.0,

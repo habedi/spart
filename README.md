@@ -32,7 +32,8 @@ cargo add spart
 
 The documentation for the latest release can be found [here](docs).
 
-Additionally, check out the [examples](examples/) and [tests](tests/) directories for detailed examples for how to use the library.
+Additionally, check out the [examples](examples/) and [tests](tests/) directories for detailed examples for how to use
+the library.
 
 ### Contributing
 
