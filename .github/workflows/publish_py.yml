@@ -1,0 +1,38 @@
+name: Publish PySpart to PyPI
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish_to_pypi:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install uv
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip make
+          pip install poetry
+
+      - name: Install Python Dependencies
+        run: |
+          poetry install --no-root
+
+      - name: Build and Publish Package
+        run: |
+          poetry run make wheel-manylinux
+          PYPI_TOKEN=${{ secrets.PYPI_API_TOKEN }} poetry run make publish-py

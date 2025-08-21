@@ -1,4 +1,4 @@
-name: Run Linters
+name: Run Linter Checks
 
 on:
   workflow_dispatch:
@@ -8,6 +8,9 @@ on:
   push:
     tags:
       - 'v*'
+
+permissions:
+  contents: read
 
 jobs:
   lint:

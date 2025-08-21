@@ -11,16 +11,16 @@ on:
       - 'v*'
 
 permissions:
-    contents: read
+  contents: read
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         # Define the Rust versions to test against
-        rust-version: [ "1.83.0", "1.84.0", "beta", "stable" ]
+        rust-version: [ "1.83.0", "stable", "beta" ]
 
     steps:
       - name: Checkout Repository

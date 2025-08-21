@@ -5,6 +5,11 @@ BINARY = :target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
 RUST_BACKTRACE := 0
 DEBUG_SPART := 0
+RUST_LOG        := info
+WHEEL_DIR       := dist
+PYSPART_DIR     := pyspart
+PY_DEP_MNGR     := uv
+WHEEL_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-*.whl 2>/dev/null | head -n 1)
 
 # Default target
 .DEFAULT_GOAL := help
@@ -46,6 +51,8 @@ run: build ## Build and run the binary
 clean: ## Remove generated and temporary files
 	@echo "Cleaning up..."
 	@cargo clean
+	@rm -rf $(WHEEL_DIR) dist/ $(PYSPART_DIR)/$(WHEEL_DIR)
+	@rm -f $(PYSPART_DIR)/*.so
 
 .PHONY: install-snap
 install-snap: ## Install a few dependencies using Snapcraft
@@ -62,6 +69,8 @@ install-deps: install-snap ## Install development dependencies
 	@cargo install cargo-tarpaulin
 	@cargo install cargo-audit
 	@cargo install nextest
+	@sudo apt-get install python3-pip
+	@pip install $(PY_DEP_MNGR)
 
 .PHONY: lint
 lint: format ## Run linters on Rust files
@@ -97,3 +106,59 @@ docs: format ## Generate the documentation
 fix-lint: ## Fix the linter warnings
 	@echo "Fixing linter warnings..."
 	@cargo clippy --fix --allow-dirty --allow-staged --all-targets --workspace --all-features -- -D warnings
+
+########################################################################################
+## Python targets
+########################################################################################
+
+.PHONY: develop-py
+develop-py: ## Build and install PySpart in the current Python environment
+	@echo "Building and installing PySpart..."
+	# Note: Maturin does not work when CONDA_PREFIX and VIRTUAL_ENV are both set
+	@(cd $(PYSPART_DIR) && unset CONDA_PREFIX && maturin develop)
+
+.PHONY: wheel
+wheel: ## Build the wheel file for PySpart
+	@echo "Building the PySpart wheel..."
+	@(cd $(PYSPART_DIR) && maturin build --release --out $(WHEEL_DIR) --auditwheel check)
+
+.PHONY: wheel-manylinux
+wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
+	@echo "Building the manylinux PySpart wheel..."
+	@(cd $(PYSPART_DIR) && maturin build --release --out $(WHEEL_DIR) --auditwheel check --zig)
+
+.PHONY: test-py
+test-py: develop-py ## Run Python tests
+	@echo "Running Python tests..."
+	@$(PY_DEP_MNGR) run pytest
+
+.PHONY: publish-py
+publish-py: wheel-manylinux ## Publish the PySpart wheel to PyPI (requires PYPI_TOKEN to be set)
+	@echo "Publishing PySpart to PyPI..."
+	@if [ -z "$(WHEEL_FILE)" ]; then \
+	   echo "Error: No wheel file found. Please run 'make wheel' first."; \
+	   exit 1; \
+	fi
+	@echo "Found wheel file: $(WHEEL_FILE)"
+	@twine upload -u __token__ -p $(PYPI_TOKEN) $(WHEEL_FILE)
+
+.PHONY: generate-ci
+generate-ci: ## Generate CI configuration files (GitHub Actions workflow)
+	@echo "Generating CI configuration files..."
+	@(cd $(PYSPART_DIR) && maturin generate-ci --zig --pytest --platform all -o ../.github/workflows/ci.yml github)
+
+########################################################################################
+## Additional targets
+########################################################################################
+
+.PHONY: setup-hooks
+setup-hooks: ## Install Git hooks (pre-commit and pre-push)
+	@echo "Installing Git hooks..."
+	@pre-commit install --hook-type pre-commit
+	@pre-commit install --hook-type pre-push
+	@pre-commit install-hooks
+
+.PHONY: test-hooks
+test-hooks: ## Test Git hooks on all files
+	@echo "Testing Git hooks..."
+	@pre-commit run --all-files
