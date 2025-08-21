@@ -11,6 +11,9 @@ homepage = "https://github.com/habedi/spart"
 documentation = "https://docs.rs/spart"
 categories = ["data-structures", "algorithms"]
 edition = "2021"
+rust-version = "1.83.0"
+
+resolver = "2"
 
 [lib]
 name = "spart"
