@@ -1,16 +1,16 @@
 name: Run Benchmarks
 
 on:
-  workflow_dispatch: { } # Allow manual execution
+  workflow_dispatch:
 
 jobs:
-  build:
+  benchmarks:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         # Define the Rust versions to test against
-        rust-version: [ "stable", "beta" ]
+        rust-version: [ "1.83.0", "stable", "beta" ]
 
     steps:
       - name: Checkout Repository
@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make
+          sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
       - name: Run Benchmarks

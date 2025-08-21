@@ -1,0 +1,34 @@
+name: Publish PySpart to PyPI
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish_to_pypi:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          pip install -U pip
+          pip install uv
+          uv sync --all-extras
+
+      - name: Build and Publish Package
+        run: |
+          make wheel-manylinux
+          env PYPI_TOKEN=${{ secrets.PYPI_API_TOKEN }} make publish-py

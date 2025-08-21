@@ -2,36 +2,15 @@
 mod shared;
 use shared::*;
 
-use criterion::{black_box, criterion_group, Criterion};
-use spart::bsp_tree::{Point2DBSP, Point3DBSP};
+use criterion::{criterion_group, Criterion};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
+use spart::{kd_tree, octree, quadtree, r_tree};
+use std::hint::black_box;
 use tracing::info;
 
 /// Configures Criterion using the shared benchmark timeout.
 fn configure_criterion() -> Criterion {
     Criterion::default().measurement_time(BENCH_TIMEOUT)
-}
-
-/// A generic helper function for knn search benchmarks.
-/// The lifetime `'a` ties the returned value's lifetime to that of the tree reference.
-fn bench_knn_search<'a, T, Q, R>(
-    name: &str,
-    tree: &'a T,
-    query: &Q,
-    search_fn: impl Fn(&'a T, &Q, usize) -> R,
-    cc: &mut Criterion,
-) where
-    R: 'a,
-{
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            info!("Running knn search benchmark: {}", name);
-            let res = search_fn(tree, query, BENCH_KNN_SIZE);
-            info!("Completed knn search benchmark: {}", name);
-            black_box(res)
-        })
-    });
 }
 
 fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
@@ -43,13 +22,15 @@ fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_kdtree_2d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_kdtree_2d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
@@ -61,33 +42,15 @@ fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_rtree_2d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
-}
-
-fn benchmark_knn_bsptree_2d(_c: &mut Criterion) {
-    info!("Setting up benchmark: knn_bsptree_2d");
-    let points = generate_2d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point2DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let target: Point2DBSP<i32> = Point2DBSP {
-        point: Point2D::new(35.0, 45.0, None),
-    };
-    let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_bsptree_2d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_rtree_2d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
@@ -105,13 +68,15 @@ fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_quadtree_2d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_quadtree_2d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
@@ -123,13 +88,15 @@ fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_kdtree_3d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_kdtree_3d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
@@ -141,33 +108,15 @@ fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_rtree_3d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
-}
-
-fn benchmark_knn_bsptree_3d(_c: &mut Criterion) {
-    info!("Setting up benchmark: knn_bsptree_3d");
-    let points = generate_3d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point3DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let target: Point3DBSP<i32> = Point3DBSP {
-        point: Point3D::new(35.0, 45.0, 35.0, None),
-    };
-    let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_bsptree_3d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_rtree_3d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_octree_3d(_c: &mut Criterion) {
@@ -180,23 +129,23 @@ fn benchmark_knn_octree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    bench_knn_search(
-        "knn_octree_3d",
-        &tree,
-        &target,
-        |t, q, k| t.knn_search(q, k),
-        &mut cc,
-    );
+    let name = "knn_octree_3d";
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            info!("Running knn search benchmark: {}", name);
+            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            info!("Completed knn search benchmark: {}", name);
+            black_box(res)
+        })
+    });
 }
 
 criterion_group!(
     benches,
     benchmark_knn_kdtree_2d,
     benchmark_knn_rtree_2d,
-    benchmark_knn_bsptree_2d,
     benchmark_knn_quadtree_2d,
     benchmark_knn_kdtree_3d,
     benchmark_knn_rtree_3d,
-    benchmark_knn_bsptree_3d,
-    benchmark_knn_octree_3d,
+    benchmark_knn_octree_3d
 );

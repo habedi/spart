@@ -1,6 +1,6 @@
 [package]
 name = "spart"
-version = "0.1.4"
+version = "0.2.0"
 description = "A collection of space partitioning tree data structures for Rust"
 repository = "https://github.com/habedi/spart"
 license = "MIT OR Apache-2.0"
@@ -11,6 +11,9 @@ homepage = "https://github.com/habedi/spart"
 documentation = "https://docs.rs/spart"
 categories = ["data-structures", "algorithms"]
 edition = "2021"
+rust-version = "1.83.0"
+
+resolver = "2"
 
 [lib]
 name = "spart"
@@ -20,10 +23,10 @@ path = "src/lib.rs"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 ordered-float = "5.0.0"
-ctor = "0.4.1"
+ctor = "0.5.0"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7.0", features = ["html_reports"] }
 
 [[bench]]
 name = "main"
@@ -39,6 +42,22 @@ debug = true
 
 [profile.test]
 debug = true
+
+[[example]]
+name = "quadtree"
+path = "examples/quadtree.rs"
+
+[[example]]
+name = "octree"
+path = "examples/octree.rs"
+
+[[example]]
+name = "kdtree"
+path = "examples/kdtree.rs"
+
+[[example]]
+name = "rtree"
+path = "examples/rtree.rs"
 
 [package.metadata.rustfmt]
 max_width = 100

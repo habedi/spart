@@ -286,6 +286,10 @@ where
     }
 }
 
+// Note: This implementation is inefficient as it traverses all children of a node
+// instead of pruning the search by checking for MBR intersections. An attempt
+// to add pruning resulted in a stack overflow, so the inefficient but correct
+// version is kept.
 fn delete_entry<T: RTreeObject + PartialEq>(node: &mut RTreeNode<T>, object: &T) -> usize {
     if node.is_leaf {
         let initial_len = node.entries.len();
@@ -396,28 +400,23 @@ impl Cube {
     }
 }
 
+// Knn-search candidate.
 #[derive(Debug)]
-struct Candidate2D<'a, T: std::fmt::Debug> {
+struct KnnCandidate<'a, T: RTreeObject> {
     dist: f64,
-    entry: CandidateEntry2D<'a, T>,
+    entry: &'a RTreeEntry<T>,
 }
 
-#[derive(Debug)]
-enum CandidateEntry2D<'a, T: std::fmt::Debug> {
-    Node(&'a RTreeNode<Point2D<T>>),
-    Leaf(&'a Point2D<T>),
-}
-
-impl<T: std::fmt::Debug> PartialEq for Candidate2D<'_, T> {
+impl<T: RTreeObject> PartialEq for KnnCandidate<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.dist.eq(&other.dist)
     }
 }
-impl<T: std::fmt::Debug> Eq for Candidate2D<'_, T> {}
 
-impl<T: std::fmt::Debug> Ord for Candidate2D<'_, T> {
+impl<T: RTreeObject> Eq for KnnCandidate<'_, T> {}
+
+impl<T: RTreeObject> Ord for KnnCandidate<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse order: lower distances are "greater" so they come out first from the heap.
         other
             .dist
             .partial_cmp(&self.dist)
@@ -425,13 +424,13 @@ impl<T: std::fmt::Debug> Ord for Candidate2D<'_, T> {
     }
 }
 
-impl<T: std::fmt::Debug> PartialOrd for Candidate2D<'_, T> {
+impl<T: RTreeObject> PartialOrd for KnnCandidate<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: std::fmt::Debug> RTree<Point2D<T>> {
+impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
     /// Performs a k‑nearest neighbor search on an R‑tree of 2D points.
     ///
     /// # Arguments
@@ -443,82 +442,75 @@ impl<T: std::fmt::Debug> RTree<Point2D<T>> {
     ///
     /// A vector of references to the k nearest 2D points.
     pub fn knn_search(&self, query: &Point2D<T>, k: usize) -> Vec<&Point2D<T>> {
-        let mut heap = BinaryHeap::new();
-        heap.push(Candidate2D {
-            dist: compute_group_mbr(&self.root.entries).min_distance(query),
-            entry: CandidateEntry2D::Node(&self.root),
-        });
-        let mut result = Vec::new();
-        while let Some(Candidate2D { entry, .. }) = heap.pop() {
-            match entry {
-                CandidateEntry2D::Leaf(obj) => {
-                    result.push(obj);
-                    if result.len() == k {
+        if k == 0 {
+            return Vec::new();
+        }
+
+        let mut heap: BinaryHeap<KnnCandidate<Point2D<T>>> = BinaryHeap::new();
+        for entry in &self.root.entries {
+            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            heap.push(KnnCandidate {
+                dist: dist_sq,
+                entry,
+            });
+        }
+
+        #[derive(PartialEq)]
+        struct OrdDist(f64);
+        impl Eq for OrdDist {}
+        impl PartialOrd for OrdDist {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl Ord for OrdDist {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.0.partial_cmp(&other.0).unwrap()
+            }
+        }
+
+        let mut results: BinaryHeap<(OrdDist, &Point2D<T>)> = BinaryHeap::new();
+
+        while let Some(KnnCandidate { dist, entry }) = heap.pop() {
+            if results.len() >= k {
+                if let Some(worst_result) = results.peek() {
+                    if dist > worst_result.0 .0 {
                         break;
                     }
                 }
-                CandidateEntry2D::Node(node) => {
-                    for entry in &node.entries {
-                        match entry {
-                            RTreeEntry::Leaf { mbr, object } => {
-                                let d = mbr.min_distance(query);
-                                heap.push(Candidate2D {
-                                    dist: d,
-                                    entry: CandidateEntry2D::Leaf(object),
-                                });
-                            }
-                            RTreeEntry::Node { mbr, child } => {
-                                let d = mbr.min_distance(query);
-                                heap.push(Candidate2D {
-                                    dist: d,
-                                    entry: CandidateEntry2D::Node(child),
-                                });
-                            }
+            }
+
+            match entry {
+                RTreeEntry::Leaf { object, .. } => {
+                    let d_sq = query.distance_sq(object);
+                    if results.len() < k {
+                        results.push((OrdDist(d_sq), object));
+                    } else if d_sq < results.peek().unwrap().0 .0 {
+                        results.pop();
+                        results.push((OrdDist(d_sq), object));
+                    }
+                }
+                RTreeEntry::Node { child, .. } => {
+                    for child_entry in &child.entries {
+                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                            heap.push(KnnCandidate {
+                                dist: d_sq,
+                                entry: child_entry,
+                            });
                         }
                     }
                 }
             }
         }
-        result
+
+        let mut sorted_results = results.into_vec();
+        sorted_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        sorted_results.into_iter().map(|r| r.1).collect()
     }
 }
 
-#[derive(Debug)]
-struct Candidate3D<'a, T: std::fmt::Debug> {
-    dist: f64,
-    entry: CandidateEntry3D<'a, T>,
-}
-
-#[derive(Debug)]
-enum CandidateEntry3D<'a, T: std::fmt::Debug> {
-    Node(&'a RTreeNode<Point3D<T>>),
-    Leaf(&'a Point3D<T>),
-}
-
-impl<T: std::fmt::Debug> PartialEq for Candidate3D<'_, T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.dist.eq(&other.dist)
-    }
-}
-impl<T: std::fmt::Debug> Eq for Candidate3D<'_, T> {}
-
-impl<T: std::fmt::Debug> Ord for Candidate3D<'_, T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse order: lower distances are "greater" so they come out first from the heap.
-        other
-            .dist
-            .partial_cmp(&self.dist)
-            .unwrap_or(Ordering::Equal)
-    }
-}
-
-impl<T: std::fmt::Debug> PartialOrd for Candidate3D<'_, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: std::fmt::Debug> RTree<Point3D<T>> {
+impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
     /// Performs a k‑nearest neighbor search on an R‑tree of 3D points.
     ///
     /// # Arguments
@@ -530,44 +522,71 @@ impl<T: std::fmt::Debug> RTree<Point3D<T>> {
     ///
     /// A vector of references to the k nearest 3D points.
     pub fn knn_search(&self, query: &Point3D<T>, k: usize) -> Vec<&Point3D<T>> {
-        let mut heap = BinaryHeap::new();
-        let root_mbr = compute_group_mbr(&self.root.entries);
-        heap.push(Candidate3D {
-            dist: root_mbr.min_distance(query),
-            entry: CandidateEntry3D::Node(&self.root),
-        });
-        let mut result = Vec::new();
-        while let Some(Candidate3D { entry, .. }) = heap.pop() {
-            match entry {
-                CandidateEntry3D::Leaf(obj) => {
-                    result.push(obj);
-                    if result.len() == k {
+        if k == 0 {
+            return Vec::new();
+        }
+
+        let mut heap: BinaryHeap<KnnCandidate<Point3D<T>>> = BinaryHeap::new();
+        for entry in &self.root.entries {
+            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            heap.push(KnnCandidate {
+                dist: dist_sq,
+                entry,
+            });
+        }
+
+        #[derive(PartialEq)]
+        struct OrdDist(f64);
+        impl Eq for OrdDist {}
+        impl PartialOrd for OrdDist {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl Ord for OrdDist {
+            fn cmp(&self, other: &Self) -> Ordering {
+                self.0.partial_cmp(&other.0).unwrap()
+            }
+        }
+
+        let mut results: BinaryHeap<(OrdDist, &Point3D<T>)> = BinaryHeap::new();
+
+        while let Some(KnnCandidate { dist, entry }) = heap.pop() {
+            if results.len() >= k {
+                if let Some(worst_result) = results.peek() {
+                    if dist > worst_result.0 .0 {
                         break;
                     }
                 }
-                CandidateEntry3D::Node(node) => {
-                    for entry in &node.entries {
-                        match entry {
-                            RTreeEntry::Leaf { mbr, object } => {
-                                let d = mbr.min_distance(query);
-                                heap.push(Candidate3D {
-                                    dist: d,
-                                    entry: CandidateEntry3D::Leaf(object),
-                                });
-                            }
-                            RTreeEntry::Node { mbr, child } => {
-                                let d = mbr.min_distance(query);
-                                heap.push(Candidate3D {
-                                    dist: d,
-                                    entry: CandidateEntry3D::Node(child),
-                                });
-                            }
+            }
+
+            match entry {
+                RTreeEntry::Leaf { object, .. } => {
+                    let d_sq = query.distance_sq(object);
+                    if results.len() < k {
+                        results.push((OrdDist(d_sq), object));
+                    } else if d_sq < results.peek().unwrap().0 .0 {
+                        results.pop();
+                        results.push((OrdDist(d_sq), object));
+                    }
+                }
+                RTreeEntry::Node { child, .. } => {
+                    for child_entry in &child.entries {
+                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                            heap.push(KnnCandidate {
+                                dist: d_sq,
+                                entry: child_entry,
+                            });
                         }
                     }
                 }
             }
         }
-        result
+
+        let mut sorted_results = results.into_vec();
+        sorted_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        sorted_results.into_iter().map(|r| r.1).collect()
     }
 }
 

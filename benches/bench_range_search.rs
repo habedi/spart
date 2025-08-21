@@ -2,10 +2,10 @@
 mod shared;
 use shared::*;
 
-use criterion::{black_box, criterion_group, Criterion};
-use spart::bsp_tree::{Point2DBSP, Point3DBSP};
+use criterion::{criterion_group, Criterion};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
-use spart::{bsp_tree, kd_tree, octree, quadtree, r_tree};
+use spart::{kd_tree, octree, quadtree, r_tree};
+use std::hint::black_box;
 use tracing::info;
 
 // Configure Criterion with our benchmark timeout.
@@ -92,53 +92,6 @@ fn benchmark_range_rtree_2d(_c: &mut Criterion) {
     let mut cc = configure_criterion();
     bench_range_search(
         "range_rtree_2d",
-        &tree,
-        &query_point,
-        |t, q, r| t.range_search(q, r),
-        &mut cc,
-    );
-}
-
-fn benchmark_range_bbox_bsptree_2d(_c: &mut Criterion) {
-    info!("Setting up benchmark_range_bbox_bsptree_2d");
-    let points = generate_2d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point2DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let query_rect = Rectangle {
-        x: 35.0 - BENCH_RANGE_RADIUS,
-        y: 45.0 - BENCH_RANGE_RADIUS,
-        width: 2.0 * BENCH_RANGE_RADIUS,
-        height: 2.0 * BENCH_RANGE_RADIUS,
-    };
-    let mut cc = configure_criterion();
-    bench_range_search(
-        "range_bsptree_bbox_2d",
-        &tree,
-        &query_rect,
-        |t, q, _| t.range_search_bbox(q),
-        &mut cc,
-    );
-}
-
-fn benchmark_range_bsptree_2d(_c: &mut Criterion) {
-    info!("Setting up benchmark_range_bsptree_2d");
-    let points = generate_2d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point2DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let query_point = Point2DBSP {
-        point: Point2D {
-            x: 35.0,
-            y: 45.0,
-            data: None,
-        },
-    };
-    let mut cc = configure_criterion();
-    bench_range_search(
-        "range_bsptree_2d",
         &tree,
         &query_point,
         |t, q, r| t.range_search(q, r),
@@ -236,56 +189,6 @@ fn benchmark_range_rtree_3d(_c: &mut Criterion) {
     );
 }
 
-fn benchmark_range_bbox_bsptree_3d(_c: &mut Criterion) {
-    info!("Setting up benchmark_range_bbox_bsptree_3d");
-    let points = generate_3d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point3DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let query_cube = Cube {
-        x: 35.0 - BENCH_RANGE_RADIUS,
-        y: 45.0 - BENCH_RANGE_RADIUS,
-        z: 35.0 - BENCH_RANGE_RADIUS,
-        width: 2.0 * BENCH_RANGE_RADIUS,
-        height: 2.0 * BENCH_RANGE_RADIUS,
-        depth: 2.0 * BENCH_RANGE_RADIUS,
-    };
-    let mut cc = configure_criterion();
-    bench_range_search(
-        "range_bsptree_bbox_3d",
-        &tree,
-        &query_cube,
-        |t, q, _| t.range_search_bbox(q),
-        &mut cc,
-    );
-}
-
-fn benchmark_range_bsptree_3d(_c: &mut Criterion) {
-    info!("Setting up benchmark_range_bsptree_3d");
-    let points = generate_3d_data_wrapped();
-    let mut tree = bsp_tree::BSPTree::<Point3DBSP<i32>>::new(BENCH_NODE_CAPACITY);
-    for point in points.iter() {
-        tree.insert(point.clone());
-    }
-    let query_point = Point3DBSP {
-        point: Point3D {
-            x: 35.0,
-            y: 45.0,
-            z: 35.0,
-            data: None,
-        },
-    };
-    let mut cc = configure_criterion();
-    bench_range_search(
-        "range_bsptree_3d",
-        &tree,
-        &query_point,
-        |t, q, r| t.range_search(q, r),
-        &mut cc,
-    );
-}
-
 fn benchmark_range_octree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_octree_3d");
     let points = generate_3d_data();
@@ -310,13 +213,9 @@ criterion_group!(
     benchmark_range_kdtree_2d,
     benchmark_range_rtree_2d,
     benchmark_range_bbox_rtree_2d,
-    benchmark_range_bsptree_2d,
-    benchmark_range_bbox_bsptree_2d,
     benchmark_range_quadtree_2d,
     benchmark_range_kdtree_3d,
     benchmark_range_rtree_3d,
     benchmark_range_bbox_rtree_3d,
-    benchmark_range_bsptree_3d,
-    benchmark_range_bbox_bsptree_3d,
-    benchmark_range_octree_3d,
+    benchmark_range_octree_3d
 );

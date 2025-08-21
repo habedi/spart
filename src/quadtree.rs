@@ -254,13 +254,10 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper(target, k, &mut heap);
-        let mut results: Vec<Point2D<T>> = heap
-            .into_sorted_vec()
+        heap.into_sorted_vec()
             .into_iter()
             .filter_map(|item| item.point_2d)
-            .collect();
-        results.reverse();
-        results
+            .collect()
     }
 
     /// Helper method for performing the recursive k-nearest neighbor search.

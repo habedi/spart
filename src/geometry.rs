@@ -23,7 +23,7 @@ use crate::exceptions::SpartError;
 /// // Use an explicit type parameter (here, `()`) so that the type can be inferred.
 /// let pt: Point2D<()> = Point2D::new(1.0, 2.0, None);
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Point2D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -31,6 +31,38 @@ pub struct Point2D<T> {
     pub y: f64,
     /// Optional associated data.
     pub data: Option<T>,
+}
+
+impl<T: PartialEq> PartialEq for Point2D<T> {
+    fn eq(&self, other: &Self) -> bool {
+        OrderedFloat(self.x) == OrderedFloat(other.x)
+            && OrderedFloat(self.y) == OrderedFloat(other.y)
+            && self.data == other.data
+    }
+}
+
+impl<T: Eq> Eq for Point2D<T> {}
+
+impl<T: PartialOrd> PartialOrd for Point2D<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (OrderedFloat(self.x), OrderedFloat(self.y))
+            .partial_cmp(&(OrderedFloat(other.x), OrderedFloat(other.y)))
+        {
+            Some(Ordering::Equal) => self.data.partial_cmp(&other.data),
+            other => other,
+        }
+    }
+}
+
+impl<T: Ord> Ord for Point2D<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (OrderedFloat(self.x), OrderedFloat(self.y))
+            .cmp(&(OrderedFloat(other.x), OrderedFloat(other.y)))
+        {
+            Ordering::Equal => self.data.cmp(&other.data),
+            other => other,
+        }
+    }
 }
 
 impl<T> Point2D<T> {
@@ -230,7 +262,7 @@ impl Rectangle {
 /// use spart::geometry::Point3D;
 /// let pt: Point3D<()> = Point3D::new(1.0, 2.0, 3.0, None);
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Point3D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -240,6 +272,53 @@ pub struct Point3D<T> {
     pub z: f64,
     /// Optional associated data.
     pub data: Option<T>,
+}
+
+impl<T: PartialEq> PartialEq for Point3D<T> {
+    fn eq(&self, other: &Self) -> bool {
+        OrderedFloat(self.x) == OrderedFloat(other.x)
+            && OrderedFloat(self.y) == OrderedFloat(other.y)
+            && OrderedFloat(self.z) == OrderedFloat(other.z)
+            && self.data == other.data
+    }
+}
+
+impl<T: Eq> Eq for Point3D<T> {}
+
+impl<T: PartialOrd> PartialOrd for Point3D<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (
+            OrderedFloat(self.x),
+            OrderedFloat(self.y),
+            OrderedFloat(self.z),
+        )
+            .partial_cmp(&(
+                OrderedFloat(other.x),
+                OrderedFloat(other.y),
+                OrderedFloat(other.z),
+            )) {
+            Some(Ordering::Equal) => self.data.partial_cmp(&other.data),
+            other => other,
+        }
+    }
+}
+
+impl<T: Ord> Ord for Point3D<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (
+            OrderedFloat(self.x),
+            OrderedFloat(self.y),
+            OrderedFloat(self.z),
+        )
+            .cmp(&(
+                OrderedFloat(other.x),
+                OrderedFloat(other.y),
+                OrderedFloat(other.z),
+            )) {
+            Ordering::Equal => self.data.cmp(&other.data),
+            other => other,
+        }
+    }
 }
 
 impl<T> Point3D<T> {
@@ -621,7 +700,7 @@ impl<T: Clone> PartialOrd for HeapItem<T> {
 
 impl<T: Clone> Ord for HeapItem<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.neg_distance.cmp(&other.neg_distance)
+        other.neg_distance.cmp(&self.neg_distance)
     }
 }
 

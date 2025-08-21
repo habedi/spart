@@ -30,10 +30,6 @@ fn main() {
 }
 ```
 
-> [!NOTE]
-> For BSP-trees, we need to use Point2DBSP and Point3DBSP instead of Point2D and Point3D.
-> Point2DBSP and Point3DBSP wrap the point with additional properties required for BSP-trees.
-
 ### Tree
 
 A tree is a spatial data structure that indexes points and provides methods for querying them.
@@ -44,14 +40,13 @@ Currently, the following trees are implemented:
 - Octree (3D)
 - Kd-tree (2D and 3D)
 - R-tree (2D and 3D)
-- BSP-tree (2D and 3D)
 
 A tree provides at least the following methods:
 
 - `new`: creates a new tree given the following parameters:
     - The bounding area of the tree (for Quadtree and Octree only)
     - The number of dimensions (for Kd-tree only)
-    - The maximum capacity of points per node (for Quadtree, Octree, R-tree, and BSP-tree)
+    - The maximum capacity of points per node (for Quadtree, Octree, and R-tree)
 - `insert`: inserts a point into the tree.
 - `delete`: removes a point from the tree.
 - `knn_search`: finds the k nearest neighbors to a query point.
@@ -71,7 +66,7 @@ A tree provides at least the following methods:
 ### Examples
 
 Below are some examples of how to use the different trees in Spart.
-Check out the [tests](../tests/) directory for more detailed examples.
+Check out the [tests](../tests) directory for more detailed examples.
 
 #### Quadtree (2D)
 
@@ -315,78 +310,6 @@ fn main() {
     };
 
     // Insert points into the R-tree.
-    tree.insert(point1.clone());
-    tree.insert(point2);
-    tree.insert(point3);
-    tree.insert(point4);
-    tree.insert(point5);
-
-    // Perform a kNN search.
-    let neighbors = tree.knn_search(&point1, 2);
-    println!("kNN search results for {:?}: {:?}", point1, neighbors);
-
-    // Perform a range search with a radius of 5.0.
-    let range_points = tree.range_search(&point1, 5.0);
-    println!("Range search results for {:?}: {:?}", point1, range_points);
-
-    // Remove a point from the tree.
-    tree.delete(&point1);
-}
-```
-
-#### BSP-tree (3D)
-
-```rust
-use spart::bsp_tree::{BSPTree, Point3DBSP};
-use spart::geometry::Point3D;
-
-fn main() {
-    // Create a new BSP-tree with a capacity of 3 points per node.
-    let mut tree: BSPTree<Point3DBSP<&str>> = BSPTree::new(3);
-
-    // Define some wrapped 3D points.
-    let point1 = Point3DBSP {
-        point: Point3D {
-            x: 1.0,
-            y: 2.0,
-            z: 3.0,
-            data: Some("Wrapped Point1"),
-        },
-    };
-    let point2 = Point3DBSP {
-        point: Point3D {
-            x: 3.0,
-            y: 4.0,
-            z: 5.0,
-            data: Some("Wrapped Point2"),
-        },
-    };
-    let point3 = Point3DBSP {
-        point: Point3D {
-            x: 5.0,
-            y: 6.0,
-            z: 7.0,
-            data: Some("Wrapped Point3"),
-        },
-    };
-    let point4 = Point3DBSP {
-        point: Point3D {
-            x: 7.0,
-            y: 8.0,
-            z: 9.0,
-            data: Some("Wrapped Point4"),
-        },
-    };
-    let point5 = Point3DBSP {
-        point: Point3D {
-            x: 2.0,
-            y: 3.0,
-            z: 4.0,
-            data: Some("Wrapped Point5"),
-        },
-    };
-
-    // Insert points into the BSP-tree.
     tree.insert(point1.clone());
     tree.insert(point2);
     tree.insert(point3);

@@ -31,15 +31,13 @@ impl fmt::Display for SpartError {
             } => {
                 write!(
                     f,
-                    "Invalid dimension: requested {}, but only {} dimensions available",
-                    requested, available
+                    "Invalid dimension: requested {requested}, but only {available} dimensions available"
                 )
             }
             SpartError::InvalidCapacity { capacity } => {
                 write!(
                     f,
-                    "Invalid capacity: {}. Capacity must be greater than zero.",
-                    capacity
+                    "Invalid capacity: {capacity}. Capacity must be greater than zero."
                 )
             }
         }

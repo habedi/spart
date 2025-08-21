@@ -1,17 +1,23 @@
 name: Run Tests
 
 on:
-  workflow_dispatch: { } # Allow manual execution
-  workflow_call: # Make this workflow callable from other workflows
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         # Define the Rust versions to test against
-        rust-version: [ "1.83.0", "1.84.0", "beta", "stable" ]
+        rust-version: [ "1.83.0", "stable", "beta" ]
 
     steps:
       - name: Checkout Repository
@@ -25,7 +31,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make
+          sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
       - name: Run Tests and Generate Coverage Report

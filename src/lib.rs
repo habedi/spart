@@ -1,4 +1,3 @@
-pub mod bsp_tree;
 pub mod exceptions;
 pub mod geometry;
 pub mod kd_tree;

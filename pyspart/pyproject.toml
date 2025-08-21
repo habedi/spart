@@ -1,0 +1,45 @@
+##########################################################################
+## Maturin configuration
+##########################################################################
+
+[build-system]
+requires = ["maturin>=1.0,<2.0", "setuptools", "wheel"]
+build-backend = "maturin"
+
+[project]
+name = "pyspart"
+description = "Python bindings for Spart library"
+authors = [{ name = "Hassan Abedi", email = "hassan.abedi.t+pyspart@gmail.com" }]
+maintainers = [{ name = "Hassan Abedi", email = "hassan.abedi.t+pyspart@gmail.com" }]
+keywords = ["quadtree", "kdtree", "r-tree", "octree", "spatial-index"]
+requires-python = ">=3.10"
+license = { text = "MIT" }
+readme = "README.md"
+dynamic = ['version']
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+
+[project.urls]
+homepage = "https://github.com/habedi/spart"
+repository = "https://github.com/habedi/spart/tree/main/pyspart"
+documentation = "https://github.com/habedi/spart/tree/main/pyspart"
+
+[tool.maturin]
+module-name = "pyspart"
+bindings = "pyo3"
+features = ["pyo3/extension-module"]
+include = [{ path = ".", format = "sdist" }]
+strip = true
+release = true
