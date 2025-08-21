@@ -3,9 +3,9 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use std::hint::black_box;
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::{kd_tree, octree, quadtree, r_tree};
+use std::hint::black_box;
 use tracing::info;
 
 // Configure Criterion with our benchmark timeout.

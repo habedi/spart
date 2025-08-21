@@ -3,9 +3,9 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use std::hint::black_box;
 use spart::geometry::{Point2D, Point3D, Rectangle};
 use spart::{kd_tree, octree, quadtree, r_tree};
+use std::hint::black_box;
 use tracing::info;
 
 /// Helper function that benchmarks a deletion function on a given dataset.
