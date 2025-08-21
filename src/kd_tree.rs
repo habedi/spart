@@ -339,10 +339,9 @@ impl<P: KdPoint> KdTree<P> {
     /// `true` if the point was found and deleted, otherwise `false`.
     pub fn delete(&mut self, point: &P) -> bool {
         info!("Attempting to delete point: {:?}", point);
-        let before = Self::collect_points(&self.root).len();
-        self.root = Self::delete_rec(self.root.take(), point, 0, self.k);
-        let after = Self::collect_points(&self.root).len();
-        before > after
+        let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
+        self.root = new_root;
+        deleted
     }
 
     fn delete_rec(
@@ -350,43 +349,64 @@ impl<P: KdPoint> KdTree<P> {
         point: &P,
         depth: usize,
         k: usize,
-    ) -> Option<Box<KdNode<P>>> {
+    ) -> (Option<Box<KdNode<P>>>, bool) {
         match node {
-            None => None,
-            Some(current) => {
+            None => (None, false),
+            Some(mut current) => {
+                let axis = depth % k;
                 if current.point == *point {
-                    let mut points = Self::collect_points(&current.left);
-                    points.extend(Self::collect_points(&current.right));
-                    Self::rebuild_subtree(points, depth, k)
-                } else {
-                    let axis = depth % k;
-                    let mut current = current;
-                    if point.coord(axis) < current.point.coord(axis) {
-                        current.left = Self::delete_rec(current.left, point, depth + 1, k);
+                    if let Some(right_subtree) = current.right.take() {
+                        let successor = Self::find_min(&right_subtree, axis, depth + 1, k).clone();
+                        let (new_right, _) =
+                            Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
+                        current.point = successor;
+                        current.right = new_right;
+                        (Some(current), true)
+                    } else if let Some(left_subtree) = current.left.take() {
+                        (Some(left_subtree), true)
                     } else {
-                        current.right = Self::delete_rec(current.right, point, depth + 1, k);
+                        (None, true)
                     }
-                    Some(current)
+                } else if point.coord(axis) < current.point.coord(axis) {
+                    let (new_left, deleted) =
+                        Self::delete_rec(current.left.take(), point, depth + 1, k);
+                    current.left = new_left;
+                    (Some(current), deleted)
+                } else {
+                    let (new_right, deleted) =
+                        Self::delete_rec(current.right.take(), point, depth + 1, k);
+                    current.right = new_right;
+                    (Some(current), deleted)
                 }
             }
         }
     }
 
-    fn rebuild_subtree(mut points: Vec<P>, depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
-        let mut subtree = None;
-        for p in points.drain(..) {
-            subtree = Some(Self::insert_rec(subtree, p, depth, k));
-        }
-        subtree
-    }
+    fn find_min(node: &KdNode<P>, d: usize, depth: usize, k: usize) -> &P {
+        let axis = depth % k;
+        let mut min = &node.point;
 
-    fn collect_points(node: &Option<Box<KdNode<P>>>) -> Vec<P> {
-        let mut points = Vec::new();
-        if let Some(ref n) = node {
-            points.push(n.point.clone());
-            points.extend(Self::collect_points(&n.left));
-            points.extend(Self::collect_points(&n.right));
+        if axis == d {
+            if let Some(ref left) = node.left {
+                let left_min = Self::find_min(left, d, depth + 1, k);
+                if left_min.coord(d) < min.coord(d) {
+                    min = left_min;
+                }
+            }
+        } else {
+            if let Some(ref left) = node.left {
+                let left_min = Self::find_min(left, d, depth + 1, k);
+                if left_min.coord(d) < min.coord(d) {
+                    min = left_min;
+                }
+            }
+            if let Some(ref right) = node.right {
+                let right_min = Self::find_min(right, d, depth + 1, k);
+                if right_min.coord(d) < min.coord(d) {
+                    min = right_min;
+                }
+            }
         }
-        points
+        min
     }
 }
