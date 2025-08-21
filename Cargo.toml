@@ -43,6 +43,22 @@ debug = true
 [profile.test]
 debug = true
 
+[[example]]
+name = "quadtree"
+path = "examples/quadtree.rs"
+
+[[example]]
+name = "octree"
+path = "examples/octree.rs"
+
+[[example]]
+name = "kdtree"
+path = "examples/kdtree.rs"
+
+[[example]]
+name = "rtree"
+path = "examples/rtree.rs"
+
 [package.metadata.rustfmt]
 max_width = 100
 hard_tabs = false

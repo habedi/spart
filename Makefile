@@ -47,6 +47,22 @@ run: build ## Build and run the binary
 	@echo "Running the $(BINARY) binary..."
 	@DEBUG_SPART=$(DEBUG_SPART) ./$(BINARY)
 
+.PHONY: run-examples
+run-examples: build ## Run the Rust examples
+	@echo "Running Rust examples..."
+	@cargo run --example quadtree
+	@cargo run --example octree
+	@cargo run --example kdtree
+	@cargo run --example rtree
+
+.PHONY: run-py-examples
+run-py-examples: develop-py ## Run the Python examples
+	@echo "Running Python examples..."
+	@$(PY_DEP_MNGR) run python pyspart/examples/quadtree.py
+	@$(PY_DEP_MNGR) run python pyspart/examples/octree.py
+	@$(PY_DEP_MNGR) run python pyspart/examples/kdtree.py
+	@$(PY_DEP_MNGR) run python pyspart/examples/rtree.py
+
 .PHONY: clean
 clean: ## Remove generated and temporary files
 	@echo "Cleaning up..."
