@@ -1,177 +1,396 @@
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::PyValueError;
 
-// Import the core types from Graphina.
-use graphina::core::types::{Graph, NodeId};
+use spart::geometry::{Point2D, Point3D, Rectangle, Cube};
+use spart::quadtree::Quadtree;
+use spart::octree::Octree;
+use spart::kd_tree::KdTree;
+use spart::r_tree::RTree;
 
-/// A Python-accessible Graph class wrapping Graphina's core undirected graph.
-///
-/// This class uses `i64` as the node attribute type and `f64` as the edge weight type.
-/// Internally, it maintains a mapping from Python-assigned node IDs (simple `usize` values)
-/// to the Graphina `NodeId`s.
-#[pyclass]
-struct PyGraph {
-    /// The underlying Graphina graph.
-    graph: Graph<i64, f64>,
-    /// Mapping from Python-level node IDs to internal NodeId values.
-    mapping: HashMap<usize, NodeId>,
-    /// The next Python-level node ID to assign.
-    next_id: usize,
+// A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.
+struct PyData(PyObject);
+
+impl Clone for PyData {
+    fn clone(&self) -> Self {
+        Python::with_gil(|py| {
+            PyData(self.0.clone_ref(py))
+        })
+    }
+}
+
+impl PartialEq for PyData {
+    fn eq(&self, other: &Self) -> bool {
+        Python::with_gil(|py| {
+            match self.0.bind(py).rich_compare(&other.0, CompareOp::Eq) {
+                Ok(result) => result.is_truthy().unwrap_or(false),
+                Err(_) => false,
+            }
+        })
+    }
+}
+impl Eq for PyData {}
+
+// Implement Debug manually since PyObject doesn't implement it.
+impl std::fmt::Debug for PyData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Python::with_gil(|py| {
+            write!(f, "PyData({})", self.0.bind(py).repr().unwrap())
+        })
+    }
+}
+
+
+#[pyclass(name = "Point2D", get_all)]
+#[derive(Debug)]
+struct PyPoint2D {
+    x: f64,
+    y: f64,
+    data: PyObject,
+}
+
+impl Clone for PyPoint2D {
+    fn clone(&self) -> Self {
+        Python::with_gil(|py| {
+            PyPoint2D {
+                x: self.x,
+                y: self.y,
+                data: self.data.clone_ref(py),
+            }
+        })
+    }
+}
+
+impl PartialEq for PyPoint2D {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && Python::with_gil(|py| {
+            match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
+                Ok(result) => result.is_truthy().unwrap_or(false),
+                Err(_) => false,
+            }
+        })
+    }
 }
 
 #[pymethods]
-impl PyGraph {
-    /// Creates a new, empty graph.
-    ///
-    /// Example:
-    ///     >>> g = pygraphina.PyGraph()
+impl PyPoint2D {
     #[new]
-    fn new() -> Self {
-        PyGraph {
-            graph: Graph::new(),
-            mapping: HashMap::new(),
-            next_id: 0,
-        }
-    }
-
-    /// Adds a node with the given integer attribute.
-    ///
-    /// Returns a Python-level node identifier.
-    ///
-    /// Example:
-    ///     >>> node_id = g.add_node(42)
-    fn add_node(&mut self, attr: i64) -> usize {
-        let node_id = self.graph.add_node(attr);
-        let py_id = self.next_id;
-        self.mapping.insert(py_id, node_id);
-        self.next_id += 1;
-        py_id
-    }
-
-    /// Updates the attribute of an existing node.
-    ///
-    /// Returns True if the update was successful, or False if the node was not found.
-    ///
-    /// Example:
-    ///     >>> success = g.update_node(0, 100)
-    fn update_node(&mut self, py_node: usize, new_attr: i64) -> PyResult<bool> {
-        let node_id = self
-            .mapping
-            .get(&py_node)
-            .ok_or_else(|| PyValueError::new_err("Invalid node id"))?;
-        Ok(self.graph.update_node(*node_id, new_attr))
-    }
-
-    /// Attempts to update the attribute of an existing node.
-    ///
-    /// Raises a ValueError on error.
-    ///
-    /// Example:
-    ///     >>> g.try_update_node(0, 200)
-    fn try_update_node(&mut self, py_node: usize, new_attr: i64) -> PyResult<()> {
-        let node_id = self
-            .mapping
-            .get(&py_node)
-            .ok_or_else(|| PyValueError::new_err("Invalid node id"))?;
-        self.graph
-            .try_update_node(*node_id, new_attr)
-            .map_err(|e| PyValueError::new_err(format!("Error: {:?}", e)))
-    }
-
-    /// Adds an edge between two nodes with the given weight.
-    ///
-    /// Returns the internal edge identifier (as an integer).
-    ///
-    /// Example:
-    ///     >>> edge_id = g.add_edge(0, 1, 3.14)
-    fn add_edge(&mut self, source: usize, target: usize, weight: f64) -> PyResult<usize> {
-        let s_id = self
-            .mapping
-            .get(&source)
-            .ok_or_else(|| PyValueError::new_err("Invalid source node id"))?;
-        let t_id = self
-            .mapping
-            .get(&target)
-            .ok_or_else(|| PyValueError::new_err("Invalid target node id"))?;
-        let edge = self.graph.add_edge(*s_id, *t_id, weight);
-        Ok(edge.index())
-    }
-
-    /// Removes a node from the graph.
-    ///
-    /// Returns the attribute of the removed node, or None if the node did not exist.
-    ///
-    /// Example:
-    ///     >>> attr = g.remove_node(0)
-    fn remove_node(&mut self, py_node: usize) -> PyResult<Option<i64>> {
-        let node_id = self
-            .mapping
-            .get(&py_node)
-            .ok_or_else(|| PyValueError::new_err("Invalid node id"))?;
-        let result = self.graph.remove_node(*node_id);
-        self.mapping.remove(&py_node);
-        Ok(result)
-    }
-
-    /// Attempts to remove a node from the graph.
-    ///
-    /// Raises a ValueError if the node does not exist.
-    ///
-    /// Example:
-    ///     >>> attr = g.try_remove_node(0)
-    fn try_remove_node(&mut self, py_node: usize) -> PyResult<i64> {
-        let node_id = self
-            .mapping
-            .get(&py_node)
-            .ok_or_else(|| PyValueError::new_err("Invalid node id"))?;
-        let result = self
-            .graph
-            .try_remove_node(*node_id)
-            .map_err(|e| PyValueError::new_err(format!("Error: {:?}", e)))?;
-        self.mapping.remove(&py_node);
-        Ok(result)
-    }
-
-    /// Returns the total number of nodes in the graph.
-    ///
-    /// Example:
-    ///     >>> count = g.node_count()
-    fn node_count(&self) -> usize {
-        self.graph.node_count()
-    }
-
-    /// Returns the total number of edges in the graph.
-    ///
-    /// Example:
-    ///     >>> count = g.edge_count()
-    fn edge_count(&self) -> usize {
-        self.graph.edge_count()
-    }
-
-    /// Returns a list of Python-level node IDs that are neighbors of the given node.
-    ///
-    /// Example:
-    ///     >>> neighbors = g.neighbors(0)
-    fn neighbors(&self, py_node: usize) -> PyResult<Vec<usize>> {
-        let node_id = self
-            .mapping
-            .get(&py_node)
-            .ok_or_else(|| PyValueError::new_err("Invalid node id"))?;
-        let mut result = Vec::new();
-        // Iterate over neighbors and reverse-search the mapping for their Python-level IDs.
-        for neighbor in self.graph.neighbors(*node_id) {
-            if let Some((&py_id, _)) = self.mapping.iter().find(|(_, &v)| v == neighbor) {
-                result.push(py_id);
-            }
-        }
-        Ok(result)
+    fn new(x: f64, y: f64, data: PyObject) -> Self {
+        PyPoint2D { x, y, data }
     }
 }
 
-/// The Python module declaration.
+impl From<PyPoint2D> for Point2D<PyData> {
+    fn from(p: PyPoint2D) -> Self {
+        Point2D::new(p.x, p.y, Some(PyData(p.data)))
+    }
+}
+
+impl From<Point2D<PyData>> for PyPoint2D {
+    fn from(p: Point2D<PyData>) -> Self {
+        PyPoint2D {
+            x: p.x,
+            y: p.y,
+            data: p.data.unwrap().0,
+        }
+    }
+}
+
+
+#[pyclass(name = "Point3D", get_all)]
+#[derive(Debug)]
+struct PyPoint3D {
+    x: f64,
+    y: f64,
+    z: f64,
+    data: PyObject,
+}
+
+impl Clone for PyPoint3D {
+    fn clone(&self) -> Self {
+        Python::with_gil(|py| {
+            PyPoint3D {
+                x: self.x,
+                y: self.y,
+                z: self.z,
+                data: self.data.clone_ref(py),
+            }
+        })
+    }
+}
+
+impl PartialEq for PyPoint3D {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z && Python::with_gil(|py| {
+            match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
+                Ok(result) => result.is_truthy().unwrap_or(false),
+                Err(_) => false,
+            }
+        })
+    }
+}
+
+#[pymethods]
+impl PyPoint3D {
+    #[new]
+    fn new(x: f64, y: f64, z: f64, data: PyObject) -> Self {
+        PyPoint3D { x, y, z, data }
+    }
+}
+
+impl From<PyPoint3D> for Point3D<PyData> {
+    fn from(p: PyPoint3D) -> Self {
+        Point3D::new(p.x, p.y, p.z, Some(PyData(p.data)))
+    }
+}
+
+impl From<Point3D<PyData>> for PyPoint3D {
+    fn from(p: Point3D<PyData>) -> Self {
+        PyPoint3D {
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            data: p.data.unwrap().0,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct PyRectangle(Rectangle);
+
+impl<'source> FromPyObject<'source> for PyRectangle {
+    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
+        let dict: &Bound<PyDict> = ob.downcast()?;
+        let x: f64 = dict.get_item("x")?.ok_or_else(|| PyValueError::new_err("missing 'x'"))?.extract()?;
+        let y: f64 = dict.get_item("y")?.ok_or_else(|| PyValueError::new_err("missing 'y'"))?.extract()?;
+        let width: f64 = dict.get_item("width")?.ok_or_else(|| PyValueError::new_err("missing 'width'"))?.extract()?;
+        let height: f64 = dict.get_item("height")?.ok_or_else(|| PyValueError::new_err("missing 'height'"))?.extract()?;
+        Ok(PyRectangle(Rectangle { x, y, width, height }))
+    }
+}
+
+#[derive(Clone)]
+struct PyCube(Cube);
+
+impl<'source> FromPyObject<'source> for PyCube {
+    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
+        let dict: &Bound<PyDict> = ob.downcast()?;
+        let x: f64 = dict.get_item("x")?.ok_or_else(|| PyValueError::new_err("missing 'x'"))?.extract()?;
+        let y: f64 = dict.get_item("y")?.ok_or_else(|| PyValueError::new_err("missing 'y'"))?.extract()?;
+        let z: f64 = dict.get_item("z")?.ok_or_else(|| PyValueError::new_err("missing 'z'"))?.extract()?;
+        let width: f64 = dict.get_item("width")?.ok_or_else(|| PyValueError::new_err("missing 'width'"))?.extract()?;
+        let height: f64 = dict.get_item("height")?.ok_or_else(|| PyValueError::new_err("missing 'height'"))?.extract()?;
+        let depth: f64 = dict.get_item("depth")?.ok_or_else(|| PyValueError::new_err("missing 'depth'"))?.extract()?;
+        Ok(PyCube(Cube { x, y, z, width, height, depth }))
+    }
+}
+
+
+#[pyclass(name = "Quadtree")]
+struct PyQuadtree {
+    tree: Quadtree<PyData>,
+}
+
+#[pymethods]
+impl PyQuadtree {
+    #[new]
+    fn new(boundary: PyRectangle, capacity: usize) -> Self {
+        PyQuadtree {
+            tree: Quadtree::new(&boundary.0, capacity),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint2D) -> bool {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+    }
+
+    fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "Octree")]
+struct PyOctree {
+    tree: Octree<PyData>,
+}
+
+#[pymethods]
+impl PyOctree {
+    #[new]
+    fn new(boundary: PyCube, capacity: usize) -> Self {
+        PyOctree {
+            tree: Octree::new(&boundary.0, capacity),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint3D) -> bool {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+    }
+
+    fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "KdTree2D")]
+struct PyKdTree2D {
+    tree: KdTree<Point2D<PyData>>,
+}
+
+#[pymethods]
+impl PyKdTree2D {
+    #[new]
+    fn new() -> Self {
+        PyKdTree2D {
+            tree: KdTree::new(2),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint2D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+    }
+
+    fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "KdTree3D")]
+struct PyKdTree3D {
+    tree: KdTree<Point3D<PyData>>,
+}
+
+#[pymethods]
+impl PyKdTree3D {
+    #[new]
+    fn new() -> Self {
+        PyKdTree3D {
+            tree: KdTree::new(3),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint3D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+    }
+
+    fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "RTree2D")]
+struct PyRTree2D {
+    tree: RTree<Point2D<PyData>>,
+}
+
+#[pymethods]
+impl PyRTree2D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRTree2D {
+            tree: RTree::new(max_entries),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint2D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "RTree3D")]
+struct PyRTree3D {
+    tree: RTree<Point3D<PyData>>,
+}
+
+#[pymethods]
+impl PyRTree3D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRTree3D {
+            tree: RTree::new(max_entries),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint3D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+    }
+}
+
+
 #[pymodule]
-fn pygraphina(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // Bound is from pyo3::prelude
-    m.add_class::<PyGraph>()?;
+fn pyspart(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyPoint2D>()?;
+    m.add_class::<PyPoint3D>()?;
+    m.add_class::<PyQuadtree>()?;
+    m.add_class::<PyOctree>()?;
+    m.add_class::<PyKdTree2D>()?;
+    m.add_class::<PyKdTree3D>()?;
+    m.add_class::<PyRTree2D>()?;
+    m.add_class::<PyRTree3D>()?;
     Ok(())
 }

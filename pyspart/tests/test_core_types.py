@@ -1,79 +1,159 @@
-import pygraphina
 import pytest
+from pyspart import Point2D, Point3D, Quadtree, Octree, KdTree2D, KdTree3D, RTree2D, RTree3D
 
+def test_point2d_creation():
+    p = Point2D(1.0, 2.0, {"some": "data"})
+    assert p.x == 1.0
+    assert p.y == 2.0
+    assert p.data == {"some": "data"}
 
-# Using the Arrange-Act-Assert pattern for testing
+def test_point3d_creation():
+    p = Point3D(1.0, 2.0, 3.0, {"some": "data"})
+    assert p.x == 1.0
+    assert p.y == 2.0
+    assert p.z == 3.0
+    assert p.data == {"some": "data"}
 
-def test_add_nodes():
-    # Arrange
-    g = pygraphina.PyGraph()
+def test_quadtree():
+    boundary = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
+    qt = Quadtree(boundary, 4)
+    p1 = Point2D(10.0, 20.0, "p1")
+    p2 = Point2D(50.0, 50.0, "p2")
+    p3 = Point2D(90.0, 80.0, "p3")
 
-    # Act
-    g.add_node(10)
-    g.add_node(20)
+    qt.insert(p1)
+    qt.insert(p2)
+    qt.insert(p3)
 
-    # Assert
-    assert g.node_count() == 2, "Expected 2 nodes in the graph"
+    # KNN Search
+    results = qt.knn_search(Point2D(12.0, 22.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
 
+    # Range Search
+    results = qt.range_search(Point2D(50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
 
-def test_update_nodes():
-    # Arrange
-    g = pygraphina.PyGraph()
-    n0 = g.add_node(10)
+    # Deletion
+    assert qt.delete(p2)
+    results = qt.knn_search(Point2D(50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
-    # Act
-    success = g.update_node(n0, 15)
+def test_octree():
+    boundary = {"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0}
+    ot = Octree(boundary, 4)
+    p1 = Point3D(10.0, 20.0, 30.0, "p1")
+    p2 = Point3D(50.0, 50.0, 50.0, "p2")
+    p3 = Point3D(90.0, 80.0, 70.0, "p3")
 
-    # Assert
-    assert success is True, "update_node should return True on success"
+    ot.insert(p1)
+    ot.insert(p2)
+    ot.insert(p3)
 
-    # Arrange for error-returning API
-    # Act & Assert: Should not raise an exception.
-    g.try_update_node(n0, 25)
+    # KNN Search
+    results = ot.knn_search(Point3D(12.0, 22.0, 32.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
 
+    # Range Search
+    results = ot.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
 
-def test_add_edge_and_neighbors():
-    # Arrange
-    g = pygraphina.PyGraph()
-    n0 = g.add_node(10)
-    n1 = g.add_node(20)
+    # Deletion
+    assert ot.delete(p2)
+    results = ot.knn_search(Point3D(50.0, 50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
-    # Act
-    edge_id = g.add_edge(n0, n1, 3.14)
+def test_kdtree2d():
+    kd = KdTree2D()
+    p1 = Point2D(1.0, 2.0, "p1")
+    p2 = Point2D(5.0, 5.0, "p2")
+    p3 = Point2D(9.0, 8.0, "p3")
+    kd.insert(p1)
+    kd.insert(p2)
+    kd.insert(p3)
 
-    # Assert: Verify edge addition.
-    assert g.edge_count() == 1, "Expected 1 edge in the graph"
+    # KNN Search
+    results = kd.knn_search(Point2D(1.0, 2.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
 
-    # Arrange: Retrieve neighbors for each node.
-    neighbors_n0 = g.neighbors(n0)
-    neighbors_n1 = g.neighbors(n1)
+    # Range Search
+    results = kd.range_search(Point2D(5.0, 5.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
 
-    # Assert: Verify neighbor relationships.
-    assert n1 in neighbors_n0, "n1 should be a neighbor of n0"
-    assert n0 in neighbors_n1, "n0 should be a neighbor of n1"
+    # Deletion
+    assert kd.delete(p2)
+    results = kd.knn_search(Point2D(5.0, 5.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
+def test_kdtree3d():
+    kd = KdTree3D()
+    p1 = Point3D(1.0, 2.0, 3.0, "p1")
+    p2 = Point3D(5.0, 5.0, 5.0, "p2")
+    p3 = Point3D(9.0, 8.0, 7.0, "p3")
+    kd.insert(p1)
+    kd.insert(p2)
+    kd.insert(p3)
 
-def test_remove_node():
-    # Arrange
-    g = pygraphina.PyGraph()
-    n0 = g.add_node(10)
-    n1 = g.add_node(20)
-    g.add_edge(n0, n1, 3.14)
+    # KNN Search
+    results = kd.knn_search(Point3D(1.0, 2.0, 3.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
 
-    # Act
-    removed_attr = g.remove_node(n1)
+    # Range Search
+    results = kd.range_search(Point3D(5.0, 5.0, 5.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
 
-    # Assert: Check the removed node's attribute.
-    assert removed_attr == 20, "Removed node should have attribute 20"
-    # Assert: Verify node count after removal.
-    assert g.node_count() == 1, "Expected 1 node after removal"
+    # Deletion
+    assert kd.delete(p2)
+    results = kd.knn_search(Point3D(5.0, 5.0, 5.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
+def test_rtree2d():
+    rt = RTree2D(4)
+    p1 = Point2D(10.0, 20.0, "p1")
+    p2 = Point2D(50.0, 50.0, "p2")
+    p3 = Point2D(90.0, 80.0, "p3")
 
-def test_try_remove_node_error():
-    # Arrange
-    g = pygraphina.PyGraph()
-    g.add_node(10)
+    rt.insert(p1)
+    rt.insert(p2)
+    rt.insert(p3)
 
-    # Act & Assert: Attempting to remove a non-existent node should raise ValueError.
-    with pytest.raises(ValueError):
-        g.try_remove_node(999)  # 999 does not exist
+    # Range Search
+    results = rt.range_search(Point2D(50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
+
+    # Deletion
+    assert rt.delete(p2)
+    results = rt.range_search(Point2D(50.0, 50.0, None), 1.0)
+    assert len(results) == 0
+
+def test_rtree3d():
+    rt = RTree3D(4)
+    p1 = Point3D(10.0, 20.0, 30.0, "p1")
+    p2 = Point3D(50.0, 50.0, 50.0, "p2")
+    p3 = Point3D(90.0, 80.0, 70.0, "p3")
+
+    rt.insert(p1)
+    rt.insert(p2)
+    rt.insert(p3)
+
+    # Range Search
+    results = rt.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
+
+    # Deletion
+    assert rt.delete(p2)
+    results = rt.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
+    assert len(results) == 0

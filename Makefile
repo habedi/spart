@@ -10,9 +10,12 @@ DEBUG_SPART := 0
 .DEFAULT_GOAL := help
 
 .PHONY: help
-help: ## Show the help message for each target
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | awk 'BEGIN {FS = ":.*?## "}; \
- 	{printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+help: ## Show the help messages for all targets
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "Targets:"
+	@grep -E '^[a-zA-Z_-]+:.*## .*$$' Makefile | \
+	awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: format
 format: ## Format Rust files
@@ -85,8 +88,8 @@ nextest: ## Run tests using nextest
 	@echo "Running tests using nextest..."
 	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo nextest run
 
-.PHONY: doc
-doc: format ## Generate the documentation
+.PHONY: docs
+docs: format ## Generate the documentation
 	@echo "Generating documentation..."
 	@cargo doc --no-deps --document-private-items
 

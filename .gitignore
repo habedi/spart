@@ -91,3 +91,4 @@ src/main.rs
 .benchmarks
 *.log
 *_output.txt
+pyspart/target/
