@@ -1,9 +1,10 @@
 ## PySpart
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python version](https://img.shields.io/badge/Python-%3E=3.10-blue)](https://github.com/habedi/pyspart)
-[![PyPI version](https://badge.fury.io/py/pygraphina.svg)](https://badge.fury.io/py/pyspart)
-[![Pip downloads](https://img.shields.io/pypi/dm/pygraphina.svg)](https://pypi.org/project/pyspart)
+[![PyPI version](https://badge.fury.io/py/pyspart.svg)](https://badge.fury.io/py/pyspart)
+[![Pip downloads](https://img.shields.io/pypi/dm/pyspart.svg)](https://pypi.org/project/pyspart)
+[![Examples](https://img.shields.io/github/v/tag/habedi/pyspart?label=examples&color=green&style=flat&labelColor=282c34&logo=python)](https://github.com/habedi/pyspart/tree/main/pyspart/examples)
 
 Python bindings for [Spart](https://github.com/habedi/spart) library.
 
@@ -12,6 +13,10 @@ Python bindings for [Spart](https://github.com/habedi/spart) library.
 ```bash
 pip install pyspart
 ```
+
+### Examples
+
+Check out [examples](examples/) directory for examples.
 
 ### License
 
