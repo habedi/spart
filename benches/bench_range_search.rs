@@ -2,7 +2,8 @@
 mod shared;
 use shared::*;
 
-use criterion::{black_box, criterion_group, Criterion};
+use criterion::{criterion_group, Criterion};
+use std::hint::black_box;
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::{kd_tree, octree, quadtree, r_tree};
 use tracing::info;
