@@ -15,8 +15,6 @@ pip install pyspart
 
 ### Examples
 
-Check out the [examples](https://github.com/habedi/spart/tree/main/pyspart/examples) directory for more detailed examples.
-
 Below are some examples of how to use the different trees in PySpart.
 
 #### Quadtree (2D)
@@ -194,6 +192,8 @@ print(f"Range search results for {point1}: {range_points}")
 # Remove a point from the tree.
 tree.delete(point1)
 ```
+
+Check out the [examples](https://github.com/habedi/spart/tree/main/pyspart/examples) directory for more examples.
 
 ### Debugging Mode
 

@@ -1,3 +1,10 @@
+<div align="center">
+  <picture>
+    <img alt="Spart Logo" src="logo.svg" height="50%" width="50%">
+  </picture>
+</div>
+<br>
+
 ## Spart
 
 [<img alt="tests" src="https://img.shields.io/github/actions/workflow/status/habedi/spart/tests.yml?label=tests&style=flat&logo=github" height="20">](https://github.com/habedi/spart/actions/workflows/tests.yml)
@@ -33,8 +40,9 @@ cargo add spart
 
 #### Python Bindings
 
-You can use the `PySpart` Python library to use Spart in your Python project.
-Check out the [pyspart](pyspart) directory for more information, including installation and Python examples.
+You can use the `PySpart` Python library to use Spart from Python.
+
+Check out the [pyspart](pyspart) directory for more information, including installation instructions and examples.
 
 ---
 
@@ -174,3 +182,8 @@ Spart is available under the terms of either of the following licenses:
 
 * MIT License ([LICENSE-MIT](LICENSE-MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+
+
+### Acknowledgements
+
+* The logo is from [SVG Repo](https://www.svgrepo.com/svg/382456/autumn-fall-leaf-orange-season-tree).
