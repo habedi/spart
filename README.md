@@ -22,8 +22,10 @@ A collection of space partitioning trees for Rust
 
 Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of popular
 space partitioning tree data structures for efficient indexing and searching of 2D and 3D point data.
+Spart also provides Python bindings for the trees.
+So, you can use Spart from Python projects as well as from Rust projects.
 
-Currently, the following data structures are implemented:
+At the moment, the following data structures and features are supported:
 
 | Index | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
 |-------|----------------------------------------------------|----|----|------------|--------------|
@@ -32,6 +34,10 @@ Currently, the following data structures are implemented:
 | 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
 | 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
 | 5     | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  | ✓          | ✓            |
+
+> [!IMPORTANT]
+> Spart is in early development, so bugs and breaking API changes are expected.
+> Please use the [issues page](https://github.com/habedi/spart/issues) to report bugs or request features.
 
 ---
 
@@ -45,17 +51,25 @@ cargo add spart
 
 #### Python Bindings
 
-You can use the `PySpart` Python library to use Spart from Python.
+You can install the Python bindings for Spart using pip:
 
-Check out the [pyspart](pyspart) directory for more information, including installation instructions and examples.
+```shell
+pip install pyspart
+```
+
+Check out the [pyspart](pyspart) directory for more information about the Python bindings including Python examples.
 
 ---
 
 ### Documentation
 
+For the latest Rust API documentation, see [docs.rs/spart](https://docs.rs/spart).
+
+#### Basic Concepts
+
 The basic building blocks of Spart are *point* and *tree*.
 
-#### Point
+##### Point
 
 A point is a tuple of coordinates plus an optional data payload of any type.
 There are two types of points: `Point2D` and `Point3D`.
@@ -83,7 +97,7 @@ fn main() {
 }
 ```
 
-#### Tree
+##### Tree
 
 A tree is a spatial data structure that indexes points and provides methods for querying them.
 
@@ -117,9 +131,12 @@ A tree provides at least the following methods:
     inserted.
 > - Deletion removes duplicates: the delete operation removes all instances of the point from the tree.
 >
-> The distance metric used for nearest neighbor and range searches is the Euclidean distance.
+> The distance metric used for nearest neighbor and range searches is the Euclidean distance by default.
+> You can use the `with_distance_metric` method to specify a different distance metric for the tree.
 
-### Debugging Mode
+### Additional Information
+
+#### Debugging Mode
 
 You can enable debugging mode for Spart by setting the `DEBUG_SPART` environment variable to `true` or `1`.
 
@@ -137,7 +154,7 @@ $env:DEBUG_SPART = "true"
 > When debugging mode is enabled, Spart will be very verbose.
 > It is recommended to use this only for debugging purposes.
 
-### Serialization
+#### Serialization
 
 Spart trees can be serialized and deserialized using the `serde` feature.
 
