@@ -34,6 +34,7 @@ use crate::geometry::{
     BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance,
     Point2D, Point3D, Rectangle,
 };
+use crate::rtree_common::{delete_entry as common_delete_entry, KnnCandidate};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -109,6 +110,62 @@ pub struct RStarTree<T: RStarTreeObject> {
     root: RStarTreeNode<T>,
     max_entries: usize,
     min_entries: usize,
+}
+
+// Common trait implementations for R*-tree to reuse shared algorithms.
+impl<T: RStarTreeObject> crate::rtree_common::EntryAccess for RStarTreeEntry<T> {
+    type BV = T::B;
+    type Node = RStarTreeNode<T>;
+    type Obj = T;
+
+    fn mbr(&self) -> &Self::BV {
+        RStarTreeEntry::mbr(self)
+    }
+    fn as_leaf_obj(&self) -> Option<&Self::Obj> {
+        match self {
+            RStarTreeEntry::Leaf { object, .. } => Some(object),
+            _ => None,
+        }
+    }
+    fn child(&self) -> Option<&<Self as crate::rtree_common::EntryAccess>::Node> {
+        match self {
+            RStarTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+    fn child_mut(&mut self) -> Option<&mut <Self as crate::rtree_common::EntryAccess>::Node> {
+        match self {
+            RStarTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+    fn set_mbr(&mut self, new_mbr: Self::BV) {
+        if let RStarTreeEntry::Node { mbr, .. } = self {
+            *mbr = new_mbr;
+        }
+    }
+    fn into_child(self) -> Option<Box<<Self as crate::rtree_common::EntryAccess>::Node>>
+    where
+        Self: Sized,
+    {
+        match self {
+            RStarTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+}
+
+impl<T: RStarTreeObject> crate::rtree_common::NodeAccess for RStarTreeNode<T> {
+    type Entry = RStarTreeEntry<T>;
+    fn is_leaf(&self) -> bool {
+        self.is_leaf
+    }
+    fn entries(&self) -> &Vec<Self::Entry> {
+        &self.entries
+    }
+    fn entries_mut(&mut self) -> &mut Vec<Self::Entry> {
+        &mut self.entries
+    }
 }
 
 impl<T: RStarTreeObject> RStarTree<T> {
@@ -605,7 +662,7 @@ where
         info!("Attempting to delete object: {:?}", object);
         let object_mbr = object.mbr();
         let mut reinsert_list = Vec::new();
-        let deleted = delete_entry(
+        let deleted = common_delete_entry(
             &mut self.root,
             object,
             &object_mbr,
@@ -626,50 +683,6 @@ where
         }
         deleted
     }
-}
-
-fn delete_entry<T: RStarTreeObject + PartialEq>(
-    node: &mut RStarTreeNode<T>,
-    object: &T,
-    object_mbr: &T::B,
-    min_entries: usize,
-    reinsert_list: &mut Vec<RStarTreeEntry<T>>,
-) -> bool {
-    let mut deleted = false;
-    if node.is_leaf {
-        let initial_len = node.entries.len();
-        node.entries.retain(|entry| {
-            if let RStarTreeEntry::Leaf { object: ref o, .. } = entry {
-                o != object
-            } else {
-                true
-            }
-        });
-        deleted = node.entries.len() < initial_len;
-    } else {
-        let mut to_delete_indices = Vec::new();
-        for (i, entry) in node.entries.iter_mut().enumerate() {
-            if let RStarTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(object_mbr)
-                    && delete_entry(child, object, object_mbr, min_entries, reinsert_list)
-                {
-                    deleted = true;
-                    if child.entries.len() < min_entries {
-                        to_delete_indices.push(i);
-                    } else {
-                        *mbr = compute_group_mbr(&child.entries);
-                    }
-                }
-            }
-        }
-
-        for &index in to_delete_indices.iter().rev() {
-            if let RStarTreeEntry::Node { child, .. } = node.entries.remove(index) {
-                reinsert_list.extend(child.entries);
-            }
-        }
-    }
-    deleted
 }
 
 impl<T: std::fmt::Debug + Clone> RStarTreeObject for Point2D<T> {
@@ -695,36 +708,6 @@ impl<T: std::fmt::Debug + Clone> RStarTreeObject for Point3D<T> {
             height: EPSILON,
             depth: EPSILON,
         }
-    }
-}
-
-// Knn-search candidate.
-#[derive(Debug)]
-struct KnnCandidate<'a, T: RStarTreeObject> {
-    dist: f64,
-    entry: &'a RStarTreeEntry<T>,
-}
-
-impl<T: RStarTreeObject> PartialEq for KnnCandidate<'_, T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.dist.eq(&other.dist)
-    }
-}
-
-impl<T: RStarTreeObject> Eq for KnnCandidate<'_, T> {}
-
-impl<T: RStarTreeObject> Ord for KnnCandidate<'_, T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other
-            .dist
-            .partial_cmp(&self.dist)
-            .unwrap_or(Ordering::Equal)
-    }
-}
-
-impl<T: RStarTreeObject> PartialOrd for KnnCandidate<'_, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
     }
 }
 
@@ -754,7 +737,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
             return Vec::new();
         }
 
-        let mut heap: BinaryHeap<KnnCandidate<Point2D<T>>> = BinaryHeap::new();
+        let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point2D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
             let dist_sq = entry.mbr().min_distance(query).powi(2);
             heap.push(KnnCandidate {
@@ -844,7 +827,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
             return Vec::new();
         }
 
-        let mut heap: BinaryHeap<KnnCandidate<Point3D<T>>> = BinaryHeap::new();
+        let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point3D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
             let dist_sq = entry.mbr().min_distance(query).powi(2);
             heap.push(KnnCandidate {

@@ -34,6 +34,10 @@ use crate::geometry::{
     BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance, Point2D,
     Point3D, Rectangle,
 };
+use crate::rtree_common::{
+    compute_group_mbr as common_compute_group_mbr, delete_entry as common_delete_entry,
+    search_node as common_search_node, KnnCandidate,
+};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -105,6 +109,68 @@ pub struct RTree<T: RTreeObject> {
     min_entries: usize,
 }
 
+// Common trait implementations to unify algorithms across R-tree family.
+impl<T: RTreeObject> crate::rtree_common::EntryAccess for RTreeEntry<T> {
+    type BV = T::B;
+    type Node = RTreeNode<T>;
+    type Obj = T;
+
+    fn mbr(&self) -> &Self::BV {
+        RTreeEntry::mbr(self)
+    }
+
+    fn as_leaf_obj(&self) -> Option<&Self::Obj> {
+        match self {
+            RTreeEntry::Leaf { object, .. } => Some(object),
+            _ => None,
+        }
+    }
+
+    fn child(&self) -> Option<&<Self as crate::rtree_common::EntryAccess>::Node> {
+        match self {
+            RTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+
+    fn child_mut(&mut self) -> Option<&mut <Self as crate::rtree_common::EntryAccess>::Node> {
+        match self {
+            RTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+
+    fn set_mbr(&mut self, new_mbr: Self::BV) {
+        if let RTreeEntry::Node { mbr, .. } = self {
+            *mbr = new_mbr;
+        }
+    }
+
+    fn into_child(self) -> Option<Box<<Self as crate::rtree_common::EntryAccess>::Node>>
+    where
+        Self: Sized,
+    {
+        match self {
+            RTreeEntry::Node { child, .. } => Some(child),
+            _ => None,
+        }
+    }
+}
+
+impl<T: RTreeObject> crate::rtree_common::NodeAccess for RTreeNode<T> {
+    type Entry = RTreeEntry<T>;
+
+    fn is_leaf(&self) -> bool {
+        self.is_leaf
+    }
+    fn entries(&self) -> &Vec<Self::Entry> {
+        &self.entries
+    }
+    fn entries_mut(&mut self) -> &mut Vec<Self::Entry> {
+        &mut self.entries
+    }
+}
+
 impl<T: RTreeObject> RTree<T> {
     /// Creates a new R‑tree with the specified maximum number of entries per node.
     ///
@@ -163,8 +229,8 @@ impl<T: RTreeObject> RTree<T> {
             entries: group2,
             is_leaf: self.root.is_leaf,
         };
-        let mbr1 = compute_group_mbr(&child1.entries);
-        let mbr2 = compute_group_mbr(&child2.entries);
+        let mbr1 = common_compute_group_mbr(&child1.entries);
+        let mbr2 = common_compute_group_mbr(&child2.entries);
         self.root.is_leaf = false;
         self.root.entries.push(RTreeEntry::Node {
             mbr: mbr1,
@@ -188,7 +254,7 @@ impl<T: RTreeObject> RTree<T> {
     pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
         info!("Performing range search with query: {:?}", query);
         let mut result = Vec::new();
-        search_node(&self.root, query, &mut result);
+        common_search_node(&self.root, query, &mut result);
         result
     }
 
@@ -219,7 +285,7 @@ impl<T: RTreeObject> RTree<T> {
                     entries: chunk.to_vec(),
                     is_leaf: self.root.is_leaf,
                 };
-                let mbr = compute_group_mbr(&child_node.entries);
+                let mbr = common_compute_group_mbr(&child_node.entries);
                 new_level_entries.push(RTreeEntry::Node {
                     mbr,
                     child: Box::new(child_node),
@@ -259,7 +325,7 @@ fn insert_entry_node<T: RTreeObject>(node: &mut RTreeNode<T>, entry: RTreeEntry<
             if let RTreeEntry::Node { mbr, child } = &mut node.entries[best_index] {
                 *mbr = mbr.union(entry.mbr());
                 insert_entry_node(child, entry);
-                *mbr = compute_group_mbr(&child.entries);
+                *mbr = common_compute_group_mbr(&child.entries);
             }
         } else {
             node.entries.push(entry);
@@ -280,8 +346,8 @@ fn split_entries<T: RTreeObject>(
     let mut group1 = vec![seed1];
     let mut group2 = vec![seed2];
     for entry in entries {
-        let mbr1 = compute_group_mbr(&group1);
-        let mbr2 = compute_group_mbr(&group2);
+        let mbr1 = common_compute_group_mbr(&group1);
+        let mbr2 = common_compute_group_mbr(&group2);
         let enlargement1 = mbr1.enlargement(entry.mbr());
         let enlargement2 = mbr2.enlargement(entry.mbr());
         if enlargement1 < enlargement2 {
@@ -291,36 +357,6 @@ fn split_entries<T: RTreeObject>(
         }
     }
     (group1, group2)
-}
-
-fn compute_group_mbr<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> T::B {
-    let mut iter = entries.iter();
-    let first = iter
-        .next()
-        .expect("At least one entry must be present")
-        .mbr()
-        .clone();
-    iter.fold(first, |acc, entry| acc.union(entry.mbr()))
-}
-
-fn search_node<'a, T: RTreeObject>(node: &'a RTreeNode<T>, query: &T::B, result: &mut Vec<&'a T>) {
-    if node.is_leaf {
-        for entry in &node.entries {
-            if let RTreeEntry::Leaf { mbr, object } = entry {
-                if mbr.intersects(query) {
-                    result.push(object);
-                }
-            }
-        }
-    } else {
-        for entry in &node.entries {
-            if let RTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(query) {
-                    search_node(child, query, result);
-                }
-            }
-        }
-    }
 }
 
 impl<T: RTreeObject> RTree<T>
@@ -340,7 +376,7 @@ where
         info!("Attempting to delete object: {:?}", object);
         let object_mbr = object.mbr();
         let mut reinsert_list = Vec::new();
-        let deleted = delete_entry(
+        let deleted = common_delete_entry(
             &mut self.root,
             object,
             &object_mbr,
@@ -368,50 +404,6 @@ where
             self.split_root();
         }
     }
-}
-
-fn delete_entry<T: RTreeObject + PartialEq>(
-    node: &mut RTreeNode<T>,
-    object: &T,
-    object_mbr: &T::B,
-    min_entries: usize,
-    reinsert_list: &mut Vec<RTreeEntry<T>>,
-) -> bool {
-    let mut deleted = false;
-    if node.is_leaf {
-        let initial_len = node.entries.len();
-        node.entries.retain(|entry| {
-            if let RTreeEntry::Leaf { object: ref o, .. } = entry {
-                o != object
-            } else {
-                true
-            }
-        });
-        deleted = node.entries.len() < initial_len;
-    } else {
-        let mut to_delete_indices = Vec::new();
-        for (i, entry) in node.entries.iter_mut().enumerate() {
-            if let RTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(object_mbr)
-                    && delete_entry(child, object, object_mbr, min_entries, reinsert_list)
-                {
-                    deleted = true;
-                    if child.entries.len() < min_entries {
-                        to_delete_indices.push(i);
-                    } else {
-                        *mbr = compute_group_mbr(&child.entries);
-                    }
-                }
-            }
-        }
-
-        for &index in to_delete_indices.iter().rev() {
-            if let RTreeEntry::Node { child, .. } = node.entries.remove(index) {
-                reinsert_list.extend(child.entries);
-            }
-        }
-    }
-    deleted
 }
 
 impl<T: std::fmt::Debug + Clone> RTreeObject for Point2D<T> {
@@ -489,36 +481,6 @@ impl Cube {
     }
 }
 
-// Knn-search candidate.
-#[derive(Debug)]
-struct KnnCandidate<'a, T: RTreeObject> {
-    dist: f64,
-    entry: &'a RTreeEntry<T>,
-}
-
-impl<T: RTreeObject> PartialEq for KnnCandidate<'_, T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.dist.eq(&other.dist)
-    }
-}
-
-impl<T: RTreeObject> Eq for KnnCandidate<'_, T> {}
-
-impl<T: RTreeObject> Ord for KnnCandidate<'_, T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other
-            .dist
-            .partial_cmp(&self.dist)
-            .unwrap_or(Ordering::Equal)
-    }
-}
-
-impl<T: RTreeObject> PartialOrd for KnnCandidate<'_, T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl<T: std::fmt::Debug + Ord + Clone> RTree<Point2D<T>> {
     /// Performs a k‑nearest neighbor search on an R‑tree of 2D points.
     ///
@@ -545,7 +507,8 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point2D<T>> {
             return Vec::new();
         }
 
-        let mut heap: BinaryHeap<KnnCandidate<Point2D<T>>> = BinaryHeap::new();
+        let mut heap: BinaryHeap<crate::rtree_common::KnnCandidate<RTreeEntry<Point2D<T>>>> =
+            BinaryHeap::new();
         for entry in &self.root.entries {
             let dist_sq = entry.mbr().min_distance(query).powi(2);
             heap.push(KnnCandidate {
@@ -635,7 +598,8 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point3D<T>> {
             return Vec::new();
         }
 
-        let mut heap: BinaryHeap<KnnCandidate<Point3D<T>>> = BinaryHeap::new();
+        let mut heap: BinaryHeap<crate::rtree_common::KnnCandidate<RTreeEntry<Point3D<T>>>> =
+            BinaryHeap::new();
         for entry in &self.root.entries {
             let dist_sq = entry.mbr().min_distance(query).powi(2);
             heap.push(KnnCandidate {
