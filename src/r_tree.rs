@@ -102,6 +102,7 @@ pub struct RTreeNode<T: RTreeObject> {
 pub struct RTree<T: RTreeObject> {
     root: RTreeNode<T>,
     max_entries: usize,
+    min_entries: usize,
 }
 
 impl<T: RTreeObject> RTree<T> {
@@ -125,6 +126,7 @@ impl<T: RTreeObject> RTree<T> {
                 is_leaf: true,
             },
             max_entries,
+            min_entries: (max_entries as f64 * 0.4).ceil() as usize,
         }
     }
 
@@ -334,53 +336,80 @@ where
     /// `true` if at least one matching object was found and removed.
     pub fn delete(&mut self, object: &T) -> bool {
         info!("Attempting to delete object: {:?}", object);
-        let count = delete_entry(&mut self.root, object);
-        if !self.root.is_leaf && self.root.entries.len() == 1 {
-            if let RTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
-                self.root = *child;
+        let object_mbr = object.mbr();
+        let mut reinsert_list = Vec::new();
+        let deleted = delete_entry(
+            &mut self.root,
+            object,
+            &object_mbr,
+            self.min_entries,
+            &mut reinsert_list,
+        );
+
+        if deleted {
+            for entry in reinsert_list {
+                self.insert_entry(entry);
+            }
+
+            if !self.root.is_leaf && self.root.entries.len() == 1 {
+                if let RTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
+                    self.root = *child;
+                }
             }
         }
-        count > 0
+        deleted
+    }
+
+    fn insert_entry(&mut self, entry: RTreeEntry<T>) {
+        insert_entry_node(&mut self.root, entry);
+        if self.root.entries.len() > self.max_entries {
+            self.split_root();
+        }
     }
 }
 
-// Note: This implementation is inefficient as it traverses all children of a node
-// instead of pruning the search by checking for MBR intersections. An attempt
-// to add pruning resulted in a stack overflow, so the inefficient but correct
-// version is kept.
-fn delete_entry<T: RTreeObject + PartialEq>(node: &mut RTreeNode<T>, object: &T) -> usize {
+fn delete_entry<T: RTreeObject + PartialEq>(
+    node: &mut RTreeNode<T>,
+    object: &T,
+    object_mbr: &T::B,
+    min_entries: usize,
+    reinsert_list: &mut Vec<RTreeEntry<T>>,
+) -> bool {
+    let mut deleted = false;
     if node.is_leaf {
         let initial_len = node.entries.len();
         node.entries.retain(|entry| {
-            if let RTreeEntry::Leaf {
-                object: ref obj, ..
-            } = entry
-            {
-                obj != object
+            if let RTreeEntry::Leaf { object: ref o, .. } = entry {
+                o != object
             } else {
                 true
             }
         });
-        initial_len - node.entries.len()
+        deleted = node.entries.len() < initial_len;
     } else {
-        let mut count = 0;
-        for entry in &mut node.entries {
-            if let RTreeEntry::Node { child, .. } = entry {
-                count += delete_entry(child, object);
-                if !child.entries.is_empty() {
-                    let new_mbr = compute_group_mbr(&child.entries);
-                    if let RTreeEntry::Node { ref mut mbr, .. } = entry {
-                        *mbr = new_mbr;
+        let mut to_delete_indices = Vec::new();
+        for (i, entry) in node.entries.iter_mut().enumerate() {
+            if let RTreeEntry::Node { mbr, child } = entry {
+                if mbr.intersects(object_mbr) {
+                    if delete_entry(child, object, object_mbr, min_entries, reinsert_list) {
+                        deleted = true;
+                        if child.entries.len() < min_entries {
+                            to_delete_indices.push(i);
+                        } else {
+                            *mbr = compute_group_mbr(&child.entries);
+                        }
                     }
                 }
             }
         }
-        node.entries.retain(|entry| match entry {
-            RTreeEntry::Node { child, .. } => !child.entries.is_empty(),
-            _ => true,
-        });
-        count
+
+        for &index in to_delete_indices.iter().rev() {
+            if let RTreeEntry::Node { child, .. } = node.entries.remove(index) {
+                reinsert_list.extend(child.entries);
+            }
+        }
     }
+    deleted
 }
 
 impl<T: std::fmt::Debug + Clone> RTreeObject for Point2D<T> {

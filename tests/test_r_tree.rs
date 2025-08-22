@@ -227,6 +227,48 @@ fn test_rtree_insert_bulk_2d() {
 }
 
 #[test]
+fn test_rtree_delete_underflow() {
+    let mut tree: RTree<Point2D<i32>> = RTree::new(4);
+    let points: Vec<_> = (0..10)
+        .map(|i| Point2D::new(i as f64, i as f64, Some(i)))
+        .collect();
+
+    for p in &points {
+        tree.insert(p.clone());
+    }
+
+    // min_entries is (4 * 0.4).ceil() = 2.
+    // Deleting points to trigger underflow.
+    // Let's say we have a node with [p0, p1, p2, p3] and another with [p4, p5, p6, p7]
+    // and a root.
+    // If we delete p0, p1, p2, one of the nodes will underflow.
+    assert!(tree.delete(&points[0]));
+    assert!(tree.delete(&points[1]));
+    assert!(tree.delete(&points[2]));
+
+    // After deletions, check if the remaining points are still there.
+    let all_points = tree.range_search_bbox(&spart::geometry::Rectangle {
+        x: -1.0,
+        y: -1.0,
+        width: 12.0,
+        height: 12.0,
+    });
+    assert_eq!(all_points.len(), 7);
+
+    for i in 3..10 {
+        assert!(tree.delete(&points[i]));
+    }
+
+    let all_points_after_all_deleted = tree.range_search_bbox(&spart::geometry::Rectangle {
+        x: -1.0,
+        y: -1.0,
+        width: 12.0,
+        height: 12.0,
+    });
+    assert!(all_points_after_all_deleted.is_empty());
+}
+
+#[test]
 fn test_rtree_empty() {
     let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
     let target = target_point_2d();
