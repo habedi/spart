@@ -198,12 +198,13 @@ impl<P: KdPoint> KdTree<P> {
     ///
     /// # Arguments
     ///
-    /// * `points` - The points to insert.
-    pub fn insert_bulk(&mut self, points: &mut [P]) {
+    /// * `points` - The points to insert. This method takes ownership of the vector
+    ///   to avoid mutating the caller's data (e.g., reordering during bulk build).
+    pub fn insert_bulk(&mut self, mut points: Vec<P>) {
         if points.is_empty() {
             return;
         }
-        self.root = self.insert_bulk_rec(points, 0);
+        self.root = self.insert_bulk_rec(&mut points[..], 0);
     }
 
     fn insert_bulk_rec(&mut self, points: &mut [P], depth: usize) -> Option<Box<KdNode<P>>> {

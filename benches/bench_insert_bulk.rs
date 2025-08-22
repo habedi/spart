@@ -51,17 +51,17 @@ fn insert_bulk_3d_octree(points: Vec<Point3D<i32>>) {
     info!("Finished insertion for 3D Octree");
 }
 
-fn insert_bulk_2d_kdtree(mut points: Vec<Point2D<i32>>) {
+fn insert_bulk_2d_kdtree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D KdTree");
     let mut tree = kd_tree::KdTree::new(2).unwrap();
-    tree.insert_bulk(&mut points);
+    tree.insert_bulk(points);
     info!("Finished insertion for 2D KdTree");
 }
 
-fn insert_bulk_3d_kdtree(mut points: Vec<Point3D<i32>>) {
+fn insert_bulk_3d_kdtree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D KdTree");
     let mut tree = kd_tree::KdTree::new(3).unwrap();
-    tree.insert_bulk(&mut points);
+    tree.insert_bulk(points);
     info!("Finished insertion for 3D KdTree");
 }
 

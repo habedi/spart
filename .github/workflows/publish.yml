@@ -17,7 +17,6 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-
     # Try to publish only if the tests pass
     needs: call_tests
     if: success()

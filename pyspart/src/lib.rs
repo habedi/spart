@@ -403,8 +403,8 @@ impl PyKdTree2D {
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
-        let mut rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
-        self.tree.insert_bulk(&mut rust_points);
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint2D) -> bool {
@@ -473,8 +473,8 @@ impl PyKdTree3D {
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
-        let mut rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
-        self.tree.insert_bulk(&mut rust_points);
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
