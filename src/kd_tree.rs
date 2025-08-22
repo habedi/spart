@@ -367,9 +367,18 @@ impl<P: KdPoint> KdTree<P> {
     /// `true` if the point was found and deleted, otherwise `false`.
     pub fn delete(&mut self, point: &P) -> bool {
         info!("Attempting to delete point: {:?}", point);
-        let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
-        self.root = new_root;
-        deleted
+        let mut deleted_any = false;
+        loop {
+            let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
+            self.root = new_root;
+            if deleted {
+                deleted_any = true;
+                // Continue to remove any additional duplicates.
+            } else {
+                break;
+            }
+        }
+        deleted_any
     }
 
     fn delete_rec(
@@ -383,22 +392,20 @@ impl<P: KdPoint> KdTree<P> {
             Some(mut current) => {
                 let axis = depth % k;
                 if current.point == *point {
-                    let mut new_current = current;
-                    while new_current.point == *point {
-                        if let Some(right_subtree) = new_current.right.take() {
-                            let successor =
-                                Self::find_min(&right_subtree, axis, depth + 1, k).clone();
-                            let (new_right, _) =
-                                Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
-                            new_current.point = successor;
-                            new_current.right = new_right;
-                        } else if let Some(left_subtree) = new_current.left.take() {
-                            return (Some(left_subtree), true);
-                        } else {
-                            return (None, true);
-                        }
+                    // Delete a single instance: replace with successor from right subtree if available,
+                    // otherwise promote left subtree, or remove leaf.
+                    if let Some(right_subtree) = current.right.take() {
+                        let successor = Self::find_min(&right_subtree, axis, depth + 1, k).clone();
+                        let (new_right, _) =
+                            Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
+                        current.point = successor;
+                        current.right = new_right;
+                        (Some(current), true)
+                    } else if let Some(left_subtree) = current.left.take() {
+                        (Some(left_subtree), true)
+                    } else {
+                        (None, true)
                     }
-                    (Some(new_current), true)
                 } else if point.coord(axis) < current.point.coord(axis) {
                     let (new_left, deleted) =
                         Self::delete_rec(current.left.take(), point, depth + 1, k);
