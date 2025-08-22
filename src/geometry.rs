@@ -633,6 +633,12 @@ pub trait BoundingVolume: Clone {
     }
     /// Determines whether the bounding volume intersects with another.
     fn intersects(&self, other: &Self) -> bool;
+
+    /// Computes the overlap between two bounding volumes
+    fn overlap(&self, other: &Self) -> f64;
+
+    /// Computes the margin of a bounding box
+    fn margin(&self) -> f64;
 }
 
 impl BoundingVolume for Rectangle {
@@ -651,6 +657,19 @@ impl BoundingVolume for Rectangle {
         debug!("BoundingVolume (Rectangle)::intersects() -> {}", i);
         i
     }
+    fn overlap(&self, other: &Self) -> f64 {
+        let overlap_x = (self.x + self.width).min(other.x + other.width) - self.x.max(other.x);
+        let overlap_y = (self.y + self.height).min(other.y + other.height) - self.y.max(other.y);
+        if overlap_x > 0.0 && overlap_y > 0.0 {
+            overlap_x * overlap_y
+        } else {
+            0.0
+        }
+    }
+
+    fn margin(&self) -> f64 {
+        2.0 * (self.width + self.height)
+    }
 }
 
 impl BoundingVolume for Cube {
@@ -668,6 +687,20 @@ impl BoundingVolume for Cube {
         let i = Cube::intersects(self, other);
         debug!("BoundingVolume (Cube)::intersects() -> {}", i);
         i
+    }
+    fn overlap(&self, other: &Self) -> f64 {
+        let overlap_x = (self.x + self.width).min(other.x + other.width) - self.x.max(other.x);
+        let overlap_y = (self.y + self.height).min(other.y + other.height) - self.y.max(other.y);
+        let overlap_z = (self.z + self.depth).min(other.z + other.depth) - self.z.max(other.z);
+        if overlap_x > 0.0 && overlap_y > 0.0 && overlap_z > 0.0 {
+            overlap_x * overlap_y * overlap_z
+        } else {
+            0.0
+        }
+    }
+
+    fn margin(&self) -> f64 {
+        2.0 * (self.width + self.height + self.depth)
     }
 }
 

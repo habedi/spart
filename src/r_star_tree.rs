@@ -1,8 +1,8 @@
-//! ## R‑tree Implementation
+//! ## R*‑tree Implementation
 //!
-//! This module implements an R‑tree for indexing 2D and 3D points.
+//! This module implements an R*‑tree for indexing 2D and 3D points.
 //! The implementation supports insertion, deletion, range search, and k‑nearest
-//! neighbor (kNN) search. Points stored in the R‑tree must implement the `RTreeObject` trait,
+//! neighbor (kNN) search. Points stored in the R*‑tree must implement the `RStarTreeObject` trait,
 //! which requires an implementation of a method to get a minimum bounding rectangle (for 2D)
 //! or cube (for 3D) around the point.
 //!
@@ -10,18 +10,18 @@
 //!
 //! ```
 //! use spart::geometry::{Point2D, Rectangle, Point3D, Cube};
-//! use spart::r_tree::{RTree, RTreeObject};
+//! use spart::r_star_tree::{RStarTree, RStarTreeObject};
 //!
-//! // Create an R‑tree for 2D points.
-//! let mut tree2d: RTree<Point2D<()>> = RTree::new(4);
+//! // Create an R*‑tree for 2D points.
+//! let mut tree2d: RStarTree<Point2D<()>> = RStarTree::new(4);
 //! let pt2d: Point2D<()> = Point2D::new(10.0, 20.0, None);
 //! tree2d.insert(pt2d);
 //! let query_rect = Rectangle { x: 5.0, y: 15.0, width: 10.0, height: 10.0 };
 //! let results = tree2d.range_search_bbox(&query_rect);
 //! assert!(!results.is_empty());
 //!
-//! // Create an R‑tree for 3D points.
-//! let mut tree3d: RTree<Point3D<()>> = RTree::new(4);
+//! // Create an R*‑tree for 3D points.
+//! let mut tree3d: RStarTree<Point3D<()>> = RStarTree::new(4);
 //! let pt3d: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
 //! tree3d.insert(pt3d);
 //! let query_cube = Cube { x: 5.0, y: 15.0, z: 25.0, width: 10.0, height: 10.0, depth: 10.0 };
@@ -31,7 +31,8 @@
 
 use crate::exceptions::SpartError;
 use crate::geometry::{
-    BoundingVolume, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D, Rectangle,
+    BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D,
+    Rectangle,
 };
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -40,54 +41,60 @@ use tracing::{debug, info};
 // Epsilon value for zero-sizes bounding boxes/cubes.
 const EPSILON: f64 = 1e-10;
 
-/// Trait for points stored in an R‑tree.
+/// Trait for points stored in an R*‑tree.
 ///
 /// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
-pub trait RTreeObject: std::fmt::Debug {
+pub trait RStarTreeObject: std::fmt::Debug {
     /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
     type B: BoundingVolume + std::fmt::Debug;
     /// Returns the minimum bounding volume of the object.
     fn mbr(&self) -> Self::B;
 }
 
-/// An entry in the R‑tree, which can be either a leaf or a node.
+/// An entry in the R*‑tree, which can be either a leaf or a node.
 #[derive(Debug, Clone)]
-pub enum RTreeEntry<T: RTreeObject> {
-    Leaf { mbr: T::B, object: T },
-    Node { mbr: T::B, child: Box<RTreeNode<T>> },
+pub enum RStarTreeEntry<T: RStarTreeObject> {
+    Leaf {
+        mbr: T::B,
+        object: T,
+    },
+    Node {
+        mbr: T::B,
+        child: Box<RStarTreeNode<T>>,
+    },
 }
 
-impl<T: RTreeObject> RTreeEntry<T> {
+impl<T: RStarTreeObject> RStarTreeEntry<T> {
     /// Returns a reference to the minimum bounding volume for this entry.
     pub fn mbr(&self) -> &T::B {
         match self {
-            RTreeEntry::Leaf { mbr, .. } => mbr,
-            RTreeEntry::Node { mbr, .. } => mbr,
+            RStarTreeEntry::Leaf { mbr, .. } => mbr,
+            RStarTreeEntry::Node { mbr, .. } => mbr,
         }
     }
 }
 
-/// A node in the R‑tree.
+/// A node in the R*‑tree.
 #[derive(Debug, Clone)]
-pub struct RTreeNode<T: RTreeObject> {
+pub struct RStarTreeNode<T: RStarTreeObject> {
     /// The entries stored in this node.
-    pub entries: Vec<RTreeEntry<T>>,
+    pub entries: Vec<RStarTreeEntry<T>>,
     /// Indicates whether this node is a leaf.
     pub is_leaf: bool,
 }
 
-/// R‑tree data structure for indexing 2D or 3D points.
+/// R*‑tree data structure for indexing 2D or 3D points.
 ///
 /// The tree is initialized with a maximum number of entries per node. If a node exceeds this
 /// number, it will split. The tree supports insertion, deletion, and range searches.
 #[derive(Debug)]
-pub struct RTree<T: RTreeObject> {
-    root: RTreeNode<T>,
+pub struct RStarTree<T: RStarTreeObject> {
+    root: RStarTreeNode<T>,
     max_entries: usize,
 }
 
-impl<T: RTreeObject> RTree<T> {
-    /// Creates a new R‑tree with the specified maximum number of entries per node.
+impl<T: RStarTreeObject> RStarTree<T> {
+    /// Creates a new R*‑tree with the specified maximum number of entries per node.
     ///
     /// # Arguments
     ///
@@ -100,9 +107,9 @@ impl<T: RTreeObject> RTree<T> {
         if max_entries == 0 {
             panic!("{}", SpartError::InvalidCapacity { capacity: 0 });
         }
-        info!("Creating new RTree with max_entries: {}", max_entries);
-        RTree {
-            root: RTreeNode {
+        info!("Creating new RStarTree with max_entries: {}", max_entries);
+        RStarTree {
+            root: RStarTreeNode {
                 entries: Vec::new(),
                 is_leaf: true,
             },
@@ -110,14 +117,18 @@ impl<T: RTreeObject> RTree<T> {
         }
     }
 
-    /// Inserts an object into the R‑tree.
+    /// Inserts an object into the R*‑tree.
     ///
     /// # Arguments
     ///
     /// * `object` - The object to insert.
-    pub fn insert(&mut self, object: T) {
-        info!("Inserting object into RTree: {:?}", object);
-        let entry = RTreeEntry::Leaf {
+    pub fn insert(&mut self, object: T)
+    where
+        T: Clone,
+        T::B: BSPBounds,
+    {
+        info!("Inserting object into RStarTree: {:?}", object);
+        let entry = RStarTreeEntry::Leaf {
             mbr: object.mbr(),
             object,
         };
@@ -129,26 +140,30 @@ impl<T: RTreeObject> RTree<T> {
     }
 
     /// Splits the root node into two child nodes when it exceeds the maximum number of entries.
-    fn split_root(&mut self) {
+    fn split_root(&mut self)
+    where
+        T: Clone,
+        T::B: BSPBounds,
+    {
         info!("Splitting root node");
         let old_entries = std::mem::take(&mut self.root.entries);
         let (group1, group2) = split_entries(old_entries, self.max_entries);
-        let child1 = RTreeNode {
+        let child1 = RStarTreeNode {
             entries: group1,
             is_leaf: self.root.is_leaf,
         };
-        let child2 = RTreeNode {
+        let child2 = RStarTreeNode {
             entries: group2,
             is_leaf: self.root.is_leaf,
         };
         let mbr1 = compute_group_mbr(&child1.entries);
         let mbr2 = compute_group_mbr(&child2.entries);
         self.root.is_leaf = false;
-        self.root.entries.push(RTreeEntry::Node {
+        self.root.entries.push(RStarTreeEntry::Node {
             mbr: mbr1,
             child: Box::new(child1),
         });
-        self.root.entries.push(RTreeEntry::Node {
+        self.root.entries.push(RStarTreeEntry::Node {
             mbr: mbr2,
             child: Box::new(child2),
         });
@@ -171,67 +186,173 @@ impl<T: RTreeObject> RTree<T> {
     }
 }
 
-fn insert_entry_node<T: RTreeObject>(node: &mut RTreeNode<T>, entry: RTreeEntry<T>) {
+fn insert_entry_node<T: RStarTreeObject>(node: &mut RStarTreeNode<T>, entry: RStarTreeEntry<T>) {
     if node.is_leaf {
         debug!("Inserting entry into leaf node");
         node.entries.push(entry);
+        return;
+    }
+
+    // Choose subtree
+    let children_are_leaves = if let Some(RStarTreeEntry::Node { child, .. }) = node.entries.first()
+    {
+        child.is_leaf
     } else {
-        let mut best_index: Option<usize> = None;
-        let mut best_enlargement = f64::INFINITY;
-        for (i, child_entry) in node.entries.iter().enumerate() {
-            if let RTreeEntry::Node { mbr, .. } = child_entry {
-                let enlargement = mbr.enlargement(entry.mbr());
-                if enlargement < best_enlargement {
-                    best_enlargement = enlargement;
-                    best_index = Some(i);
-                } else if (enlargement - best_enlargement).abs() < f64::EPSILON {
-                    if let Some(current_best) = best_index {
-                        if mbr.area() < node.entries[current_best].mbr().area() {
-                            best_index = Some(i);
-                        }
-                    }
+        // If there are no entries in a non-leaf node, we can't determine the level of children.
+        // This state is generally invalid for a populated R-tree but can occur during initial insertions.
+        // We default to the behavior for non-leaf children, which is area-based.
+        false
+    };
+
+    let best_index = if children_are_leaves {
+        // Children are leaves: choose the entry with the least overlap enlargement.
+        // Tie-breaking: least area enlargement, then smallest area.
+        node.entries
+            .iter()
+            .enumerate()
+            .min_by(|&(_, a), &(_, b)| {
+                let mbr_a = a.mbr();
+                let mbr_b = b.mbr();
+
+                let overlap_a = node
+                    .entries
+                    .iter()
+                    .filter(|e| !std::ptr::eq(*e, a))
+                    .map(|e| e.mbr().union(entry.mbr()).overlap(e.mbr()))
+                    .sum::<f64>();
+
+                let overlap_b = node
+                    .entries
+                    .iter()
+                    .filter(|e| !std::ptr::eq(*e, b))
+                    .map(|e| e.mbr().union(entry.mbr()).overlap(e.mbr()))
+                    .sum::<f64>();
+
+                let overlap_cmp = overlap_a.partial_cmp(&overlap_b).unwrap_or(Ordering::Equal);
+                if overlap_cmp != Ordering::Equal {
+                    return overlap_cmp;
                 }
-            }
-        }
-        if let Some(best_index) = best_index {
-            if let RTreeEntry::Node { mbr, child } = &mut node.entries[best_index] {
-                *mbr = mbr.union(entry.mbr());
-                insert_entry_node(child, entry);
-                *mbr = compute_group_mbr(&child.entries);
-            }
-        } else {
-            node.entries.push(entry);
+
+                let enlargement_a = mbr_a.enlargement(entry.mbr());
+                let enlargement_b = mbr_b.enlargement(entry.mbr());
+                let enlargement_cmp = enlargement_a
+                    .partial_cmp(&enlargement_b)
+                    .unwrap_or(Ordering::Equal);
+                if enlargement_cmp != Ordering::Equal {
+                    return enlargement_cmp;
+                }
+
+                mbr_a
+                    .area()
+                    .partial_cmp(&mbr_b.area())
+                    .unwrap_or(Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    } else {
+        // Children are not leaves: choose the entry with the least area enlargement.
+        // Tie-breaking: smallest area.
+        node.entries
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| {
+                let mbr_a = a.mbr();
+                let mbr_b = b.mbr();
+
+                let enlargement_a = mbr_a.enlargement(entry.mbr());
+                let enlargement_b = mbr_b.enlargement(entry.mbr());
+
+                let enlargement_cmp = enlargement_a
+                    .partial_cmp(&enlargement_b)
+                    .unwrap_or(Ordering::Equal);
+                if enlargement_cmp != Ordering::Equal {
+                    return enlargement_cmp;
+                }
+                mbr_a
+                    .area()
+                    .partial_cmp(&mbr_b.area())
+                    .unwrap_or(Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(0)
+    };
+
+    if let Some(RStarTreeEntry::Node { child, .. }) = node.entries.get_mut(best_index) {
+        insert_entry_node(child, entry);
+        let new_mbr = compute_group_mbr(&child.entries);
+        if let Some(RStarTreeEntry::Node { ref mut mbr, .. }) = node.entries.get_mut(best_index) {
+            *mbr = new_mbr;
         }
     }
 }
 
-fn split_entries<T: RTreeObject>(
-    entries: Vec<RTreeEntry<T>>,
-    _max_entries: usize,
-) -> (Vec<RTreeEntry<T>>, Vec<RTreeEntry<T>>) {
-    let mut entries = entries;
-    if entries.len() < 2 {
-        return (entries, Vec::new());
-    }
-    let seed1 = entries.remove(0);
-    let seed2 = entries.remove(0);
-    let mut group1 = vec![seed1];
-    let mut group2 = vec![seed2];
-    for entry in entries {
-        let mbr1 = compute_group_mbr(&group1);
-        let mbr2 = compute_group_mbr(&group2);
-        let enlargement1 = mbr1.enlargement(entry.mbr());
-        let enlargement2 = mbr2.enlargement(entry.mbr());
-        if enlargement1 < enlargement2 {
-            group1.push(entry);
-        } else {
-            group2.push(entry);
+fn split_entries<T: RStarTreeObject + Clone>(
+    mut entries: Vec<RStarTreeEntry<T>>,
+    max_entries: usize,
+) -> (Vec<RStarTreeEntry<T>>, Vec<RStarTreeEntry<T>>)
+where
+    T::B: BSPBounds,
+{
+    let min_entries = (max_entries as f64 * 0.4).ceil() as usize;
+    let mut best_axis = 0;
+    let mut best_split_index = 0;
+    let mut min_margin = f64::INFINITY;
+
+    for dim in 0..T::B::DIM {
+        entries.sort_by(|a, b| {
+            a.mbr()
+                .center(dim)
+                .partial_cmp(&b.mbr().center(dim))
+                .unwrap_or(Ordering::Equal)
+        });
+
+        for k in min_entries..=entries.len() - min_entries {
+            let group1 = &entries[..k];
+            let group2 = &entries[k..];
+            let mbr1 = compute_group_mbr(group1);
+            let mbr2 = compute_group_mbr(group2);
+            let margin = mbr1.margin() + mbr2.margin();
+            if margin < min_margin {
+                min_margin = margin;
+                best_axis = dim;
+                best_split_index = k;
+            }
         }
     }
-    (group1, group2)
+
+    entries.sort_by(|a, b| {
+        a.mbr()
+            .center(best_axis)
+            .partial_cmp(&b.mbr().center(best_axis))
+            .unwrap_or(Ordering::Equal)
+    });
+
+    let mut best_overlap = f64::INFINITY;
+    let mut best_area = f64::INFINITY;
+
+    for k in min_entries..=entries.len() - min_entries {
+        let group1 = &entries[..k];
+        let group2 = &entries[k..];
+        let mbr1 = compute_group_mbr(group1);
+        let mbr2 = compute_group_mbr(group2);
+        let overlap = mbr1.overlap(&mbr2);
+        let area = mbr1.area() + mbr2.area();
+
+        if overlap < best_overlap {
+            best_overlap = overlap;
+            best_area = area;
+            best_split_index = k;
+        } else if (overlap - best_overlap).abs() < EPSILON && area < best_area {
+            best_area = area;
+            best_split_index = k;
+        }
+    }
+
+    let (group1, group2) = entries.split_at(best_split_index);
+    (group1.to_vec(), group2.to_vec())
 }
 
-fn compute_group_mbr<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> T::B {
+fn compute_group_mbr<T: RStarTreeObject>(entries: &[RStarTreeEntry<T>]) -> T::B {
     let mut iter = entries.iter();
     let first = iter
         .next()
@@ -241,10 +362,14 @@ fn compute_group_mbr<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> T::B {
     iter.fold(first, |acc, entry| acc.union(entry.mbr()))
 }
 
-fn search_node<'a, T: RTreeObject>(node: &'a RTreeNode<T>, query: &T::B, result: &mut Vec<&'a T>) {
+fn search_node<'a, T: RStarTreeObject>(
+    node: &'a RStarTreeNode<T>,
+    query: &T::B,
+    result: &mut Vec<&'a T>,
+) {
     if node.is_leaf {
         for entry in &node.entries {
-            if let RTreeEntry::Leaf { mbr, object } = entry {
+            if let RStarTreeEntry::Leaf { mbr, object } = entry {
                 if mbr.intersects(query) {
                     result.push(object);
                 }
@@ -252,7 +377,7 @@ fn search_node<'a, T: RTreeObject>(node: &'a RTreeNode<T>, query: &T::B, result:
         }
     } else {
         for entry in &node.entries {
-            if let RTreeEntry::Node { mbr, child } = entry {
+            if let RStarTreeEntry::Node { mbr, child } = entry {
                 if mbr.intersects(query) {
                     search_node(child, query, result);
                 }
@@ -261,11 +386,11 @@ fn search_node<'a, T: RTreeObject>(node: &'a RTreeNode<T>, query: &T::B, result:
     }
 }
 
-impl<T: RTreeObject> RTree<T>
+impl<T: RStarTreeObject> RStarTree<T>
 where
     T: PartialEq,
 {
-    /// Deletes an object from the R‑tree.
+    /// Deletes an object from the R*‑tree.
     ///
     /// # Arguments
     ///
@@ -278,7 +403,7 @@ where
         info!("Attempting to delete object: {:?}", object);
         let count = delete_entry(&mut self.root, object);
         if !self.root.is_leaf && self.root.entries.len() == 1 {
-            if let RTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
+            if let RStarTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
                 self.root = *child;
             }
         }
@@ -290,11 +415,11 @@ where
 // instead of pruning the search by checking for MBR intersections. An attempt
 // to add pruning resulted in a stack overflow, so the inefficient but correct
 // version is kept.
-fn delete_entry<T: RTreeObject + PartialEq>(node: &mut RTreeNode<T>, object: &T) -> usize {
+fn delete_entry<T: RStarTreeObject + PartialEq>(node: &mut RStarTreeNode<T>, object: &T) -> usize {
     if node.is_leaf {
         let initial_len = node.entries.len();
         node.entries.retain(|entry| {
-            if let RTreeEntry::Leaf {
+            if let RStarTreeEntry::Leaf {
                 object: ref obj, ..
             } = entry
             {
@@ -307,25 +432,25 @@ fn delete_entry<T: RTreeObject + PartialEq>(node: &mut RTreeNode<T>, object: &T)
     } else {
         let mut count = 0;
         for entry in &mut node.entries {
-            if let RTreeEntry::Node { child, .. } = entry {
+            if let RStarTreeEntry::Node { child, .. } = entry {
                 count += delete_entry(child, object);
                 if !child.entries.is_empty() {
                     let new_mbr = compute_group_mbr(&child.entries);
-                    if let RTreeEntry::Node { ref mut mbr, .. } = entry {
+                    if let RStarTreeEntry::Node { ref mut mbr, .. } = entry {
                         *mbr = new_mbr;
                     }
                 }
             }
         }
         node.entries.retain(|entry| match entry {
-            RTreeEntry::Node { child, .. } => !child.entries.is_empty(),
+            RStarTreeEntry::Node { child, .. } => !child.entries.is_empty(),
             _ => true,
         });
         count
     }
 }
 
-impl<T: std::fmt::Debug> RTreeObject for Point2D<T> {
+impl<T: std::fmt::Debug> RStarTreeObject for Point2D<T> {
     type B = Rectangle;
     fn mbr(&self) -> Self::B {
         Rectangle {
@@ -337,7 +462,7 @@ impl<T: std::fmt::Debug> RTreeObject for Point2D<T> {
     }
 }
 
-impl<T: std::fmt::Debug> RTreeObject for Point3D<T> {
+impl<T: std::fmt::Debug> RStarTreeObject for Point3D<T> {
     type B = Cube;
     fn mbr(&self) -> Self::B {
         Cube {
@@ -351,71 +476,22 @@ impl<T: std::fmt::Debug> RTreeObject for Point3D<T> {
     }
 }
 
-impl Rectangle {
-    /// Computes the minimum distance from this rectangle to a given 2D point.
-    pub fn min_distance<T>(&self, point: &Point2D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy).sqrt()
-    }
-}
-
-impl Cube {
-    /// Computes the minimum distance from this cube to a given 3D point.
-    pub fn min_distance<T>(&self, point: &Point3D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        let dz = if point.z < self.z {
-            self.z - point.z
-        } else if point.z > self.z + self.depth {
-            point.z - (self.z + self.depth)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    }
-}
-
 // Knn-search candidate.
 #[derive(Debug)]
-struct KnnCandidate<'a, T: RTreeObject> {
+struct KnnCandidate<'a, T: RStarTreeObject> {
     dist: f64,
-    entry: &'a RTreeEntry<T>,
+    entry: &'a RStarTreeEntry<T>,
 }
 
-impl<T: RTreeObject> PartialEq for KnnCandidate<'_, T> {
+impl<T: RStarTreeObject> PartialEq for KnnCandidate<'_, T> {
     fn eq(&self, other: &Self) -> bool {
         self.dist.eq(&other.dist)
     }
 }
 
-impl<T: RTreeObject> Eq for KnnCandidate<'_, T> {}
+impl<T: RStarTreeObject> Eq for KnnCandidate<'_, T> {}
 
-impl<T: RTreeObject> Ord for KnnCandidate<'_, T> {
+impl<T: RStarTreeObject> Ord for KnnCandidate<'_, T> {
     fn cmp(&self, other: &Self) -> Ordering {
         other
             .dist
@@ -424,14 +500,14 @@ impl<T: RTreeObject> Ord for KnnCandidate<'_, T> {
     }
 }
 
-impl<T: RTreeObject> PartialOrd for KnnCandidate<'_, T> {
+impl<T: RStarTreeObject> PartialOrd for KnnCandidate<'_, T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
-    /// Performs a k‑nearest neighbor search on an R‑tree of 2D points.
+impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
+    /// Performs a k‑nearest neighbor search on an R*‑tree of 2D points.
     ///
     /// # Arguments
     ///
@@ -481,7 +557,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
             }
 
             match entry {
-                RTreeEntry::Leaf { object, .. } => {
+                RStarTreeEntry::Leaf { object, .. } => {
                     let d_sq = query.distance_sq(object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
@@ -490,7 +566,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
                         results.push((OrdDist(d_sq), object));
                     }
                 }
-                RTreeEntry::Node { child, .. } => {
+                RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
                         if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
@@ -510,8 +586,8 @@ impl<T: std::fmt::Debug + Ord> RTree<Point2D<T>> {
     }
 }
 
-impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
-    /// Performs a k‑nearest neighbor search on an R‑tree of 3D points.
+impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
+    /// Performs a k‑nearest neighbor search on an R*‑tree of 3D points.
     ///
     /// # Arguments
     ///
@@ -561,7 +637,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
             }
 
             match entry {
-                RTreeEntry::Leaf { object, .. } => {
+                RStarTreeEntry::Leaf { object, .. } => {
                     let d_sq = query.distance_sq(object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
@@ -570,7 +646,7 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
                         results.push((OrdDist(d_sq), object));
                     }
                 }
-                RTreeEntry::Node { child, .. } => {
+                RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
                         if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
@@ -590,12 +666,12 @@ impl<T: std::fmt::Debug + Ord> RTree<Point3D<T>> {
     }
 }
 
-impl<T> RTree<T>
+impl<T> RStarTree<T>
 where
-    T: RTreeObject + PartialEq + std::fmt::Debug,
+    T: RStarTreeObject + PartialEq + std::fmt::Debug,
     T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
 {
-    /// Performs a range search on the R‑tree using a query object and radius.
+    /// Performs a range search on the R*‑tree using a query object and radius.
     ///
     /// The query object is wrapped into a bounding volume using `from_point_radius`.
     ///
