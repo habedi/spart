@@ -158,31 +158,32 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point2D<T>) -> bool {
         if !self.boundary.contains(&point) {
-            debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
-        if self.divided {
-            let children = self.children_mut();
-            let num_children = children.len();
-            for (i, child) in children.into_iter().enumerate() {
-                // Insert into each child until one accepts the point.
-                if i < num_children - 1 {
-                    if child.insert(point.clone()) {
-                        return true;
-                    }
-                } else {
-                    return child.insert(point);
-                }
+
+        if !self.divided {
+            if self.points.len() < self.capacity {
+                self.points.push(point);
+                return true;
             }
-            return false;
+            self.subdivide();
         }
-        if self.points.len() < self.capacity {
-            info!("Inserting point {:?} into Quadtree", point);
-            self.points.push(point);
+
+        if self.northwest.as_mut().unwrap().insert(point.clone()) {
             return true;
         }
-        self.subdivide();
-        self.insert(point)
+        if self.northeast.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.southwest.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.southeast.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+
+        // This case should be unreachable if boundary logic is sound.
+        unreachable!("A point within the parent boundary should always fit in a child boundary.");
     }
 
     /// Inserts a bulk of points into the quadtree.

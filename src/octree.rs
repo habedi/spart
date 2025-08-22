@@ -325,21 +325,61 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         if !self.boundary.contains(&point) {
             return false;
         }
-        if self.divided {
-            for child in self.children_mut() {
-                if child.boundary.contains(&point) {
-                    return child.insert(point);
-                }
+
+        if !self.divided {
+            if self.points.len() < self.capacity {
+                self.points.push(point);
+                return true;
             }
-            // If on boundary, it might not be in any child. Insert into points.
+            self.subdivide();
         }
-        if self.points.len() < self.capacity {
-            info!("Inserting point {:?} into Octree", point);
-            self.points.push(point);
+
+        if self.front_top_left.as_mut().unwrap().insert(point.clone()) {
             return true;
         }
-        self.subdivide();
-        self.insert(point)
+        if self.front_top_right.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self
+            .front_bottom_left
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self
+            .front_bottom_right
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self.back_top_left.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.back_top_right.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self
+            .back_bottom_left
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self
+            .back_bottom_right
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+
+        unreachable!("A point within the parent boundary should always fit in a child boundary.");
     }
 
     /// Inserts a bulk of points into the octree.
