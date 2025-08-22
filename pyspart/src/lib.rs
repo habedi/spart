@@ -259,7 +259,7 @@ impl PyQuadtree {
     #[new]
     fn new(boundary: PyRectangle, capacity: usize) -> Self {
         PyQuadtree {
-            tree: Quadtree::new(&boundary.0, capacity),
+            tree: Quadtree::new(&boundary.0, capacity).unwrap(),
         }
     }
 
@@ -329,7 +329,7 @@ impl PyOctree {
     #[new]
     fn new(boundary: PyCube, capacity: usize) -> Self {
         PyOctree {
-            tree: Octree::new(&boundary.0, capacity),
+            tree: Octree::new(&boundary.0, capacity).unwrap(),
         }
     }
 
@@ -399,7 +399,7 @@ impl PyKdTree2D {
     #[new]
     fn new() -> Self {
         PyKdTree2D {
-            tree: KdTree::new(2),
+            tree: KdTree::new(2).unwrap(),
         }
     }
 
@@ -469,7 +469,7 @@ impl PyKdTree3D {
     #[new]
     fn new() -> Self {
         PyKdTree3D {
-            tree: KdTree::new(3),
+            tree: KdTree::new(3).unwrap(),
         }
     }
 
@@ -539,7 +539,7 @@ impl PyRTree2D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRTree2D {
-            tree: RTree::new(max_entries),
+            tree: RTree::new(max_entries).unwrap(),
         }
     }
 
@@ -611,7 +611,7 @@ impl PyRTree3D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRTree3D {
-            tree: RTree::new(max_entries),
+            tree: RTree::new(max_entries).unwrap(),
         }
     }
 
@@ -684,7 +684,7 @@ impl PyRStarTree2D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRStarTree2D {
-            tree: RStarTree::new(max_entries),
+            tree: RStarTree::new(max_entries).unwrap(),
         }
     }
 
@@ -756,7 +756,7 @@ impl PyRStarTree3D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRStarTree3D {
-            tree: RStarTree::new(max_entries),
+            tree: RStarTree::new(max_entries).unwrap(),
         }
     }
 

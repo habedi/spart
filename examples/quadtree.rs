@@ -18,7 +18,7 @@ fn main() {
         width: 100.0,
         height: 100.0,
     };
-    let mut quadtree = Quadtree::<u32>::new(&boundary, 4);
+    let mut quadtree = Quadtree::<u32>::new(&boundary, 4).unwrap();
 
     // Insert some points into the quadtree
     quadtree.insert(Point2D::new(10.0, 20.0, Some(1)));

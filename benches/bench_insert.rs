@@ -38,7 +38,7 @@ fn insert_2d_quadtree(points: Vec<Point2D<i32>>) {
         width: BENCH_BOUNDARY.width,
         height: BENCH_BOUNDARY.height,
     };
-    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -48,7 +48,7 @@ fn insert_2d_quadtree(points: Vec<Point2D<i32>>) {
 fn insert_3d_octree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D Octree");
     let boundary = BENCH_BOUNDARY;
-    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -57,7 +57,7 @@ fn insert_3d_octree(points: Vec<Point3D<i32>>) {
 
 fn insert_2d_kdtree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D KdTree");
-    let mut tree = kd_tree::KdTree::new(2);
+    let mut tree = kd_tree::KdTree::new(2).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -66,7 +66,7 @@ fn insert_2d_kdtree(points: Vec<Point2D<i32>>) {
 
 fn insert_3d_kdtree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D KdTree");
-    let mut tree = kd_tree::KdTree::new(3);
+    let mut tree = kd_tree::KdTree::new(3).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -75,7 +75,7 @@ fn insert_3d_kdtree(points: Vec<Point3D<i32>>) {
 
 fn insert_2d_rtree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D RTree");
-    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -84,7 +84,7 @@ fn insert_2d_rtree(points: Vec<Point2D<i32>>) {
 
 fn insert_3d_rtree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D RTree");
-    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -135,7 +135,7 @@ fn bench_insert_rtree_3d(_c: &mut Criterion) {
 
 fn insert_2d_rstartree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D RStarTree");
-    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }
@@ -144,7 +144,7 @@ fn insert_2d_rstartree(points: Vec<Point2D<i32>>) {
 
 fn insert_3d_rstartree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D RStarTree");
-    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points {
         tree.insert(point);
     }

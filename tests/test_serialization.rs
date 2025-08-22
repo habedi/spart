@@ -18,7 +18,7 @@ mod tests {
             width: 100.0,
             height: 100.0,
         };
-        let mut qt = Quadtree::new(&boundary, 4);
+        let mut qt = Quadtree::new(&boundary, 4).unwrap();
         qt.insert(Point2D::new(10.0, 20.0, Some("point1".to_string())));
         qt.insert(Point2D::new(50.0, 50.0, Some("point2".to_string())));
 
@@ -45,7 +45,7 @@ mod tests {
             height: 100.0,
             depth: 100.0,
         };
-        let mut octree = Octree::new(&boundary, 4);
+        let mut octree = Octree::new(&boundary, 4).unwrap();
         octree.insert(Point3D::new(10.0, 20.0, 30.0, Some("point1".to_string())));
         octree.insert(Point3D::new(50.0, 50.0, 50.0, Some("point2".to_string())));
 
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_kdtree_serialization() -> Anyhow {
-        let mut tree: KdTree<Point2D<String>> = KdTree::new(2);
+        let mut tree: KdTree<Point2D<String>> = KdTree::new(2).unwrap();
         tree.insert(Point2D::new(1.0, 2.0, Some("point1".to_string())));
         tree.insert(Point2D::new(3.0, 4.0, Some("point2".to_string())));
 
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_rtree_serialization() -> Anyhow {
-        let mut tree: RTree<Point2D<String>> = RTree::new(4);
+        let mut tree: RTree<Point2D<String>> = RTree::new(4).unwrap();
         tree.insert(Point2D::new(10.0, 20.0, Some("point1".to_string())));
         tree.insert(Point2D::new(50.0, 50.0, Some("point2".to_string())));
 
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_rstartree_serialization() -> Anyhow {
-        let mut tree: RStarTree<Point2D<String>> = RStarTree::new(4);
+        let mut tree: RStarTree<Point2D<String>> = RStarTree::new(4).unwrap();
         tree.insert(Point2D::new(10.0, 20.0, Some("point1".to_string())));
         tree.insert(Point2D::new(50.0, 50.0, Some("point2".to_string())));
 

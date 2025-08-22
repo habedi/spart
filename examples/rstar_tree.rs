@@ -18,7 +18,7 @@ impl<T> DistanceMetric<Point3D<T>> for ManhattanDistance {
 
 fn main() {
     // Create a new R*-tree for 2D points with a maximum capacity of 4 points per node.
-    let mut tree_2d: RStarTree<Point2D<&str>> = RStarTree::new(4);
+    let mut tree_2d: RStarTree<Point2D<&str>> = RStarTree::new(4).unwrap();
     println!("--- 2D R*-Tree Example ---");
 
     // Define some 2D points.
@@ -56,7 +56,7 @@ fn main() {
     println!("Deleted point: {:?}", point1_2d);
 
     // Create a new R*-tree for 3D points with a maximum capacity of 4 points per node.
-    let mut tree_3d: RStarTree<Point3D<&str>> = RStarTree::new(4);
+    let mut tree_3d: RStarTree<Point3D<&str>> = RStarTree::new(4).unwrap();
     println!("\n--- 3D R*-Tree Example ---");
 
     // Define some 3D points.

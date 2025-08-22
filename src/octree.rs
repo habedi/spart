@@ -13,7 +13,7 @@
 //! // Define a cubic boundary for the octree.
 //! let boundary = Cube { x: 0.0, y: 0.0, z: 0.0, width: 100.0, height: 100.0, depth: 100.0 };
 //! // Create an octree with a capacity of 4 points per node.
-//! let mut octree = Octree::new(&boundary, 4);
+//! let mut octree = Octree::new(&boundary, 4).unwrap();
 //!
 //! // Insert some points.
 //! let pt1: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
@@ -68,18 +68,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// * `boundary` - The cube defining the 3D region covered by this octree.
     /// * `capacity` - The maximum number of points a node can hold before subdividing.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-    pub fn new(boundary: &Cube, capacity: usize) -> Self {
+    /// Returns `SpartError::InvalidCapacity` if `capacity` is zero.
+    pub fn new(boundary: &Cube, capacity: usize) -> Result<Self, SpartError> {
         if capacity == 0 {
-            panic!("{}", SpartError::InvalidCapacity { capacity });
+            return Err(SpartError::InvalidCapacity { capacity });
         }
         info!(
             "Creating new Octree with boundary: {:?} and capacity: {}",
             boundary, capacity
         );
-        Octree {
+        Ok(Octree {
             boundary: boundary.clone(),
             points: Vec::new(),
             capacity,
@@ -92,7 +92,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             back_top_right: None,
             back_bottom_left: None,
             back_bottom_right: None,
-        }
+        })
     }
 
     /// Subdivides the current octree node into eight child octants.
@@ -107,94 +107,118 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         let h = self.boundary.height / 2.0;
         let d = self.boundary.depth / 2.0;
 
-        self.front_top_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_top_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_bottom_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y: y + h,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_bottom_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y: y + h,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_top_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_top_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_bottom_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y: y + h,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_bottom_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y: y + h,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
+        self.front_top_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_top_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_bottom_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y: y + h,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_bottom_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y: y + h,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_top_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_top_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_bottom_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y: y + h,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_bottom_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y: y + h,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
         self.divided = true;
 
         // Reinsert existing points into the appropriate children.

@@ -13,7 +13,7 @@
 //! use spart::r_tree::{RTree, RTreeObject};
 //!
 //! // Create an R‑tree for 2D points.
-//! let mut tree2d: RTree<Point2D<()>> = RTree::new(4);
+//! let mut tree2d: RTree<Point2D<()>> = RTree::new(4).unwrap();
 //! let pt2d: Point2D<()> = Point2D::new(10.0, 20.0, None);
 //! tree2d.insert(pt2d);
 //! let query_rect = Rectangle { x: 5.0, y: 15.0, width: 10.0, height: 10.0 };
@@ -21,7 +21,7 @@
 //! assert!(!results.is_empty());
 //!
 //! // Create an R‑tree for 3D points.
-//! let mut tree3d: RTree<Point3D<()>> = RTree::new(4);
+//! let mut tree3d: RTree<Point3D<()>> = RTree::new(4).unwrap();
 //! let pt3d: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
 //! tree3d.insert(pt3d);
 //! let query_cube = Cube { x: 5.0, y: 15.0, z: 25.0, width: 10.0, height: 10.0, depth: 10.0 };
@@ -112,22 +112,24 @@ impl<T: RTreeObject> RTree<T> {
     ///
     /// * `max_entries` - The maximum number of entries allowed in a node.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidCapacity` if `max_entries` is zero.
-    pub fn new(max_entries: usize) -> Self {
-        if max_entries == 0 {
-            panic!("{}", SpartError::InvalidCapacity { capacity: 0 });
+    /// Returns `SpartError::InvalidCapacity` if `max_entries` is less than 2.
+    pub fn new(max_entries: usize) -> Result<Self, SpartError> {
+        if max_entries < 2 {
+            return Err(SpartError::InvalidCapacity {
+                capacity: max_entries,
+            });
         }
         info!("Creating new RTree with max_entries: {}", max_entries);
-        RTree {
+        Ok(RTree {
             root: RTreeNode {
                 entries: Vec::new(),
                 is_leaf: true,
             },
             max_entries,
             min_entries: (max_entries as f64 * 0.4).ceil() as usize,
-        }
+        })
     }
 
     /// Inserts an object into the R‑tree.

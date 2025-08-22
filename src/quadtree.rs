@@ -14,7 +14,7 @@
 //! // Define a boundary for the quadtree.
 //! let boundary = Rectangle { x: 0.0, y: 0.0, width: 100.0, height: 100.0 };
 //! // Create a quadtree with capacity 4.
-//! let mut qt = Quadtree::new(&boundary, 4);
+//! let mut qt = Quadtree::new(&boundary, 4).unwrap();
 //!
 //! // Insert some points.
 //! let pt1: Point2D<()> = Point2D::new(10.0, 20.0, None);
@@ -65,18 +65,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// * `boundary` - The rectangular region covered by this quadtree.
     /// * `capacity` - The maximum number of points a node can hold before subdividing.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-    pub fn new(boundary: &Rectangle, capacity: usize) -> Self {
+    /// Returns `SpartError::InvalidCapacity` if `capacity` is zero.
+    pub fn new(boundary: &Rectangle, capacity: usize) -> Result<Self, SpartError> {
         if capacity == 0 {
-            panic!("{}", SpartError::InvalidCapacity { capacity });
+            return Err(SpartError::InvalidCapacity { capacity });
         }
         info!(
             "Creating new Quadtree with boundary: {:?} and capacity: {}",
             boundary, capacity
         );
-        Quadtree {
+        Ok(Quadtree {
             boundary: boundary.clone(),
             points: Vec::new(),
             capacity,
@@ -85,7 +85,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             northwest: None,
             southeast: None,
             southwest: None,
-        }
+        })
     }
 
     /// Subdivides the current quadtree node into four child quadrants.
@@ -97,42 +97,54 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         let y = self.boundary.y;
         let w = self.boundary.width / 2.0;
         let h = self.boundary.height / 2.0;
-        self.northeast = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x: x + w,
-                y,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.northwest = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x,
-                y,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.southeast = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x: x + w,
-                y: y + h,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.southwest = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x,
-                y: y + h,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
+        self.northeast = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x: x + w,
+                    y,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.northwest = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.southeast = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x: x + w,
+                    y: y + h,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.southwest = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x,
+                    y: y + h,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
         self.divided = true;
         // Reinsert existing points into the appropriate children.
         let old_points = std::mem::take(&mut self.points);

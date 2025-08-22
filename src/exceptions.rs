@@ -5,7 +5,11 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Represents errors specific to invalid operations or parameters in Spart.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum SpartError {
     /// Occurs when an invalid dimension is requested.

@@ -10,7 +10,7 @@ fn run_quadtree_2d_test() {
     info!("Starting Quadtree 2D test");
 
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     info!("Created quadtree with boundary: {:?}", boundary);
 
     let points = common_points_2d();
@@ -79,7 +79,7 @@ fn test_quadtree_2d() {
 #[test]
 fn test_quadtree_insert_bulk() {
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(&points);
 
@@ -97,7 +97,7 @@ fn test_quadtree_insert_bulk() {
 #[test]
 fn test_quadtree_delete() {
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(&points);
 
@@ -122,7 +122,7 @@ fn test_quadtree_delete() {
 #[test]
 fn test_quadtree_empty() {
     let boundary = BOUNDARY_RECT;
-    let mut tree: Quadtree<&str> = Quadtree::new(&boundary, CAPACITY);
+    let mut tree: Quadtree<&str> = Quadtree::new(&boundary, CAPACITY).unwrap();
     let target = target_point_2d();
 
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
@@ -146,7 +146,7 @@ fn test_quadtree_empty() {
 #[test]
 fn test_quadtree_knn_edge_cases() {
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(&points);
 
@@ -170,7 +170,7 @@ fn test_quadtree_knn_edge_cases() {
 #[test]
 fn test_quadtree_range_zero_radius() {
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(&points);
 
@@ -187,7 +187,7 @@ fn test_quadtree_range_zero_radius() {
 #[test]
 fn test_quadtree_duplicates() {
     let boundary = BOUNDARY_RECT;
-    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let mut tree = Quadtree::new(&boundary, CAPACITY).unwrap();
     let p1 = common_points_2d()[0].clone();
     let p2 = p1.clone();
     tree.insert(p1.clone());

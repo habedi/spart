@@ -92,3 +92,4 @@ src/main.rs
 *.log
 *_output.txt
 pyspart/target/
+.output.txt

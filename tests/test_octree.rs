@@ -11,7 +11,7 @@ fn run_octree_3d_test() {
 
     // Create an octree with the shared cube boundary and capacity.
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     info!("Created octree with boundary: {:?}", boundary);
 
     // Insert common 3D points into the octree.
@@ -81,7 +81,7 @@ fn test_octree_3d() {
 #[test]
 fn test_octree_insert_bulk() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(&points);
 
@@ -99,7 +99,7 @@ fn test_octree_insert_bulk() {
 #[test]
 fn test_octree_delete() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(&points);
 
@@ -124,7 +124,7 @@ fn test_octree_delete() {
 #[test]
 fn test_octree_empty() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree: Octree<&str> = Octree::new(&boundary, CAPACITY);
+    let mut tree: Octree<&str> = Octree::new(&boundary, CAPACITY).unwrap();
     let target = target_point_3d();
 
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
@@ -148,7 +148,7 @@ fn test_octree_empty() {
 #[test]
 fn test_octree_knn_edge_cases() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(&points);
 
@@ -172,7 +172,7 @@ fn test_octree_knn_edge_cases() {
 #[test]
 fn test_octree_range_zero_radius() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(&points);
 
@@ -189,7 +189,7 @@ fn test_octree_range_zero_radius() {
 #[test]
 fn test_octree_duplicates() {
     let boundary = BOUNDARY_CUBE;
-    let mut tree = Octree::new(&boundary, CAPACITY);
+    let mut tree = Octree::new(&boundary, CAPACITY).unwrap();
     let p1 = common_points_3d()[0].clone();
     let p2 = p1.clone();
     tree.insert(p1.clone());

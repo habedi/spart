@@ -9,7 +9,7 @@ use tracing::{debug, info};
 fn run_kdtree_2d_test() {
     info!("Starting KDTree 2D test");
 
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
 
     let points = common_points_2d();
     for pt in &points {
@@ -90,7 +90,7 @@ fn run_kdtree_2d_test() {
 fn run_kdtree_3d_test() {
     info!("Starting KDTree 3D test");
 
-    let mut tree: KdTree<Point3D<&str>> = KdTree::new(3);
+    let mut tree: KdTree<Point3D<&str>> = KdTree::new(3).unwrap();
 
     let points = common_points_3d();
     for pt in &points {
@@ -180,7 +180,7 @@ fn test_kdtree_3d() {
 
 #[test]
 fn test_kdtree_insert_bulk_2d() {
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
     let mut points = common_points_2d();
     tree.insert_bulk(&mut points);
 
@@ -197,7 +197,7 @@ fn test_kdtree_insert_bulk_2d() {
 
 #[test]
 fn test_kdtree_empty() {
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
     let target = target_point_2d();
 
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
@@ -220,7 +220,7 @@ fn test_kdtree_empty() {
 
 #[test]
 fn test_kdtree_knn_edge_cases() {
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
     let mut points = common_points_2d();
     tree.insert_bulk(&mut points);
 
@@ -245,7 +245,7 @@ fn test_kdtree_knn_edge_cases() {
 
 #[test]
 fn test_kdtree_range_zero_radius() {
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
     let mut points = common_points_2d();
     tree.insert_bulk(&mut points);
 
@@ -263,7 +263,7 @@ fn test_kdtree_range_zero_radius() {
 
 #[test]
 fn test_kdtree_duplicates() {
-    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2).unwrap();
     let p1 = Point2D::new(10.0, 10.0, Some("A"));
     let p2 = Point2D::new(10.0, 10.0, Some("A"));
     tree.insert(p1.clone());
@@ -285,7 +285,7 @@ fn test_kdtree_duplicates() {
 
 #[test]
 fn test_kdtree_insert_bulk_3d() {
-    let mut tree: KdTree<Point3D<&str>> = KdTree::new(3);
+    let mut tree: KdTree<Point3D<&str>> = KdTree::new(3).unwrap();
     let mut points = common_points_3d();
     tree.insert_bulk(&mut points);
 

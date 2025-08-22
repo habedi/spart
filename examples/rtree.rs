@@ -19,7 +19,7 @@ impl<T> DistanceMetric<Point3D<T>> for ManhattanDistance {
 fn main() {
     // --- 2D RTree Example ---
     println!("--- 2D RTree Example ---");
-    let mut tree2d: RTree<Point2D<u32>> = RTree::new(4);
+    let mut tree2d: RTree<Point2D<u32>> = RTree::new(4).unwrap();
 
     // Insert some points
     tree2d.insert(Point2D::new(10.0, 20.0, Some(1)));
@@ -47,7 +47,7 @@ fn main() {
 
     // --- 3D RTree Example ---
     println!("\n--- 3D RTree Example ---");
-    let mut tree3d: RTree<Point3D<u32>> = RTree::new(4);
+    let mut tree3d: RTree<Point3D<u32>> = RTree::new(4).unwrap();
 
     // Insert some points
     tree3d.insert(Point3D::new(10.0, 20.0, 30.0, Some(1)));

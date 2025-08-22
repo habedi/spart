@@ -11,14 +11,14 @@
 //! use spart::kd_tree::{KdPoint, KdTree};
 //!
 //! // Create a 2D Kd‑tree and insert some points.
-//! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2);
+//! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2).unwrap();
 //! tree2d.insert(Point2D::new(1.0, 2.0, None));
 //! tree2d.insert(Point2D::new(3.0, 4.0, None));
 //! let neighbors2d = tree2d.knn_search::<EuclideanDistance>(&Point2D::new(2.0, 3.0, None), 1);
 //! assert!(!neighbors2d.is_empty());
 //!
 //! // Create a 3D Kd‑tree and insert some points.
-//! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3);
+//! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3).unwrap();
 //! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None));
 //! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None));
 //! let neighbors3d = tree3d.knn_search::<EuclideanDistance>(&Point3D::new(2.0, 3.0, 4.0, None), 1);
@@ -160,20 +160,17 @@ impl<P: KdPoint> KdTree<P> {
     ///
     /// * `k` - The number of dimensions.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `k` is zero.
-    pub fn new(k: usize) -> Self {
+    /// Returns `SpartError::InvalidDimension` if `k` is zero.
+    pub fn new(k: usize) -> Result<Self, SpartError> {
         if k == 0 {
-            panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: 0,
-                    available: 0
-                }
-            );
+            return Err(SpartError::InvalidDimension {
+                requested: 0,
+                available: 0,
+            });
         }
-        KdTree { root: None, k }
+        Ok(KdTree { root: None, k })
     }
 
     /// Inserts a point into the Kd‑tree.

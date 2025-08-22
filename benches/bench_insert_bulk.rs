@@ -38,7 +38,7 @@ fn insert_bulk_2d_quadtree(points: Vec<Point2D<i32>>) {
         width: BENCH_BOUNDARY.width,
         height: BENCH_BOUNDARY.height,
     };
-    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(&points);
     info!("Finished insertion for 2D Quadtree");
 }
@@ -46,49 +46,49 @@ fn insert_bulk_2d_quadtree(points: Vec<Point2D<i32>>) {
 fn insert_bulk_3d_octree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D Octree");
     let boundary = BENCH_BOUNDARY;
-    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(&points);
     info!("Finished insertion for 3D Octree");
 }
 
 fn insert_bulk_2d_kdtree(mut points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D KdTree");
-    let mut tree = kd_tree::KdTree::new(2);
+    let mut tree = kd_tree::KdTree::new(2).unwrap();
     tree.insert_bulk(&mut points);
     info!("Finished insertion for 2D KdTree");
 }
 
 fn insert_bulk_3d_kdtree(mut points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D KdTree");
-    let mut tree = kd_tree::KdTree::new(3);
+    let mut tree = kd_tree::KdTree::new(3).unwrap();
     tree.insert_bulk(&mut points);
     info!("Finished insertion for 3D KdTree");
 }
 
 fn insert_bulk_2d_rtree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D RTree");
-    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(points);
     info!("Finished insertion for 2D RTree");
 }
 
 fn insert_bulk_3d_rtree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D RTree");
-    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(points);
     info!("Finished insertion for 3D RTree");
 }
 
 fn insert_bulk_2d_rstartree(points: Vec<Point2D<i32>>) {
     info!("Starting insertion for 2D RStarTree");
-    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(points);
     info!("Finished insertion for 2D RStarTree");
 }
 
 fn insert_bulk_3d_rstartree(points: Vec<Point3D<i32>>) {
     info!("Starting insertion for 3D RStarTree");
-    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
     tree.insert_bulk(points);
     info!("Finished insertion for 3D RStarTree");
 }

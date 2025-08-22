@@ -9,7 +9,7 @@ use tracing::{debug, info};
 fn run_rtree_2d_test() {
     info!("Starting RTree 2D test");
 
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
 
     let points = common_points_2d();
     for pt in &points {
@@ -106,7 +106,7 @@ fn run_rtree_2d_test() {
 fn run_rtree_3d_test() {
     info!("Starting RTree 3D test");
 
-    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY).unwrap();
 
     let points = common_points_3d();
     for pt in &points {
@@ -211,7 +211,7 @@ fn test_rtree_3d() {
 
 #[test]
 fn test_rtree_insert_bulk_2d() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points);
 
@@ -228,7 +228,7 @@ fn test_rtree_insert_bulk_2d() {
 
 #[test]
 fn test_rtree_delete_underflow() {
-    let mut tree: RTree<Point2D<i32>> = RTree::new(4);
+    let mut tree: RTree<Point2D<i32>> = RTree::new(4).unwrap();
     let points: Vec<_> = (0..10)
         .map(|i| Point2D::new(i as f64, i as f64, Some(i)))
         .collect();
@@ -270,7 +270,7 @@ fn test_rtree_delete_underflow() {
 
 #[test]
 fn test_rtree_empty() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
     let target = target_point_2d();
 
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
@@ -293,7 +293,7 @@ fn test_rtree_empty() {
 
 #[test]
 fn test_rtree_knn_edge_cases() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points.clone());
 
@@ -316,7 +316,7 @@ fn test_rtree_knn_edge_cases() {
 
 #[test]
 fn test_rtree_range_zero_radius() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points.clone());
 
@@ -332,7 +332,7 @@ fn test_rtree_range_zero_radius() {
 
 #[test]
 fn test_rtree_duplicates() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
     let p1 = common_points_2d()[0].clone();
     let p2 = p1.clone();
     tree.insert(p1.clone());
@@ -356,7 +356,7 @@ fn test_rtree_duplicates() {
 
 #[test]
 fn test_rtree_insert_bulk_3d() {
-    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY);
+    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(points);
 

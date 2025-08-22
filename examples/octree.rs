@@ -20,7 +20,7 @@ fn main() {
         height: 100.0,
         depth: 100.0,
     };
-    let mut octree = Octree::<u32>::new(&boundary, 4);
+    let mut octree = Octree::<u32>::new(&boundary, 4).unwrap();
 
     // Insert some points into the octree
     octree.insert(Point3D::new(10.0, 20.0, 30.0, Some(1)));

@@ -14,7 +14,7 @@ fn bench_quadtree_serialization(c: &mut Criterion) {
         width: 10000.0,
         height: 10000.0,
     };
-    let mut qt = Quadtree::new(&boundary, 4);
+    let mut qt = Quadtree::new(&boundary, 4).unwrap();
     for i in 0..10000 {
         qt.insert(Point2D::new(i as f64, i as f64, Some(i)));
     }
@@ -43,7 +43,7 @@ fn bench_octree_serialization(c: &mut Criterion) {
         height: 10000.0,
         depth: 10000.0,
     };
-    let mut octree = Octree::new(&boundary, 4);
+    let mut octree = Octree::new(&boundary, 4).unwrap();
     for i in 0..10000 {
         octree.insert(Point3D::new(i as f64, i as f64, i as f64, Some(i)));
     }
@@ -64,7 +64,7 @@ fn bench_octree_serialization(c: &mut Criterion) {
 
 fn bench_kdtree_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("KdTree Serialization");
-    let mut tree: KdTree<Point2D<i32>> = KdTree::new(2);
+    let mut tree: KdTree<Point2D<i32>> = KdTree::new(2).unwrap();
     for i in 0..10000 {
         tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
     }
@@ -85,7 +85,7 @@ fn bench_kdtree_serialization(c: &mut Criterion) {
 
 fn bench_rtree_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("RTree Serialization");
-    let mut tree: RTree<Point2D<i32>> = RTree::new(16);
+    let mut tree: RTree<Point2D<i32>> = RTree::new(16).unwrap();
     for i in 0..10000 {
         tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
     }
@@ -106,7 +106,7 @@ fn bench_rtree_serialization(c: &mut Criterion) {
 
 fn bench_rstartree_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("RStarTree Serialization");
-    let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(16);
+    let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(16).unwrap();
     for i in 0..10000 {
         tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
     }
