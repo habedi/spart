@@ -21,7 +21,8 @@ A collection of space partitioning trees for Rust
 ---
 
 Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of popular
-space partitioning tree data structures for efficient indexing and searching of 2D and 3D point data.
+[space partitioning tree data structures](https://en.wikipedia.org/wiki/Space_partitioning) for efficient indexing and
+searching of 2D and 3D point data.
 Spart also provides Python bindings for the trees.
 So, you can use Spart from Python projects as well as from Rust projects.
 
@@ -51,17 +52,13 @@ cargo add spart
 
 #### Python Bindings
 
-You can install the Python bindings for Spart using pip:
+You can install the Python bindings for Spart using `pip`:
 
 ```shell
 pip install pyspart
 ```
 
-- Quick start examples (including R*-tree) are available under [pyspart/examples](pyspart/examples).
-- You can run all Python examples at once from the repo root:
-  - make run-py-examples
-- Or run the R*-tree example directly:
-  - python pyspart/examples/r_star_tree.py
+Check out the [pyspart](pyspart) directory for more information about using Spart from Python.
 
 ---
 
@@ -139,7 +136,7 @@ A tree provides at least the following methods:
 > - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
 >
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance by default.
-> However, you can use a custom distance metric by implementing the `Distance` trait.
+> However, you can use a custom distance metric by implementing the `DistanceMetric` trait.
 
 ### Additional Information
 
