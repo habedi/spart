@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-    <img alt="Spart Logo" src="logo.svg" height="50%" width="50%">
+    <img alt="Spart Logo" src="logo.svg" height="25%" width="25%">
   </picture>
 </div>
 <br>
