@@ -1,9 +1,8 @@
 ## PySpart
 
-[<img alt="license" src="https://img.shields.io/badge/license-MIT-007ec6?style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart/tree/main/pyspart/LICENSE)
-[<img alt="python version" src="https://img.shields.io/badge/Python-%3E=3.10-blue?style=flat&logo=python" height="20">](https://github.com/habedi/spart/tree/main/pyspart)
-[<img alt="pypi" src="https://img.shields.io/pypi/v/pyspart?style=flat&logo=pypi&color=fc8d62" height="20">](https://pypi.org/project/pyspart)
-[<img alt="downloads" src="https://img.shields.io/pypi/dm/pyspart?style=flat&logo=pypi" height="20">](https://pypi.org/project/pyspart)
+[![License](https://img.shields.io/badge/license-MIT-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart/tree/main/pyspart/LICENSE)
+[![Python Version](https://img.shields.io/badge/Python-%3E=3.10-blue?style=flat&labelColor=282c34&logo=python)](https://github.com/habedi/spart/tree/main/pyspart)
+[![PyPI](https://img.shields.io/pypi/v/pyspart?label=pypi&style=flat&labelColor=282c34&logo=pypi&color=fc8d62)](https://pypi.org/project/pyspart)
 
 Python bindings for the [Spart](https://github.com/habedi/spart) library.
 
@@ -194,6 +193,18 @@ tree.delete(point1)
 ```
 
 Check out the [examples](https://github.com/habedi/spart/tree/main/pyspart/examples) directory for more examples.
+
+### Behavior Notes
+
+> [!NOTE]
+> Currently, the following properties hold for all trees:
+> - Duplicates are allowed: inserting a duplicate point will add another copy to the tree.
+> - Searches return duplicates: both `knn_search` and `range_search` can return duplicate points if they were previously
+    inserted.
+> - Deletion removes duplicates: the `delete` operation removes **all** instances of the point from the tree.
+> - A `knn_search` with `k=0` will return an empty list.
+> - A `knn_search` with `k` greater than the number of points in the tree will return all points.
+> - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
 
 ### Debugging Mode
 

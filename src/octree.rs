@@ -32,7 +32,7 @@ use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
-use tracing::{debug, info};
+use tracing::info;
 
 /// An octree for indexing of 3D points.
 ///
@@ -323,22 +323,15 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point3D<T>) -> bool {
         if !self.boundary.contains(&point) {
-            debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
         if self.divided {
-            let children = self.children_mut();
-            let n = children.len();
-            for (i, child) in children.into_iter().enumerate() {
-                if i < n - 1 {
-                    if child.insert(point.clone()) {
-                        return true;
-                    }
-                } else {
+            for child in self.children_mut() {
+                if child.boundary.contains(&point) {
                     return child.insert(point);
                 }
             }
-            return false;
+            // If on boundary, it might not be in any child. Insert into points.
         }
         if self.points.len() < self.capacity {
             info!("Inserting point {:?} into Octree", point);
@@ -531,6 +524,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         target: &Point3D<T>,
         k: usize,
     ) -> Vec<Point3D<T>> {
+        if k == 0 {
+            return Vec::new();
+        }
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper::<M>(target, k, &mut heap);
         heap.into_sorted_vec()
@@ -631,12 +627,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             self.try_merge();
             return deleted;
         }
-        if let Some(pos) = self.points.iter().position(|p| p == point) {
+        let initial_len = self.points.len();
+        self.points.retain(|p| p != point);
+        let deleted = self.points.len() < initial_len;
+        if deleted {
             info!("Deleting point {:?} from Octree", point);
-            self.points.remove(pos);
-            return true;
         }
-        false
+        deleted
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.

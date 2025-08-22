@@ -258,6 +258,9 @@ impl<P: KdPoint> KdTree<P> {
     ///
     /// A vector of the nearest points, ordered from nearest to farthest.
     pub fn knn_search<M: DistanceMetric<P>>(&self, target: &P, k_neighbors: usize) -> Vec<P> {
+        if k_neighbors == 0 {
+            return Vec::new();
+        }
         info!(
             "Performing k‑NN search for target {:?} with k={}",
             target, k_neighbors
@@ -383,18 +386,22 @@ impl<P: KdPoint> KdTree<P> {
             Some(mut current) => {
                 let axis = depth % k;
                 if current.point == *point {
-                    if let Some(right_subtree) = current.right.take() {
-                        let successor = Self::find_min(&right_subtree, axis, depth + 1, k).clone();
-                        let (new_right, _) =
-                            Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
-                        current.point = successor;
-                        current.right = new_right;
-                        (Some(current), true)
-                    } else if let Some(left_subtree) = current.left.take() {
-                        (Some(left_subtree), true)
-                    } else {
-                        (None, true)
+                    let mut new_current = current;
+                    while new_current.point == *point {
+                        if let Some(right_subtree) = new_current.right.take() {
+                            let successor =
+                                Self::find_min(&right_subtree, axis, depth + 1, k).clone();
+                            let (new_right, _) =
+                                Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
+                            new_current.point = successor;
+                            new_current.right = new_right;
+                        } else if let Some(left_subtree) = new_current.left.take() {
+                            return (Some(left_subtree), true);
+                        } else {
+                            return (None, true);
+                        }
                     }
+                    (Some(new_current), true)
                 } else if point.coord(axis) < current.point.coord(axis) {
                     let (new_left, deleted) =
                         Self::delete_rec(current.left.take(), point, depth + 1, k);

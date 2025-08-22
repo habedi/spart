@@ -196,6 +196,94 @@ fn test_kdtree_insert_bulk_2d() {
 }
 
 #[test]
+fn test_kdtree_empty() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let target = target_point_2d();
+
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
+    assert!(
+        knn_results.is_empty(),
+        "kNN search on empty tree should return no points"
+    );
+
+    let range_results = tree.range_search::<EuclideanDistance>(&target, 10.0);
+    assert!(
+        range_results.is_empty(),
+        "Range search on empty tree should return no points"
+    );
+
+    assert!(
+        !tree.delete(&target),
+        "Deleting from an empty tree should return false"
+    );
+}
+
+#[test]
+fn test_kdtree_knn_edge_cases() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut points = common_points_2d();
+    tree.insert_bulk(&mut points);
+
+    let target = target_point_2d();
+    let num_points = points.len();
+
+    // k = 0
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, 0);
+    assert!(
+        knn_results.is_empty(),
+        "kNN search with k=0 should return no points"
+    );
+
+    // k > number of points
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, num_points + 5);
+    assert_eq!(
+        knn_results.len(),
+        num_points,
+        "kNN search with k > num_points should return all points"
+    );
+}
+
+#[test]
+fn test_kdtree_range_zero_radius() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut points = common_points_2d();
+    tree.insert_bulk(&mut points);
+
+    let target = Point2D::new(10.0, 10.0, Some("A"));
+    tree.insert(target.clone());
+
+    let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+    assert_eq!(
+        results.len(),
+        1,
+        "Range search with zero radius should return only the exact point"
+    );
+    assert_eq!(results[0], target);
+}
+
+#[test]
+fn test_kdtree_duplicates() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let p1 = Point2D::new(10.0, 10.0, Some("A"));
+    let p2 = Point2D::new(10.0, 10.0, Some("A"));
+    tree.insert(p1.clone());
+    tree.insert(p2.clone());
+
+    let target = Point2D::new(10.0, 10.0, None);
+    let results = tree.knn_search::<EuclideanDistance>(&target, 2);
+    assert_eq!(results.len(), 2, "kNN should return duplicate points");
+
+    let deleted = tree.delete(&p1);
+    assert!(deleted, "Deleting a duplicate point should succeed");
+
+    let results_after_delete = tree.knn_search::<EuclideanDistance>(&target, 2);
+    assert!(
+        results_after_delete.is_empty(),
+        "Deleting a point should remove all its duplicates"
+    );
+}
+
+#[test]
 fn test_kdtree_insert_bulk_3d() {
     let mut tree: KdTree<Point3D<&str>> = KdTree::new(3);
     let mut points = common_points_3d();

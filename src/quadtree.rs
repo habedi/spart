@@ -342,6 +342,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         target: &Point2D<T>,
         k: usize,
     ) -> Vec<Point2D<T>> {
+        if k == 0 {
+            return Vec::new();
+        }
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
         self.knn_search_helper::<M>(target, k, &mut heap);
         heap.into_sorted_vec()
@@ -442,12 +445,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             self.try_merge();
             return deleted;
         }
-        if let Some(pos) = self.points.iter().position(|p| p == point) {
+        let initial_len = self.points.len();
+        self.points.retain(|p| p != point);
+        let deleted = self.points.len() < initial_len;
+        if deleted {
             info!("Deleting point {:?} from Quadtree", point);
-            self.points.remove(pos);
-            return true;
         }
-        false
+        deleted
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.

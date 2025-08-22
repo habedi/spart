@@ -67,8 +67,7 @@ run-py-examples: develop-py ## Run the Python examples
 clean: ## Remove generated and temporary files
 	@echo "Cleaning up..."
 	@cargo clean
-	@rm -rf $(WHEEL_DIR) dist/ $(PYSPART_DIR)/$(WHEEL_DIR)
-	@rm -f $(PYSPART_DIR)/*.so
+	@rm -rf $(WHEEL_DIR) dist/ $(PYSPART_DIR)/$(WHEEL_DIR) $(PYSPART_DIR)/*.so $(PYSPART_DIR)/target
 
 .PHONY: install-snap
 install-snap: ## Install a few dependencies using Snapcraft

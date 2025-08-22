@@ -226,3 +226,86 @@ def test_rstartree3d():
     results = rst.knn_search(Point3D(50.0, 50.0, 50.0, None), 1)
     assert len(results) == 1
     assert results[0].data != "p2"
+
+def test_empty_trees():
+    # Quadtree
+    boundary = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
+    qt = Quadtree(boundary, 4)
+    assert not qt.knn_search(Point2D(0, 0, None), 1)
+    assert not qt.range_search(Point2D(0, 0, None), 1)
+    assert not qt.delete(Point2D(0, 0, None))
+
+    # Octree
+    boundary = {"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0}
+    ot = Octree(boundary, 4)
+    assert not ot.knn_search(Point3D(0, 0, 0, None), 1)
+    assert not ot.range_search(Point3D(0, 0, 0, None), 1)
+    assert not ot.delete(Point3D(0, 0, 0, None))
+
+    # KdTree2D
+    kd2 = KdTree2D()
+    assert not kd2.knn_search(Point2D(0, 0, None), 1)
+    assert not kd2.range_search(Point2D(0, 0, None), 1)
+    assert not kd2.delete(Point2D(0, 0, None))
+
+    # KdTree3D
+    kd3 = KdTree3D()
+    assert not kd3.knn_search(Point3D(0, 0, 0, None), 1)
+    assert not kd3.range_search(Point3D(0, 0, 0, None), 1)
+    assert not kd3.delete(Point3D(0, 0, 0, None))
+
+    # RTree2D
+    rt2 = RTree2D(4)
+    assert not rt2.knn_search(Point2D(0, 0, None), 1)
+    assert not rt2.range_search(Point2D(0, 0, None), 1)
+    assert not rt2.delete(Point2D(0, 0, None))
+
+    # RTree3D
+    rt3 = RTree3D(4)
+    assert not rt3.knn_search(Point3D(0, 0, 0, None), 1)
+    assert not rt3.range_search(Point3D(0, 0, 0, None), 1)
+    assert not rt3.delete(Point3D(0, 0, 0, None))
+
+    # RStarTree2D
+    rst2 = RStarTree2D(4)
+    assert not rst2.knn_search(Point2D(0, 0, None), 1)
+    assert not rst2.range_search(Point2D(0, 0, None), 1)
+    assert not rst2.delete(Point2D(0, 0, None))
+
+    # RStarTree3D
+    rst3 = RStarTree3D(4)
+    assert not rst3.knn_search(Point3D(0, 0, 0, None), 1)
+    assert not rst3.range_search(Point3D(0, 0, 0, None), 1)
+    assert not rst3.delete(Point3D(0, 0, 0, None))
+
+def test_knn_edge_cases():
+    kd = KdTree2D()
+    points = [Point2D(1, 2, 'p1'), Point2D(3, 4, 'p2')]
+    kd.insert_bulk(points)
+
+    # k=0
+    assert not kd.knn_search(Point2D(0, 0, None), 0)
+
+    # k > num_points
+    assert len(kd.knn_search(Point2D(0, 0, None), 5)) == 2
+
+def test_range_zero_radius():
+    kd = KdTree2D()
+    p1 = Point2D(1, 2, 'p1')
+    kd.insert(p1)
+
+    results = kd.range_search(Point2D(1, 2, None), 0)
+    assert len(results) == 1
+    assert results[0].data == 'p1'
+
+def test_duplicates():
+    kd = KdTree2D()
+    p1 = Point2D(1, 2, 'p1')
+    p2 = Point2D(1, 2, 'p1')
+    kd.insert(p1)
+    kd.insert(p2)
+
+    assert len(kd.knn_search(Point2D(1, 2, None), 2)) == 2
+
+    assert kd.delete(p1)
+    assert not kd.knn_search(Point2D(1, 2, None), 1)

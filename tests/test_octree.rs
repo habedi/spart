@@ -95,3 +95,118 @@ fn test_octree_insert_bulk() {
         knn_results.len()
     );
 }
+
+#[test]
+fn test_octree_delete() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree = Octree::new(&boundary, CAPACITY);
+    let points = common_points_3d();
+    tree.insert_bulk(&points);
+
+    let point_to_delete = points[3].clone();
+    assert!(
+        tree.delete(&point_to_delete),
+        "Deletion of existing point should succeed"
+    );
+
+    let results = tree.knn_search::<EuclideanDistance>(&point_to_delete, 1);
+    assert_ne!(
+        results[0], point_to_delete,
+        "Deleted point should not be found"
+    );
+
+    assert!(
+        !tree.delete(&point_to_delete),
+        "Deletion of non-existent point should fail"
+    );
+}
+
+#[test]
+fn test_octree_empty() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree: Octree<&str> = Octree::new(&boundary, CAPACITY);
+    let target = target_point_3d();
+
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
+    assert!(
+        knn_results.is_empty(),
+        "kNN search on empty tree should return no points"
+    );
+
+    let range_results = tree.range_search::<EuclideanDistance>(&target, 10.0);
+    assert!(
+        range_results.is_empty(),
+        "Range search on empty tree should return no points"
+    );
+
+    assert!(
+        !tree.delete(&target),
+        "Deleting from an empty tree should return false"
+    );
+}
+
+#[test]
+fn test_octree_knn_edge_cases() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree = Octree::new(&boundary, CAPACITY);
+    let points = common_points_3d();
+    tree.insert_bulk(&points);
+
+    let target = target_point_3d();
+    let num_points = points.len();
+
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, 0);
+    assert!(
+        knn_results.is_empty(),
+        "kNN search with k=0 should return no points"
+    );
+
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, num_points + 5);
+    assert_eq!(
+        knn_results.len(),
+        num_points,
+        "kNN search with k > num_points should return all points"
+    );
+}
+
+#[test]
+fn test_octree_range_zero_radius() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree = Octree::new(&boundary, CAPACITY);
+    let points = common_points_3d();
+    tree.insert_bulk(&points);
+
+    let target = points[0].clone();
+    let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+    assert_eq!(
+        results.len(),
+        1,
+        "Range search with zero radius should return only the exact point"
+    );
+    assert_eq!(results[0], target);
+}
+
+#[test]
+fn test_octree_duplicates() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree = Octree::new(&boundary, CAPACITY);
+    let p1 = common_points_3d()[0].clone();
+    let p2 = p1.clone();
+    tree.insert(p1.clone());
+    tree.insert(p2.clone());
+
+    let target = p1.clone();
+    let results = tree.knn_search::<EuclideanDistance>(&target, 2);
+    assert_eq!(results.len(), 2, "kNN should return duplicate points");
+
+    assert!(
+        tree.delete(&p1),
+        "Deleting a duplicate point should succeed"
+    );
+
+    let results_after_delete = tree.knn_search::<EuclideanDistance>(&target, 2);
+    assert!(
+        results_after_delete.is_empty(),
+        "Deleting a point should remove all its duplicates"
+    );
+}

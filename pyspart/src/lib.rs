@@ -557,6 +557,16 @@ impl PyRTree2D {
         self.tree.delete(&p)
     }
 
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
+    }
+
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
         self.tree
@@ -617,6 +627,16 @@ impl PyRTree3D {
     fn delete(&mut self, point: PyPoint3D) -> bool {
         let p: Point3D<PyData> = point.into();
         self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {

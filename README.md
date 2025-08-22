@@ -7,8 +7,8 @@
 <h2>Spart</h2>
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/habedi/spart/tests.yml?label=tests&style=flat&labelColor=282c34&logo=github)](https://github.com/habedi/spart/actions/workflows/tests.yml)
-[![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=code%20coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
-[![Code Quality](https://img.shields.io/codefactor/grade/github/habedi/spart?label=code%20quality&style=flat&labelColor=282c34&logo=codefactor)](https://www.codefactor.io/repository/github/habedi/spart)
+[![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
+[![Code Quality](https://img.shields.io/codefactor/grade/github/habedi/spart?label=quality&style=flat&labelColor=282c34&logo=codefactor)](https://www.codefactor.io/repository/github/habedi/spart)
 [![Crates.io](https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&labelColor=282c34&color=fc8d62&logo=rust)](https://crates.io/crates/spart)
 [![Docs.rs](https://img.shields.io/badge/docs-spart-66c2a5?style=flat&labelColor=282c34&logo=docs.rs)](https://docs.rs/spart)
 [![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
@@ -27,13 +27,13 @@ So, you can use Spart from Python projects as well as from Rust projects.
 
 At the moment, the following data structures and features are supported:
 
-| Index | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
-|-------|----------------------------------------------------|----|----|------------|--------------|
-| 1     | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓          | ✓            |
-| 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
-| 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
-| 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
-| 5     | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  | ✓          | ✓            |
+| # | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
+|---|----------------------------------------------------|----|----|------------|--------------|
+| 1 | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓          | ✓            |
+| 2 | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
+| 3 | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
+| 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
+| 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  | ✓          | ✓            |
 
 > [!IMPORTANT]
 > Spart is in early development, so bugs and breaking API changes are expected.
@@ -67,7 +67,7 @@ For the latest Rust API documentation, see [docs.rs/spart](https://docs.rs/spart
 
 #### Basic Concepts
 
-The basic building blocks of Spart are *point* and *tree*.
+The basic building blocks of Spart are **point** and **tree**.
 
 ##### Point
 
@@ -127,12 +127,15 @@ A tree provides at least the following methods:
 > [!NOTE]
 > Currently, the following properties hold for all trees:
 > - Duplicates are allowed: inserting a duplicate point will add another copy to the tree.
-> - Searches return duplicates: both knn_search and range_search can return duplicate points if they were previously
+> - Searches return duplicates: both `knn_search` and `range_search` can return duplicate points if they were previously
     inserted.
-> - Deletion removes duplicates: the delete operation removes all instances of the point from the tree.
+> - Deletion removes duplicates: the `delete` operation removes **all** instances of the point from the tree.
+> - A `knn_search` with `k=0` will return an empty list.
+> - A `knn_search` with `k` greater than the number of points in the tree will return all points.
+> - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
 >
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance by default.
-> You can use the `with_distance_metric` method to specify a different distance metric for the tree.
+> However, you can use a custom distance metric by implementing the `Distance` trait.
 
 ### Additional Information
 
