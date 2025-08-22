@@ -38,7 +38,7 @@ use crate::geometry::{
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use tracing::{debug, info};
+use tracing::info;
 
 // Epsilon value for zero-sizes bounding boxes/cubes.
 const EPSILON: f64 = 1e-10;
@@ -151,41 +151,67 @@ impl<T: RStarTreeObject> RStarTree<T> {
             mbr: object.mbr(),
             object,
         };
-        insert_entry_node(&mut self.root, entry);
-        if self.root.entries.len() > self.max_entries {
-            info!("Root has exceeded max_entries; splitting root");
-            self.split_root();
-        }
+        self.insert_entry(entry, None);
     }
 
-    /// Splits the root node into two child nodes when it exceeds the maximum number of entries.
-    fn split_root(&mut self)
+    fn insert_entry(&mut self, entry: RStarTreeEntry<T>, reinsert_from_level: Option<usize>)
     where
         T: Clone,
         T::B: BSPBounds,
     {
-        info!("Splitting root node");
-        let old_entries = std::mem::take(&mut self.root.entries);
-        let (group1, group2) = split_entries(old_entries, self.max_entries);
-        let child1 = RStarTreeNode {
-            entries: group1,
-            is_leaf: self.root.is_leaf,
-        };
-        let child2 = RStarTreeNode {
-            entries: group2,
-            is_leaf: self.root.is_leaf,
-        };
-        let mbr1 = compute_group_mbr(&child1.entries);
-        let mbr2 = compute_group_mbr(&child2.entries);
-        self.root.is_leaf = false;
-        self.root.entries.push(RStarTreeEntry::Node {
-            mbr: mbr1,
-            child: Box::new(child1),
-        });
-        self.root.entries.push(RStarTreeEntry::Node {
-            mbr: mbr2,
-            child: Box::new(child2),
-        });
+        let mut to_insert = vec![(entry, 0)];
+        let mut reinsert_level = reinsert_from_level;
+
+        while let Some((item, level)) = to_insert.pop() {
+            let overflow = insert_recursive(
+                &mut self.root,
+                item,
+                self.max_entries,
+                level,
+                &mut reinsert_level,
+                &mut to_insert,
+            );
+
+            if let Some((overflowed_node, overflow_level)) = overflow {
+                if reinsert_level == Some(overflow_level) {
+                    let old_entries = overflowed_node;
+                    let (group1, group2) = split_entries(old_entries, self.max_entries);
+                    let child1 = RStarTreeNode {
+                        entries: group1,
+                        is_leaf: self.root.is_leaf,
+                    };
+                    let child2 = RStarTreeNode {
+                        entries: group2,
+                        is_leaf: self.root.is_leaf,
+                    };
+                    let mbr1 = compute_group_mbr(&child1.entries);
+                    let mbr2 = compute_group_mbr(&child2.entries);
+                    self.root.is_leaf = false;
+                    self.root.entries.clear();
+                    self.root.entries.push(RStarTreeEntry::Node {
+                        mbr: mbr1,
+                        child: Box::new(child1),
+                    });
+                    self.root.entries.push(RStarTreeEntry::Node {
+                        mbr: mbr2,
+                        child: Box::new(child2),
+                    });
+                } else {
+                    if reinsert_level.is_none() {
+                        reinsert_level = Some(overflow_level);
+                    }
+                    let mut node = RStarTreeNode {
+                        entries: overflowed_node,
+                        is_leaf: self.root.is_leaf,
+                    };
+                    let reinserted_entries = forced_reinsert(&mut node, self.max_entries);
+                    self.root.entries = node.entries;
+                    for entry in reinserted_entries {
+                        to_insert.push((entry, 0));
+                    }
+                }
+            }
+        }
     }
 
     /// Performs a range search with a given query bounding volume.
@@ -247,29 +273,33 @@ impl<T: RStarTreeObject> RStarTree<T> {
 
         self.root.entries.extend(entries);
     }
+
+    #[doc(hidden)]
+    pub fn height(&self) -> usize {
+        let mut height = 1;
+        let mut current_node = &self.root;
+        while !current_node.is_leaf {
+            height += 1;
+            current_node =
+                if let Some(RStarTreeEntry::Node { child, .. }) = current_node.entries.first() {
+                    child
+                } else {
+                    break;
+                };
+        }
+        height
+    }
 }
 
-fn insert_entry_node<T: RStarTreeObject>(node: &mut RStarTreeNode<T>, entry: RStarTreeEntry<T>) {
-    if node.is_leaf {
-        debug!("Inserting entry into leaf node");
-        node.entries.push(entry);
-        return;
-    }
-
-    // Choose subtree
+fn choose_subtree<T: RStarTreeObject>(node: &RStarTreeNode<T>, entry: &RStarTreeEntry<T>) -> usize {
     let children_are_leaves = if let Some(RStarTreeEntry::Node { child, .. }) = node.entries.first()
     {
         child.is_leaf
     } else {
-        // If there are no entries in a non-leaf node, we can't determine the level of children.
-        // This state is generally invalid for a populated R-tree but can occur during initial insertions.
-        // We default to the behavior for non-leaf children, which is area-based.
         false
     };
 
-    let best_index = if children_are_leaves {
-        // Children are leaves: choose the entry with the least overlap enlargement.
-        // Tie-breaking: least area enlargement, then smallest area.
+    if children_are_leaves {
         node.entries
             .iter()
             .enumerate()
@@ -313,8 +343,6 @@ fn insert_entry_node<T: RStarTreeObject>(node: &mut RStarTreeNode<T>, entry: RSt
             .map(|(i, _)| i)
             .unwrap_or(0)
     } else {
-        // Children are not leaves: choose the entry with the least area enlargement.
-        // Tie-breaking: smallest area.
         node.entries
             .iter()
             .enumerate()
@@ -338,15 +366,123 @@ fn insert_entry_node<T: RStarTreeObject>(node: &mut RStarTreeNode<T>, entry: RSt
             })
             .map(|(i, _)| i)
             .unwrap_or(0)
-    };
+    }
+}
 
-    if let Some(RStarTreeEntry::Node { child, .. }) = node.entries.get_mut(best_index) {
-        insert_entry_node(child, entry);
-        let new_mbr = compute_group_mbr(&child.entries);
-        if let Some(RStarTreeEntry::Node { ref mut mbr, .. }) = node.entries.get_mut(best_index) {
+fn insert_recursive<T: RStarTreeObject + Clone>(
+    node: &mut RStarTreeNode<T>,
+    entry: RStarTreeEntry<T>,
+    max_entries: usize,
+    level: usize,
+    reinsert_level: &mut Option<usize>,
+    to_insert_queue: &mut Vec<(RStarTreeEntry<T>, usize)>,
+) -> Option<(Vec<RStarTreeEntry<T>>, usize)>
+where
+    T::B: BSPBounds,
+{
+    if node.is_leaf {
+        node.entries.push(entry);
+    } else {
+        let best_index = choose_subtree(node, &entry);
+        let child = if let RStarTreeEntry::Node { child, .. } = &mut node.entries[best_index] {
+            child
+        } else {
+            unreachable!()
+        };
+
+        if let Some((overflow, overflow_level)) = insert_recursive(
+            child,
+            entry,
+            max_entries,
+            level + 1,
+            reinsert_level,
+            to_insert_queue,
+        ) {
+            if reinsert_level.is_some() && *reinsert_level == Some(overflow_level) {
+                let (g1, g2) = split_entries(overflow, max_entries);
+                let child1 = RStarTreeNode {
+                    entries: g1,
+                    is_leaf: child.is_leaf,
+                };
+                let child2 = RStarTreeNode {
+                    entries: g2,
+                    is_leaf: child.is_leaf,
+                };
+                let mbr1 = compute_group_mbr(&child1.entries);
+                let mbr2 = compute_group_mbr(&child2.entries);
+                node.entries[best_index] = RStarTreeEntry::Node {
+                    mbr: mbr1,
+                    child: Box::new(child1),
+                };
+                node.entries.push(RStarTreeEntry::Node {
+                    mbr: mbr2,
+                    child: Box::new(child2),
+                });
+            } else {
+                if reinsert_level.is_none() {
+                    *reinsert_level = Some(overflow_level);
+                }
+                let mut overflowed_node = RStarTreeNode {
+                    entries: overflow,
+                    is_leaf: child.is_leaf,
+                };
+                let reinserted = forced_reinsert(&mut overflowed_node, max_entries);
+                for item in reinserted {
+                    to_insert_queue.push((item, 0));
+                }
+                if let RStarTreeEntry::Node { child, .. } = &mut node.entries[best_index] {
+                    child.entries = overflowed_node.entries;
+                }
+            }
+        }
+        let new_mbr = compute_group_mbr(
+            if let RStarTreeEntry::Node { child, .. } = &node.entries[best_index] {
+                &child.entries
+            } else {
+                unreachable!()
+            },
+        );
+        if let RStarTreeEntry::Node { mbr, .. } = &mut node.entries[best_index] {
             *mbr = new_mbr;
         }
     }
+
+    if node.entries.len() > max_entries {
+        return Some((std::mem::take(&mut node.entries), level));
+    }
+    None
+}
+
+fn forced_reinsert<T: RStarTreeObject + Clone>(
+    node: &mut RStarTreeNode<T>,
+    max_entries: usize,
+) -> Vec<RStarTreeEntry<T>>
+where
+    T::B: BSPBounds,
+{
+    let node_mbr = compute_group_mbr(&node.entries);
+    let reinsert_count = (max_entries as f64 * 0.3).ceil() as usize;
+
+    node.entries.sort_by(|a, b| {
+        let center_a: Vec<f64> = (0..T::B::DIM).map(|d| a.mbr().center(d)).collect();
+        let center_b: Vec<f64> = (0..T::B::DIM).map(|d| b.mbr().center(d)).collect();
+        let node_center: Vec<f64> = (0..T::B::DIM).map(|d| node_mbr.center(d)).collect();
+
+        let dist_a = center_a
+            .iter()
+            .zip(node_center.iter())
+            .map(|(ca, cb)| (ca - cb).powi(2))
+            .sum::<f64>();
+        let dist_b = center_b
+            .iter()
+            .zip(node_center.iter())
+            .map(|(ca, cb)| (ca - cb).powi(2))
+            .sum::<f64>();
+
+        dist_b.partial_cmp(&dist_a).unwrap_or(Ordering::Equal)
+    });
+
+    node.entries.drain(0..reinsert_count).collect()
 }
 
 fn split_entries<T: RStarTreeObject + Clone>(
@@ -477,7 +613,7 @@ where
 
         if deleted {
             for entry in reinsert_list {
-                self.insert_entry(entry);
+                self.insert_entry(entry, None);
             }
 
             if !self.root.is_leaf && self.root.entries.len() == 1 {
@@ -487,13 +623,6 @@ where
             }
         }
         deleted
-    }
-
-    fn insert_entry(&mut self, entry: RStarTreeEntry<T>) {
-        insert_entry_node(&mut self.root, entry);
-        if self.root.entries.len() > self.max_entries {
-            self.split_root();
-        }
     }
 }
 
@@ -519,14 +648,14 @@ fn delete_entry<T: RStarTreeObject + PartialEq>(
         let mut to_delete_indices = Vec::new();
         for (i, entry) in node.entries.iter_mut().enumerate() {
             if let RStarTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(object_mbr) {
-                    if delete_entry(child, object, object_mbr, min_entries, reinsert_list) {
-                        deleted = true;
-                        if child.entries.len() < min_entries {
-                            to_delete_indices.push(i);
-                        } else {
-                            *mbr = compute_group_mbr(&child.entries);
-                        }
+                if mbr.intersects(object_mbr)
+                    && delete_entry(child, object, object_mbr, min_entries, reinsert_list)
+                {
+                    deleted = true;
+                    if child.entries.len() < min_entries {
+                        to_delete_indices.push(i);
+                    } else {
+                        *mbr = compute_group_mbr(&child.entries);
                     }
                 }
             }

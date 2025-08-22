@@ -227,6 +227,43 @@ fn test_rstar_tree_insert_bulk_2d() {
 }
 
 #[test]
+fn test_rstar_tree_forced_reinsertion() {
+    let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(4);
+    let points: Vec<_> = (0..5)
+        .map(|i| Point2D::new(i as f64, i as f64, Some(i)))
+        .collect();
+
+    for p in &points {
+        tree.insert(p.clone());
+    }
+
+    assert_eq!(
+        tree.height(),
+        2,
+        "Tree height should be 2 after 5 insertions"
+    );
+
+    // Insert more points to trigger overflow in a child node.
+    for i in 5..10 {
+        tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
+    }
+
+    assert_eq!(
+        tree.height(),
+        2,
+        "Tree height should still be 2 after forced reinsertion"
+    );
+
+    let all_points = tree.range_search_bbox(&spart::geometry::Rectangle {
+        x: -1.0,
+        y: -1.0,
+        width: 11.0,
+        height: 11.0,
+    });
+    assert_eq!(all_points.len(), 10, "All points should be in the tree");
+}
+
+#[test]
 fn test_rstar_tree_delete_underflow() {
     let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(4);
     let points: Vec<_> = (0..10)

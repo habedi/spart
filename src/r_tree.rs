@@ -390,14 +390,14 @@ fn delete_entry<T: RTreeObject + PartialEq>(
         let mut to_delete_indices = Vec::new();
         for (i, entry) in node.entries.iter_mut().enumerate() {
             if let RTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(object_mbr) {
-                    if delete_entry(child, object, object_mbr, min_entries, reinsert_list) {
-                        deleted = true;
-                        if child.entries.len() < min_entries {
-                            to_delete_indices.push(i);
-                        } else {
-                            *mbr = compute_group_mbr(&child.entries);
-                        }
+                if mbr.intersects(object_mbr)
+                    && delete_entry(child, object, object_mbr, min_entries, reinsert_list)
+                {
+                    deleted = true;
+                    if child.entries.len() < min_entries {
+                        to_delete_indices.push(i);
+                    } else {
+                        *mbr = compute_group_mbr(&child.entries);
                     }
                 }
             }
