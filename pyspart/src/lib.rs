@@ -237,6 +237,11 @@ impl PyQuadtree {
         self.tree.insert(point.into())
     }
 
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&rust_points);
+    }
+
     fn delete(&mut self, point: PyPoint2D) -> bool {
         let p: Point2D<PyData> = point.into();
         self.tree.delete(&p)
@@ -277,6 +282,11 @@ impl PyOctree {
 
     fn insert(&mut self, point: PyPoint3D) -> bool {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -321,6 +331,11 @@ impl PyKdTree2D {
         self.tree.insert(point.into())
     }
 
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let mut rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&mut rust_points);
+    }
+
     fn delete(&mut self, point: PyPoint2D) -> bool {
         let p: Point2D<PyData> = point.into();
         self.tree.delete(&p)
@@ -361,6 +376,11 @@ impl PyKdTree3D {
 
     fn insert(&mut self, point: PyPoint3D) {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let mut rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&mut rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -405,6 +425,11 @@ impl PyRTree2D {
         self.tree.insert(point.into())
     }
 
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
+    }
+
     fn delete(&mut self, point: PyPoint2D) -> bool {
         let p: Point2D<PyData> = point.into();
         self.tree.delete(&p)
@@ -437,6 +462,11 @@ impl PyRTree3D {
 
     fn insert(&mut self, point: PyPoint3D) {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -472,6 +502,11 @@ impl PyRStarTree2D {
 
     fn insert(&mut self, point: PyPoint2D) {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint2D) -> bool {
@@ -516,6 +551,11 @@ impl PyRStarTree3D {
 
     fn insert(&mut self, point: PyPoint3D) {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {

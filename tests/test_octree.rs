@@ -77,3 +77,21 @@ fn run_octree_3d_test() {
 fn test_octree_3d() {
     run_octree_3d_test();
 }
+
+#[test]
+fn test_octree_insert_bulk() {
+    let boundary = BOUNDARY_CUBE;
+    let mut tree = Octree::new(&boundary, CAPACITY);
+    let points = common_points_3d();
+    tree.insert_bulk(&points);
+
+    let target = target_point_3d();
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
+    assert_eq!(
+        knn_results.len(),
+        KNN_COUNT,
+        "Expected {} nearest neighbors, got {}",
+        KNN_COUNT,
+        knn_results.len()
+    );
+}

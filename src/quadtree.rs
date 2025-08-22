@@ -182,6 +182,83 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         self.insert(point)
     }
 
+    /// Inserts a bulk of points into the quadtree.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The points to insert.
+    pub fn insert_bulk(&mut self, points: &[Point2D<T>]) {
+        if points.is_empty() {
+            return;
+        }
+
+        // Filter out points that are not within the boundary
+        let points_within_boundary: Vec<Point2D<T>> = points
+            .iter()
+            .filter(|p| self.boundary.contains(p))
+            .cloned()
+            .collect();
+
+        if points_within_boundary.is_empty() {
+            return;
+        }
+
+        // If the current node is not divided and has enough capacity, add the points
+        if !self.divided && self.points.len() + points_within_boundary.len() <= self.capacity {
+            self.points.extend(points_within_boundary);
+            return;
+        }
+
+        // If the current node is not divided but adding the new points would exceed the capacity,
+        // subdivide the node and distribute the existing and new points among the children.
+        if !self.divided {
+            self.subdivide();
+        }
+
+        // If the node is already divided, distribute the new points among the children.
+        let mut points_to_insert = points_within_boundary;
+        if self.divided {
+            let mut children_points: [Vec<Point2D<T>>; 4] = [vec![], vec![], vec![], vec![]];
+
+            for point in points_to_insert.drain(..) {
+                if self.northeast.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[0].push(point);
+                } else if self.northwest.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[1].push(point);
+                } else if self.southeast.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[2].push(point);
+                } else if self.southwest.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[3].push(point);
+                }
+            }
+
+            if !children_points[0].is_empty() {
+                self.northeast
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[0]);
+            }
+            if !children_points[1].is_empty() {
+                self.northwest
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[1]);
+            }
+            if !children_points[2].is_empty() {
+                self.southeast
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[2]);
+            }
+            if !children_points[3].is_empty() {
+                self.southwest
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[3]);
+            }
+        }
+    }
+
     /// Returns mutable references to the four child quadrants, if they exist.
     fn children_mut(&mut self) -> Vec<&mut Quadtree<T>> {
         let mut children = Vec::with_capacity(4);

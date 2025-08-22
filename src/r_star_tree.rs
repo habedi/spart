@@ -44,9 +44,9 @@ const EPSILON: f64 = 1e-10;
 /// Trait for points stored in an R*‑tree.
 ///
 /// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
-pub trait RStarTreeObject: std::fmt::Debug {
+pub trait RStarTreeObject: std::fmt::Debug + Clone {
     /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
-    type B: BoundingVolume + std::fmt::Debug;
+    type B: BoundingVolume + std::fmt::Debug + Clone;
     /// Returns the minimum bounding volume of the object.
     fn mbr(&self) -> Self::B;
 }
@@ -183,6 +183,50 @@ impl<T: RStarTreeObject> RStarTree<T> {
         let mut result = Vec::new();
         search_node(&self.root, query, &mut result);
         result
+    }
+
+    /// Inserts a bulk of objects into the R*-tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `objects` - The objects to insert.
+    pub fn insert_bulk(&mut self, objects: Vec<T>)
+    where
+        T: Clone,
+        T::B: BSPBounds,
+    {
+        if objects.is_empty() {
+            return;
+        }
+
+        let mut entries: Vec<RStarTreeEntry<T>> = objects
+            .into_iter()
+            .map(|obj| RStarTreeEntry::Leaf {
+                mbr: obj.mbr(),
+                object: obj,
+            })
+            .collect();
+
+        while entries.len() > self.max_entries {
+            let mut new_level_entries = Vec::new();
+            let chunks = entries.chunks(self.max_entries);
+
+            for chunk in chunks {
+                let child_node = RStarTreeNode {
+                    entries: chunk.to_vec(),
+                    is_leaf: self.root.is_leaf,
+                };
+                let mbr = compute_group_mbr(&child_node.entries);
+                new_level_entries.push(RStarTreeEntry::Node {
+                    mbr,
+                    child: Box::new(child_node),
+                });
+            }
+            entries = new_level_entries;
+            self.root.is_leaf = false;
+        }
+
+        self.root.entries.extend(entries);
     }
 }
 
@@ -450,7 +494,7 @@ fn delete_entry<T: RStarTreeObject + PartialEq>(node: &mut RStarTreeNode<T>, obj
     }
 }
 
-impl<T: std::fmt::Debug> RStarTreeObject for Point2D<T> {
+impl<T: std::fmt::Debug + Clone> RStarTreeObject for Point2D<T> {
     type B = Rectangle;
     fn mbr(&self) -> Self::B {
         Rectangle {
@@ -462,7 +506,7 @@ impl<T: std::fmt::Debug> RStarTreeObject for Point2D<T> {
     }
 }
 
-impl<T: std::fmt::Debug> RStarTreeObject for Point3D<T> {
+impl<T: std::fmt::Debug + Clone> RStarTreeObject for Point3D<T> {
     type B = Cube;
     fn mbr(&self) -> Self::B {
         Cube {
@@ -506,7 +550,7 @@ impl<T: RStarTreeObject> PartialOrd for KnnCandidate<'_, T> {
     }
 }
 
-impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
+impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
     /// Performs a k‑nearest neighbor search on an R*‑tree of 2D points.
     ///
     /// # Arguments
@@ -560,7 +604,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.0.0 {
                         break;
                     }
                 }
@@ -571,7 +615,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                    } else if d_sq < results.peek().unwrap().0.0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -579,7 +623,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
@@ -596,7 +640,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
     }
 }
 
-impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
+impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
     /// Performs a k‑nearest neighbor search on an R*‑tree of 3D points.
     ///
     /// # Arguments
@@ -650,7 +694,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.0.0 {
                         break;
                     }
                 }
@@ -661,7 +705,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                    } else if d_sq < results.peek().unwrap().0.0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -669,7 +713,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,

@@ -75,3 +75,21 @@ fn run_quadtree_2d_test() {
 fn test_quadtree_2d() {
     run_quadtree_2d_test();
 }
+
+#[test]
+fn test_quadtree_insert_bulk() {
+    let boundary = BOUNDARY_RECT;
+    let mut tree = Quadtree::new(&boundary, CAPACITY);
+    let points = common_points_2d();
+    tree.insert_bulk(&points);
+
+    let target = target_point_2d();
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
+    assert_eq!(
+        knn_results.len(),
+        KNN_COUNT,
+        "Expected {} nearest neighbors, got {}",
+        KNN_COUNT,
+        knn_results.len()
+    );
+}

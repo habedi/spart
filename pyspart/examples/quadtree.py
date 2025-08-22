@@ -7,9 +7,12 @@ def main():
     quadtree = Quadtree(boundary, 4)
 
     # Insert some points into the quadtree
-    quadtree.insert(Point2D(10.0, 20.0, 1))
-    quadtree.insert(Point2D(80.0, 30.0, 2))
-    quadtree.insert(Point2D(45.0, 70.0, 3))
+    points_to_insert = [
+        Point2D(10.0, 20.0, 1),
+        Point2D(80.0, 30.0, 2),
+        Point2D(45.0, 70.0, 3),
+    ]
+    quadtree.insert_bulk(points_to_insert)
 
     # Query the quadtree for the 2 nearest neighbors to a point
     query_point = Point2D(12.0, 22.0, None)

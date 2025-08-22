@@ -193,6 +193,37 @@ impl<P: KdPoint> KdTree<P> {
         self.root = Some(Self::insert_rec(self.root.take(), point, 0, self.k));
     }
 
+    /// Inserts a bulk of points into the Kd-tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The points to insert.
+    pub fn insert_bulk(&mut self, points: &mut [P]) {
+        if points.is_empty() {
+            return;
+        }
+        self.root = self.insert_bulk_rec(points, 0);
+    }
+
+    fn insert_bulk_rec(&mut self, points: &mut [P], depth: usize) -> Option<Box<KdNode<P>>> {
+        if points.is_empty() {
+            return None;
+        }
+
+        let axis = depth % self.k;
+        points.sort_by(|a, b| a.coord(axis).partial_cmp(&b.coord(axis)).unwrap());
+        let median_idx = points.len() / 2;
+
+        let mut node = KdNode::new(points[median_idx].clone());
+        let (left_slice, right_slice) = points.split_at_mut(median_idx);
+        let right_slice = &mut right_slice[1..];
+
+        node.left = self.insert_bulk_rec(left_slice, depth + 1);
+        node.right = self.insert_bulk_rec(right_slice, depth + 1);
+
+        Some(Box::new(node))
+    }
+
     fn insert_rec(
         node: Option<Box<KdNode<P>>>,
         point: P,

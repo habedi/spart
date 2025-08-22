@@ -345,6 +345,167 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         self.insert(point)
     }
 
+    /// Inserts a bulk of points into the octree.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The points to insert.
+    pub fn insert_bulk(&mut self, points: &[Point3D<T>]) {
+        if points.is_empty() {
+            return;
+        }
+
+        let points_within_boundary: Vec<Point3D<T>> = points
+            .iter()
+            .filter(|p| self.boundary.contains(p))
+            .cloned()
+            .collect();
+
+        if points_within_boundary.is_empty() {
+            return;
+        }
+
+        if !self.divided && self.points.len() + points_within_boundary.len() <= self.capacity {
+            self.points.extend(points_within_boundary);
+            return;
+        }
+
+        if !self.divided {
+            self.subdivide();
+        }
+
+        let mut points_to_insert = points_within_boundary;
+        if self.divided {
+            let mut children_points: [Vec<Point3D<T>>; 8] = [
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            ];
+
+            for point in points_to_insert.drain(..) {
+                if self
+                    .front_top_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[0].push(point);
+                } else if self
+                    .front_top_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[1].push(point);
+                } else if self
+                    .front_bottom_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[2].push(point);
+                } else if self
+                    .front_bottom_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[3].push(point);
+                } else if self
+                    .back_top_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[4].push(point);
+                } else if self
+                    .back_top_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[5].push(point);
+                } else if self
+                    .back_bottom_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[6].push(point);
+                } else if self
+                    .back_bottom_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[7].push(point);
+                }
+            }
+
+            if !children_points[0].is_empty() {
+                self.front_top_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[0]);
+            }
+            if !children_points[1].is_empty() {
+                self.front_top_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[1]);
+            }
+            if !children_points[2].is_empty() {
+                self.front_bottom_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[2]);
+            }
+            if !children_points[3].is_empty() {
+                self.front_bottom_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[3]);
+            }
+            if !children_points[4].is_empty() {
+                self.back_top_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[4]);
+            }
+            if !children_points[5].is_empty() {
+                self.back_top_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[5]);
+            }
+            if !children_points[6].is_empty() {
+                self.back_bottom_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[6]);
+            }
+            if !children_points[7].is_empty() {
+                self.back_bottom_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[7]);
+            }
+        }
+    }
+
     /// Performs a k-nearest neighbor search for the target point.
     ///
     /// # Arguments

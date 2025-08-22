@@ -14,9 +14,12 @@ def main():
     octree = Octree(boundary, 4)
 
     # Insert some points into the octree
-    octree.insert(Point3D(10.0, 20.0, 30.0, 1))
-    octree.insert(Point3D(80.0, 30.0, 40.0, 2))
-    octree.insert(Point3D(45.0, 70.0, 50.0, 3))
+    points_to_insert = [
+        Point3D(10.0, 20.0, 30.0, 1),
+        Point3D(80.0, 30.0, 40.0, 2),
+        Point3D(45.0, 70.0, 50.0, 3),
+    ]
+    octree.insert_bulk(points_to_insert)
 
     # Query the octree for the 2 nearest neighbors to a point
     query_point = Point3D(12.0, 22.0, 32.0, None)

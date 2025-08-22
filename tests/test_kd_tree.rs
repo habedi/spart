@@ -177,3 +177,37 @@ fn test_kdtree_2d() {
 fn test_kdtree_3d() {
     run_kdtree_3d_test();
 }
+
+#[test]
+fn test_kdtree_insert_bulk_2d() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new(2);
+    let mut points = common_points_2d();
+    tree.insert_bulk(&mut points);
+
+    let target = target_point_2d();
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
+    assert_eq!(
+        knn_results.len(),
+        KNN_COUNT,
+        "Expected {} nearest neighbors, got {}",
+        KNN_COUNT,
+        knn_results.len()
+    );
+}
+
+#[test]
+fn test_kdtree_insert_bulk_3d() {
+    let mut tree: KdTree<Point3D<&str>> = KdTree::new(3);
+    let mut points = common_points_3d();
+    tree.insert_bulk(&mut points);
+
+    let target = target_point_3d();
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
+    assert_eq!(
+        knn_results.len(),
+        KNN_COUNT,
+        "Expected {} nearest neighbors, got {}",
+        KNN_COUNT,
+        knn_results.len()
+    );
+}

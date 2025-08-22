@@ -7,9 +7,12 @@ def main():
     tree2d = RStarTree2D(4)
 
     # Insert some points
-    tree2d.insert(Point2D(10.0, 20.0, 1))
-    tree2d.insert(Point2D(80.0, 30.0, 2))
-    tree2d.insert(Point2D(45.0, 70.0, 3))
+    points_to_insert_2d = [
+        Point2D(10.0, 20.0, 1),
+        Point2D(80.0, 30.0, 2),
+        Point2D(45.0, 70.0, 3),
+    ]
+    tree2d.insert_bulk(points_to_insert_2d)
 
     # KNN Search
     query_point_2d_knn = Point2D(12.0, 22.0, None)
@@ -28,9 +31,12 @@ def main():
     tree3d = RStarTree3D(4)
 
     # Insert some points
-    tree3d.insert(Point3D(10.0, 20.0, 30.0, 1))
-    tree3d.insert(Point3D(80.0, 30.0, 40.0, 2))
-    tree3d.insert(Point3D(45.0, 70.0, 50.0, 3))
+    points_to_insert_3d = [
+        Point3D(10.0, 20.0, 30.0, 1),
+        Point3D(80.0, 30.0, 40.0, 2),
+        Point3D(45.0, 70.0, 50.0, 3),
+    ]
+    tree3d.insert_bulk(points_to_insert_3d)
 
     # KNN Search
     query_point_3d_knn = Point3D(12.0, 22.0, 32.0, None)
