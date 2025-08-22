@@ -1,6 +1,6 @@
 <div align="center">
   <picture>
-    <img alt="Spart Logo" src="logo.svg" height="25%" width="25%">
+    <img alt="Spart Logo" src="logo.svg" height="30%" width="30%">
   </picture>
 <br>
 
@@ -63,7 +63,7 @@ Check out the [pyspart](pyspart) directory for more information about the Python
 
 ### Documentation
 
-For the latest Rust API documentation, see [docs.rs/spart](https://docs.rs/spart).
+For the Rust API documentation, see [docs.rs/spart](https://docs.rs/spart).
 
 #### Basic Concepts
 

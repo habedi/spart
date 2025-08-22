@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[path = "shared.rs"]
 mod shared;
 use shared::*;
