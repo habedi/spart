@@ -711,7 +711,7 @@ impl<T: std::fmt::Debug + Clone> RStarTreeObject for Point3D<T> {
     }
 }
 
-impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
+impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
     /// Performs a k‑nearest neighbor search on an R*‑tree of 2D points.
     ///
     /// # Arguments
@@ -760,12 +760,38 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
             }
         }
 
-        let mut results: BinaryHeap<(OrdDist, &Point2D<T>)> = BinaryHeap::new();
+        struct HeapItem<'a, P> {
+            key: OrdDist,
+            idx: usize,
+            obj: &'a P,
+        }
+        impl<P> PartialEq for HeapItem<'_, P> {
+            fn eq(&self, other: &Self) -> bool {
+                self.key == other.key && self.idx == other.idx
+            }
+        }
+        impl<P> Eq for HeapItem<'_, P> {}
+        impl<P> Ord for HeapItem<'_, P> {
+            fn cmp(&self, other: &Self) -> Ordering {
+                match self.key.cmp(&other.key) {
+                    Ordering::Equal => self.idx.cmp(&other.idx),
+                    ord => ord,
+                }
+            }
+        }
+        impl<P> PartialOrd for HeapItem<'_, P> {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        let mut results: BinaryHeap<HeapItem<Point2D<T>>> = BinaryHeap::new();
+        let mut counter: usize = 0;
 
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.key.0 {
                         break;
                     }
                 }
@@ -775,16 +801,26 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
                 RStarTreeEntry::Leaf { object, .. } => {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
-                        results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                        counter += 1;
+                        results.push(HeapItem {
+                            key: OrdDist(d_sq),
+                            idx: counter,
+                            obj: object,
+                        });
+                    } else if d_sq < results.peek().unwrap().key.0 {
                         results.pop();
-                        results.push((OrdDist(d_sq), object));
+                        counter += 1;
+                        results.push(HeapItem {
+                            key: OrdDist(d_sq),
+                            idx: counter,
+                            obj: object,
+                        });
                     }
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().key.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
@@ -796,12 +832,12 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point2D<T>> {
         }
 
         let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        sorted_results.into_iter().map(|r| r.1).collect()
+        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap());
+        sorted_results.into_iter().map(|r| r.obj).collect()
     }
 }
 
-impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
+impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
     /// Performs a k‑nearest neighbor search on an R*‑tree of 3D points.
     ///
     /// # Arguments
@@ -850,12 +886,38 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
             }
         }
 
-        let mut results: BinaryHeap<(OrdDist, &Point3D<T>)> = BinaryHeap::new();
+        struct HeapItem<'a, P> {
+            key: OrdDist,
+            idx: usize,
+            obj: &'a P,
+        }
+        impl<P> PartialEq for HeapItem<'_, P> {
+            fn eq(&self, other: &Self) -> bool {
+                self.key == other.key && self.idx == other.idx
+            }
+        }
+        impl<P> Eq for HeapItem<'_, P> {}
+        impl<P> Ord for HeapItem<'_, P> {
+            fn cmp(&self, other: &Self) -> Ordering {
+                match self.key.cmp(&other.key) {
+                    Ordering::Equal => self.idx.cmp(&other.idx),
+                    ord => ord,
+                }
+            }
+        }
+        impl<P> PartialOrd for HeapItem<'_, P> {
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        let mut results: BinaryHeap<HeapItem<Point3D<T>>> = BinaryHeap::new();
+        let mut counter: usize = 0;
 
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0 .0 {
+                    if dist > worst_result.key.0 {
                         break;
                     }
                 }
@@ -865,16 +927,26 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
                 RStarTreeEntry::Leaf { object, .. } => {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
-                        results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0 .0 {
+                        counter += 1;
+                        results.push(HeapItem {
+                            key: OrdDist(d_sq),
+                            idx: counter,
+                            obj: object,
+                        });
+                    } else if d_sq < results.peek().unwrap().key.0 {
                         results.pop();
-                        results.push((OrdDist(d_sq), object));
+                        counter += 1;
+                        results.push(HeapItem {
+                            key: OrdDist(d_sq),
+                            idx: counter,
+                            obj: object,
+                        });
                     }
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().key.0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
@@ -886,8 +958,8 @@ impl<T: std::fmt::Debug + Ord + Clone> RStarTree<Point3D<T>> {
         }
 
         let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        sorted_results.into_iter().map(|r| r.1).collect()
+        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap());
+        sorted_results.into_iter().map(|r| r.obj).collect()
     }
 }
 

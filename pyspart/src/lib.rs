@@ -60,11 +60,6 @@ impl PartialOrd for PyData {
     }
 }
 
-impl Ord for PyData {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
 
 // Implement Debug manually since PyObject doesn't implement it.
 impl std::fmt::Debug for PyData {
