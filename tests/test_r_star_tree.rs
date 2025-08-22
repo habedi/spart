@@ -2,7 +2,7 @@
 mod shared;
 use shared::*;
 
-use spart::geometry::{Point2D, Point3D};
+use spart::geometry::{EuclideanDistance, Point2D, Point3D};
 use spart::r_star_tree::RStarTree;
 use tracing::{debug, info};
 
@@ -20,7 +20,7 @@ fn run_rstar_tree_2d_test() {
 
     let target = target_point_2d();
     info!("Performing 2D kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target, KNN_COUNT);
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     info!("2D kNN search returned {} results", knn_results.len());
     assert_eq!(
         knn_results.len(),
@@ -69,7 +69,7 @@ fn run_rstar_tree_2d_test() {
     );
 
     // Perform a range search using a radius.
-    let range_results_radius = tree.range_search(&target, 5.0);
+    let range_results_radius = tree.range_search::<EuclideanDistance>(&target, 5.0);
     info!(
         "2D range search (radius) returned {} results",
         range_results_radius.len()
@@ -90,7 +90,7 @@ fn run_rstar_tree_2d_test() {
         "Deleting non-existent point should return false"
     );
 
-    let knn_after = tree.knn_search(&target, KNN_COUNT);
+    let knn_after = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     for pt in &knn_after {
         debug!("RStarTree 2D kNN after deletion: {:?}", pt);
         assert_ne!(
@@ -117,7 +117,7 @@ fn run_rstar_tree_3d_test() {
 
     let target = target_point_3d();
     info!("Performing 3D kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target, KNN_COUNT);
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     info!("3D kNN search returned {} results", knn_results.len());
     assert_eq!(
         knn_results.len(),
@@ -165,7 +165,7 @@ fn run_rstar_tree_3d_test() {
     );
 
     // Perform a range search using a radius.
-    let range_results_radius = tree.range_search(&target, 5.0);
+    let range_results_radius = tree.range_search::<EuclideanDistance>(&target, 5.0);
     info!(
         "3D range search (radius) returned {} results",
         range_results_radius.len()
@@ -186,7 +186,7 @@ fn run_rstar_tree_3d_test() {
         "Deleting non-existent 3D point should return false"
     );
 
-    let knn_after = tree.knn_search(&target, KNN_COUNT);
+    let knn_after = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     for pt in &knn_after {
         debug!("RStarTree 3D kNN after deletion: {:?}", pt);
         assert_ne!(

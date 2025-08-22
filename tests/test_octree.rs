@@ -2,6 +2,7 @@
 mod shared;
 use shared::*;
 
+use spart::geometry::EuclideanDistance;
 use spart::octree::Octree;
 use tracing::{debug, info};
 
@@ -24,7 +25,7 @@ fn run_octree_3d_test() {
     // Perform a kNN search.
     let target = target_point_3d();
     info!("Performing 3D kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target, KNN_COUNT);
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     info!("3D kNN search returned {} results", knn_results.len());
     assert_eq!(
         knn_results.len(),
@@ -50,7 +51,7 @@ fn run_octree_3d_test() {
         "Performing 3D range search for query point {:?} with radius {}",
         range_query, RADIUS
     );
-    let range_results = tree.range_search(&range_query, RADIUS);
+    let range_results = tree.range_search::<EuclideanDistance>(&range_query, RADIUS);
     info!("3D range search returned {} points", range_results.len());
     for pt in &range_results {
         let d = distance_3d(&range_query, pt);

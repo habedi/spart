@@ -3,7 +3,7 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
+use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
 use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
@@ -49,7 +49,7 @@ fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
         "range_kdtree_2d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -94,7 +94,7 @@ fn benchmark_range_rtree_2d(_c: &mut Criterion) {
         "range_rtree_2d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -118,7 +118,7 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
         "range_quadtree_2d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -136,7 +136,7 @@ fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
         "range_kdtree_3d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -184,7 +184,7 @@ fn benchmark_range_rtree_3d(_c: &mut Criterion) {
         "range_rtree_3d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -203,7 +203,7 @@ fn benchmark_range_octree_3d(_c: &mut Criterion) {
         "range_octree_3d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -225,7 +225,7 @@ fn benchmark_range_rstartree_2d(_c: &mut Criterion) {
         "range_rstartree_2d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -248,7 +248,7 @@ fn benchmark_range_rstartree_3d(_c: &mut Criterion) {
         "range_rstartree_3d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }

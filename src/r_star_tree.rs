@@ -31,8 +31,8 @@
 
 use crate::exceptions::SpartError;
 use crate::geometry::{
-    BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, HasMinDistance, Point2D, Point3D,
-    Rectangle,
+    BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance,
+    Point2D, Point3D, Rectangle,
 };
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -517,7 +517,17 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
     /// # Returns
     ///
     /// A vector of references to the k nearest 2D points.
-    pub fn knn_search(&self, query: &Point2D<T>, k: usize) -> Vec<&Point2D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn knn_search<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        query: &Point2D<T>,
+        k: usize,
+    ) -> Vec<&Point2D<T>> {
         if k == 0 {
             return Vec::new();
         }
@@ -558,7 +568,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point2D<T>> {
 
             match entry {
                 RStarTreeEntry::Leaf { object, .. } => {
-                    let d_sq = query.distance_sq(object);
+                    let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
                     } else if d_sq < results.peek().unwrap().0 .0 {
@@ -597,7 +607,17 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
     /// # Returns
     ///
     /// A vector of references to the k nearest 3D points.
-    pub fn knn_search(&self, query: &Point3D<T>, k: usize) -> Vec<&Point3D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn knn_search<M: DistanceMetric<Point3D<T>>>(
+        &self,
+        query: &Point3D<T>,
+        k: usize,
+    ) -> Vec<&Point3D<T>> {
         if k == 0 {
             return Vec::new();
         }
@@ -638,7 +658,7 @@ impl<T: std::fmt::Debug + Ord> RStarTree<Point3D<T>> {
 
             match entry {
                 RStarTreeEntry::Leaf { object, .. } => {
-                    let d_sq = query.distance_sq(object);
+                    let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
                     } else if d_sq < results.peek().unwrap().0 .0 {
@@ -683,12 +703,18 @@ where
     /// # Returns
     ///
     /// A vector of references to the objects within the given radius.
-    pub fn range_search(&self, query: &T, radius: f64) -> Vec<&T> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn range_search<M: DistanceMetric<T>>(&self, query: &T, radius: f64) -> Vec<&T> {
         let query_volume = T::B::from_point_radius(query, radius);
         let candidates = self.range_search_bbox(&query_volume);
         candidates
             .into_iter()
-            .filter(|object| object.mbr().min_distance(query) <= radius)
+            .filter(|object| M::distance_sq(query, object) <= radius * radius)
             .collect()
     }
 }

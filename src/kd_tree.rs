@@ -7,25 +7,26 @@
 //! ### Example
 //!
 //! ```
-//! use spart::geometry::{Point2D, Point3D};
-//! use spart::kd_tree::{KdTree, KdPoint};
+//! use spart::geometry::{EuclideanDistance, Point2D, Point3D};
+//! use spart::kd_tree::{KdPoint, KdTree};
 //!
 //! // Create a 2D Kd‑tree and insert some points.
 //! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2);
 //! tree2d.insert(Point2D::new(1.0, 2.0, None));
 //! tree2d.insert(Point2D::new(3.0, 4.0, None));
-//! let neighbors2d = tree2d.knn_search(&Point2D::new(2.0, 3.0, None), 1);
+//! let neighbors2d = tree2d.knn_search::<EuclideanDistance>(&Point2D::new(2.0, 3.0, None), 1);
 //! assert!(!neighbors2d.is_empty());
 //!
 //! // Create a 3D Kd‑tree and insert some points.
 //! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3);
 //! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None));
 //! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None));
-//! let neighbors3d = tree3d.knn_search(&Point3D::new(2.0, 3.0, 4.0, None), 1);
+//! let neighbors3d = tree3d.knn_search::<EuclideanDistance>(&Point3D::new(2.0, 3.0, 4.0, None), 1);
 //! assert!(!neighbors3d.is_empty());
 //! ```
 
 use crate::exceptions::SpartError;
+use crate::geometry::DistanceMetric;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -45,8 +46,6 @@ pub trait KdPoint: Clone + PartialEq + std::fmt::Debug {
     ///
     /// Panics with `SpartError::InvalidDimension` if the axis is invalid.
     fn coord(&self, axis: usize) -> f64;
-    /// Computes the squared Euclidean distance to another point.
-    fn distance_sq(&self, other: &Self) -> f64;
 }
 
 impl<T> KdPoint for crate::geometry::Point2D<T>
@@ -68,9 +67,6 @@ where
                 }
             ),
         }
-    }
-    fn distance_sq(&self, other: &Self) -> f64 {
-        (self.x - other.x).powi(2) + (self.y - other.y).powi(2)
     }
 }
 
@@ -94,9 +90,6 @@ where
                 }
             ),
         }
-    }
-    fn distance_sq(&self, other: &Self) -> f64 {
-        (self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2)
     }
 }
 
@@ -229,13 +222,13 @@ impl<P: KdPoint> KdTree<P> {
     /// # Returns
     ///
     /// A vector of the nearest points, ordered from nearest to farthest.
-    pub fn knn_search(&self, target: &P, k_neighbors: usize) -> Vec<P> {
+    pub fn knn_search<M: DistanceMetric<P>>(&self, target: &P, k_neighbors: usize) -> Vec<P> {
         info!(
             "Performing k‑NN search for target {:?} with k={}",
             target, k_neighbors
         );
         let mut heap: BinaryHeap<HeapItem<P>> = BinaryHeap::new();
-        Self::knn_search_rec(&self.root, target, k_neighbors, 0, &mut heap);
+        Self::knn_search_rec::<M>(&self.root, target, k_neighbors, 0, &mut heap);
         let mut result: Vec<(f64, P)> = heap
             .into_iter()
             .map(|item| (item.dist.into_inner(), item.point))
@@ -244,7 +237,7 @@ impl<P: KdPoint> KdTree<P> {
         result.into_iter().map(|(_d, p)| p).collect()
     }
 
-    fn knn_search_rec(
+    fn knn_search_rec<M: DistanceMetric<P>>(
         node: &Option<Box<KdNode<P>>>,
         target: &P,
         k_neighbors: usize,
@@ -252,7 +245,7 @@ impl<P: KdPoint> KdTree<P> {
         heap: &mut BinaryHeap<HeapItem<P>>,
     ) {
         if let Some(ref n) = node {
-            let dist_sq = target.distance_sq(&n.point);
+            let dist_sq = M::distance_sq(target, &n.point);
             let dist = OrderedFloat(dist_sq);
             if heap.len() < k_neighbors {
                 heap.push(HeapItem {
@@ -276,11 +269,11 @@ impl<P: KdPoint> KdTree<P> {
             } else {
                 (&n.right, &n.left)
             };
-            Self::knn_search_rec(first, target, k_neighbors, depth + 1, heap);
+            Self::knn_search_rec::<M>(first, target, k_neighbors, depth + 1, heap);
             let diff = (target_coord - node_coord).abs();
             let diff_sq = diff * diff;
             if heap.len() < k_neighbors || diff_sq < heap.peek().unwrap().dist.into_inner() {
-                Self::knn_search_rec(second, target, k_neighbors, depth + 1, heap);
+                Self::knn_search_rec::<M>(second, target, k_neighbors, depth + 1, heap);
             }
         }
     }
@@ -295,15 +288,15 @@ impl<P: KdPoint> KdTree<P> {
     /// # Returns
     ///
     /// A vector of points within the specified radius.
-    pub fn range_search(&self, center: &P, radius: f64) -> Vec<P> {
+    pub fn range_search<M: DistanceMetric<P>>(&self, center: &P, radius: f64) -> Vec<P> {
         info!("Finding points within radius {} of {:?}", radius, center);
         let mut found = Vec::new();
         let radius_sq = radius * radius;
-        Self::range_search_rec(&self.root, center, radius_sq, 0, radius, &mut found);
+        Self::range_search_rec::<M>(&self.root, center, radius_sq, 0, radius, &mut found);
         found
     }
 
-    fn range_search_rec(
+    fn range_search_rec<M: DistanceMetric<P>>(
         node: &Option<Box<KdNode<P>>>,
         center: &P,
         radius_sq: f64,
@@ -312,7 +305,7 @@ impl<P: KdPoint> KdTree<P> {
         found: &mut Vec<P>,
     ) {
         if let Some(ref n) = node {
-            let dist_sq = center.distance_sq(&n.point);
+            let dist_sq = M::distance_sq(center, &n.point);
             if dist_sq <= radius_sq {
                 found.push(n.point.clone());
             }
@@ -320,10 +313,10 @@ impl<P: KdPoint> KdTree<P> {
             let center_coord = center.coord(axis);
             let node_coord = n.point.coord(axis);
             if center_coord - radius <= node_coord {
-                Self::range_search_rec(&n.left, center, radius_sq, depth + 1, radius, found);
+                Self::range_search_rec::<M>(&n.left, center, radius_sq, depth + 1, radius, found);
             }
             if center_coord + radius >= node_coord {
-                Self::range_search_rec(&n.right, center, radius_sq, depth + 1, radius, found);
+                Self::range_search_rec::<M>(&n.right, center, radius_sq, depth + 1, radius, found);
             }
         }
     }

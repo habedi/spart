@@ -2,6 +2,7 @@
 mod shared;
 use shared::*;
 
+use spart::geometry::EuclideanDistance;
 use spart::quadtree::Quadtree;
 use tracing::{debug, info};
 
@@ -22,7 +23,7 @@ fn run_quadtree_2d_test() {
     // kNN search test
     let target = target_point_2d();
     info!("Performing kNN search for target: {:?}", target);
-    let knn_results = tree.knn_search(&target, KNN_COUNT);
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     info!("kNN search returned {} results", knn_results.len());
     assert_eq!(
         knn_results.len(),
@@ -48,7 +49,7 @@ fn run_quadtree_2d_test() {
         "Performing range search for query point {:?} with radius {}",
         range_query, RADIUS
     );
-    let range_results = tree.range_search(&range_query, RADIUS);
+    let range_results = tree.range_search::<EuclideanDistance>(&range_query, RADIUS);
     info!("Range search returned {} points", range_results.len());
     for pt in &range_results {
         let d = distance_2d(&range_query, pt);

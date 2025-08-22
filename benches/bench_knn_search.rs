@@ -3,7 +3,7 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use spart::geometry::{Point2D, Point3D, Rectangle};
+use spart::geometry::{EuclideanDistance, Point2D, Point3D, Rectangle};
 use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
@@ -26,7 +26,7 @@ fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -46,7 +46,7 @@ fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -72,7 +72,7 @@ fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -92,7 +92,7 @@ fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -112,7 +112,7 @@ fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -133,7 +133,7 @@ fn benchmark_knn_octree_3d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -153,7 +153,7 @@ fn benchmark_knn_rstartree_2d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })
@@ -173,7 +173,7 @@ fn benchmark_knn_rstartree_3d(_c: &mut Criterion) {
     cc.bench_function(name, |b| {
         b.iter(|| {
             info!("Running knn search benchmark: {}", name);
-            let res = tree.knn_search(&target, BENCH_KNN_SIZE);
+            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
             info!("Completed knn search benchmark: {}", name);
             black_box(res)
         })

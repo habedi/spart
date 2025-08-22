@@ -8,7 +8,7 @@
 //! ### Example
 //!
 //! ```
-//! use spart::geometry::{Point2D, Rectangle};
+//! use spart::geometry::{EuclideanDistance, Point2D, Rectangle};
 //! use spart::quadtree::Quadtree;
 //!
 //! // Define a boundary for the quadtree.
@@ -23,12 +23,12 @@
 //! qt.insert(pt2);
 //!
 //! // Perform a k-nearest neighbor search.
-//! let neighbors = qt.knn_search(&Point2D::new(12.0, 22.0, None), 1);
+//! let neighbors = qt.knn_search::<EuclideanDistance>(&Point2D::new(12.0, 22.0, None), 1);
 //! assert!(!neighbors.is_empty());
 //! ```
 
 use crate::exceptions::SpartError;
-use crate::geometry::{HeapItem, Point2D, Rectangle};
+use crate::geometry::{DistanceMetric, HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
@@ -251,9 +251,19 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// # Returns
     ///
     /// A vector of the k nearest points, ordered from nearest to farthest.
-    pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn knn_search<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        target: &Point2D<T>,
+        k: usize,
+    ) -> Vec<Point2D<T>> {
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
-        self.knn_search_helper(target, k, &mut heap);
+        self.knn_search_helper::<M>(target, k, &mut heap);
         heap.into_sorted_vec()
             .into_iter()
             .filter_map(|item| item.point_2d)
@@ -261,9 +271,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     }
 
     /// Helper method for performing the recursive k-nearest neighbor search.
-    fn knn_search_helper(&self, target: &Point2D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
+    fn knn_search_helper<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        target: &Point2D<T>,
+        k: usize,
+        heap: &mut BinaryHeap<HeapItem<T>>,
+    ) {
         for point in &self.points {
-            let dist_sq = point.distance_sq(target);
+            let dist_sq = M::distance_sq(point, target);
             let item = HeapItem {
                 neg_distance: OrderedFloat(-dist_sq),
                 point_2d: Some(point.clone()),
@@ -282,7 +297,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                         continue;
                     }
                 }
-                child.knn_search_helper(target, k, heap);
+                child.knn_search_helper::<M>(target, k, heap);
             }
         }
     }
@@ -297,20 +312,30 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// # Returns
     ///
     /// A vector of points within the range.
-    pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn range_search<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        center: &Point2D<T>,
+        radius: f64,
+    ) -> Vec<Point2D<T>> {
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
             return found;
         }
         for point in &self.points {
-            if point.distance_sq(center) <= radius_sq {
+            if M::distance_sq(point, center) <= radius_sq {
                 found.push(point.clone());
             }
         }
         if self.divided {
             for child in self.children() {
-                found.extend(child.range_search(center, radius));
+                found.extend(child.range_search::<M>(center, radius));
             }
         }
         found

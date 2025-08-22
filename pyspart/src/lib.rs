@@ -3,7 +3,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
+use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
 use spart::octree::Octree;
 use spart::quadtree::Quadtree;
@@ -244,12 +244,20 @@ impl PyQuadtree {
 
     fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -278,12 +286,20 @@ impl PyOctree {
 
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -312,12 +328,20 @@ impl PyKdTree2D {
 
     fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -346,12 +370,20 @@ impl PyKdTree3D {
 
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -380,7 +412,12 @@ impl PyRTree2D {
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -409,7 +446,12 @@ impl PyRTree3D {
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -439,12 +481,22 @@ impl PyRStarTree2D {
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 }
 
@@ -473,12 +525,22 @@ impl PyRStarTree3D {
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .cloned()
+            .map(|p| p.into())
+            .collect()
     }
 }
 

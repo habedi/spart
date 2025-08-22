@@ -54,6 +54,27 @@ impl<T: PartialOrd> PartialOrd for Point2D<T> {
     }
 }
 
+/// A trait for defining distance metrics.
+pub trait DistanceMetric<P> {
+    /// Computes the squared distance between two points.
+    fn distance_sq(p1: &P, p2: &P) -> f64;
+}
+
+/// A struct for Euclidean distance calculations.
+pub struct EuclideanDistance;
+
+impl<T> DistanceMetric<Point2D<T>> for EuclideanDistance {
+    fn distance_sq(p1: &Point2D<T>, p2: &Point2D<T>) -> f64 {
+        (p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)
+    }
+}
+
+impl<T> DistanceMetric<Point3D<T>> for EuclideanDistance {
+    fn distance_sq(p1: &Point3D<T>, p2: &Point3D<T>) -> f64 {
+        (p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2) + (p1.z - p2.z).powi(2)
+    }
+}
+
 impl<T: Ord> Ord for Point2D<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         match (OrderedFloat(self.x), OrderedFloat(self.y))
