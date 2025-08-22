@@ -253,6 +253,54 @@ fn benchmark_range_rstartree_3d(_c: &mut Criterion) {
     );
 }
 
+fn benchmark_range_bbox_rstartree_2d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_bbox_rstartree_2d");
+    let points = generate_2d_data();
+    let mut tree = r_star_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_rect = Rectangle {
+        x: 35.0 - BENCH_RANGE_RADIUS,
+        y: 45.0 - BENCH_RANGE_RADIUS,
+        width: 2.0 * BENCH_RANGE_RADIUS,
+        height: 2.0 * BENCH_RANGE_RADIUS,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_bbox_2d",
+        &tree,
+        &query_rect,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_bbox_rstartree_3d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_bbox_rstartree_3d");
+    let points = generate_3d_data();
+    let mut tree = r_star_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_cube = Cube {
+        x: 35.0 - BENCH_RANGE_RADIUS,
+        y: 45.0 - BENCH_RANGE_RADIUS,
+        z: 35.0 - BENCH_RANGE_RADIUS,
+        width: 2.0 * BENCH_RANGE_RADIUS,
+        height: 2.0 * BENCH_RANGE_RADIUS,
+        depth: 2.0 * BENCH_RANGE_RADIUS,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_bbox_3d",
+        &tree,
+        &query_cube,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
+}
+
 criterion_group!(
     benches,
     benchmark_range_kdtree_2d,
@@ -264,5 +312,7 @@ criterion_group!(
     benchmark_range_bbox_rtree_3d,
     benchmark_range_octree_3d,
     benchmark_range_rstartree_2d,
-    benchmark_range_rstartree_3d
+    benchmark_range_rstartree_3d,
+    benchmark_range_bbox_rstartree_2d,
+    benchmark_range_bbox_rstartree_3d
 );
