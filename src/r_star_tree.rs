@@ -35,6 +35,7 @@ use crate::geometry::{
     Point2D, Point3D, Rectangle,
 };
 use crate::rtree_common::{delete_entry as common_delete_entry, KnnCandidate};
+use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -746,18 +747,11 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
             });
         }
 
-        #[derive(PartialEq)]
-        struct OrdDist(f64);
-        impl Eq for OrdDist {}
-        impl PartialOrd for OrdDist {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-        impl Ord for OrdDist {
-            fn cmp(&self, other: &Self) -> Ordering {
-                self.0.partial_cmp(&other.0).unwrap()
-            }
+        type OrdDist = OrderedFloat<f64>;
+        #[inline]
+        #[allow(non_snake_case)]
+        fn OrdDist(x: f64) -> OrderedFloat<f64> {
+            OrderedFloat(x)
         }
 
         struct HeapItem<'a, P> {
@@ -872,18 +866,11 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
             });
         }
 
-        #[derive(PartialEq)]
-        struct OrdDist(f64);
-        impl Eq for OrdDist {}
-        impl PartialOrd for OrdDist {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-        impl Ord for OrdDist {
-            fn cmp(&self, other: &Self) -> Ordering {
-                self.0.partial_cmp(&other.0).unwrap()
-            }
+        type OrdDist = OrderedFloat<f64>;
+        #[inline]
+        #[allow(non_snake_case)]
+        fn OrdDist(x: f64) -> OrderedFloat<f64> {
+            OrderedFloat(x)
         }
 
         struct HeapItem<'a, P> {
