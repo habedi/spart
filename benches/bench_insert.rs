@@ -93,44 +93,141 @@ fn insert_3d_rtree(points: Vec<Point3D<i32>>) {
 
 fn bench_insert_quadtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
-    info!("Benchmark 'insert_2d_quadtree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
+    let boundary = Rectangle {
+        x: BENCH_BOUNDARY.x,
+        y: BENCH_BOUNDARY.y,
+        width: BENCH_BOUNDARY.width,
+        height: BENCH_BOUNDARY.height,
+    };
     let mut cc = configure_criterion();
-    bench_insert("insert_2d_quadtree", points, insert_2d_quadtree, &mut cc);
+    cc.bench_function("insert_2d_quadtree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_octree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
-    info!("Benchmark 'insert_3d_octree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
+    let boundary = BENCH_BOUNDARY;
     let mut cc = configure_criterion();
-    bench_insert("insert_3d_octree", points, insert_3d_octree, &mut cc);
+    cc.bench_function("insert_3d_octree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_kdtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
-    info!("Benchmark 'insert_2d_kdtree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_2d_kdtree", points, insert_2d_kdtree, &mut cc);
+    cc.bench_function("insert_2d_kdtree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = kd_tree::KdTree::new(2).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_kdtree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
-    info!("Benchmark 'insert_3d_kdtree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_3d_kdtree", points, insert_3d_kdtree, &mut cc);
+    cc.bench_function("insert_3d_kdtree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = kd_tree::KdTree::new(3).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_rtree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
-    info!("Benchmark 'insert_2d_rtree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_2d_rtree", points, insert_2d_rtree, &mut cc);
+    cc.bench_function("insert_2d_rtree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_rtree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
-    info!("Benchmark 'insert_3d_rtree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_3d_rtree", points, insert_3d_rtree, &mut cc);
+    cc.bench_function("insert_3d_rtree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn insert_2d_rstartree(points: Vec<Point2D<i32>>) {
@@ -153,16 +250,46 @@ fn insert_3d_rstartree(points: Vec<Point3D<i32>>) {
 
 fn bench_insert_rstartree_2d(_c: &mut Criterion) {
     let points = generate_2d_data();
-    info!("Benchmark 'insert_2d_rstartree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_2d_rstartree", points, insert_2d_rstartree, &mut cc);
+    cc.bench_function("insert_2d_rstartree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 fn bench_insert_rstartree_3d(_c: &mut Criterion) {
     let points = generate_3d_data();
-    info!("Benchmark 'insert_3d_rstartree' started");
+    let to_insert = points[points.len() - 1].clone();
+    let mut base_points = points.clone();
+    base_points.pop();
     let mut cc = configure_criterion();
-    bench_insert("insert_3d_rstartree", points, insert_3d_rstartree, &mut cc);
+    cc.bench_function("insert_3d_rstartree", |b| {
+        b.iter_with_setup(
+            || {
+                let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                for p in base_points.clone() {
+                    tree.insert(p);
+                }
+                tree
+            },
+            |mut tree| {
+                black_box(tree.insert(to_insert.clone()));
+            },
+        )
+    });
 }
 
 criterion_group!(

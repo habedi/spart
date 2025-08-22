@@ -28,9 +28,7 @@ fn bench_range_search<'a, T, Q, R>(
 {
     cc.bench_function(name, |b| {
         b.iter(|| {
-            info!("Running range search benchmark: {}", name);
             let res = search_fn(tree, query, BENCH_RANGE_RADIUS);
-            info!("Completed range search benchmark: {}", name);
             black_box(res)
         })
     });

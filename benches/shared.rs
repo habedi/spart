@@ -15,7 +15,7 @@ use tracing::{debug, info};
 // Benchmark Parameters
 //
 pub const BENCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-pub const BENCH_NUM_INSERT: i32 = 5;
+pub const BENCH_NUM_INSERT: i32 = 10_000;
 pub const BENCH_NODE_CAPACITY: usize = 5;
 
 pub const BENCH_KNN_SIZE: usize = 3;
