@@ -1,7 +1,9 @@
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyBytes, PyDict, PyType};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fs::File;
 
 use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
@@ -73,6 +75,35 @@ impl std::fmt::Debug for PyData {
     }
 }
 
+impl Serialize for PyData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Python::with_gil(|py| {
+            let pickle = py.import("pickle").map_err(serde::ser::Error::custom)?;
+            let bound_self = self.0.bind(py);
+            let bytes = pickle.call_method1("dumps", (bound_self,)).map_err(serde::ser::Error::custom)?;
+            let bytes: &[u8] = bytes.extract().map_err(serde::ser::Error::custom)?;
+            serializer.serialize_bytes(bytes)
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for PyData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
+        Python::with_gil(|py| {
+            let pickle = py.import("pickle").map_err(serde::de::Error::custom)?;
+            let obj = pickle.call_method("loads", (PyBytes::new(py, &bytes),), None).map_err(serde::de::Error::custom)?;
+            Ok(PyData(obj.into()))
+        })
+    }
+}
+
 
 #[pyclass(name = "Point2D", get_all)]
 #[derive(Debug)]
@@ -128,7 +159,6 @@ impl From<Point2D<PyData>> for PyPoint2D {
         }
     }
 }
-
 
 #[pyclass(name = "Point3D", get_all)]
 #[derive(Debug)]
@@ -264,6 +294,29 @@ impl PyQuadtree {
             .map(|p| p.into())
             .collect()
     }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyQuadtree { tree })
+    }
 }
 
 #[pyclass(name = "Octree")]
@@ -310,6 +363,29 @@ impl PyOctree {
             .into_iter()
             .map(|p| p.into())
             .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyOctree { tree })
     }
 }
 
@@ -358,6 +434,29 @@ impl PyKdTree2D {
             .map(|p| p.into())
             .collect()
     }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyKdTree2D { tree })
+    }
 }
 
 #[pyclass(name = "KdTree3D")]
@@ -405,6 +504,29 @@ impl PyKdTree3D {
             .map(|p| p.into())
             .collect()
     }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyKdTree3D { tree })
+    }
 }
 
 #[pyclass(name = "RTree2D")]
@@ -444,6 +566,29 @@ impl PyRTree2D {
             .map(|p| p.into())
             .collect()
     }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree2D { tree })
+    }
 }
 
 #[pyclass(name = "RTree3D")]
@@ -482,6 +627,29 @@ impl PyRTree3D {
             .cloned()
             .map(|p| p.into())
             .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree3D { tree })
     }
 }
 
@@ -533,6 +701,29 @@ impl PyRStarTree2D {
             .map(|p| p.into())
             .collect()
     }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree2D { tree })
+    }
 }
 
 #[pyclass(name = "RStarTree3D")]
@@ -581,6 +772,29 @@ impl PyRStarTree3D {
             .cloned()
             .map(|p| p.into())
             .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree3D { tree })
     }
 }
 

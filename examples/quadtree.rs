@@ -43,4 +43,17 @@ fn main() {
         "2 nearest neighbors to {:?} (Manhattan): {:?}",
         query_point, results_manhattan
     );
+
+    // Serialize the quadtree
+    let encoded: Vec<u8> = bincode::serialize(&quadtree).unwrap();
+
+    // Deserialize the quadtree
+    let decoded: Quadtree<u32> = bincode::deserialize(&encoded[..]).unwrap();
+
+    // Query the decoded quadtree
+    let results_decoded = decoded.knn_search::<EuclideanDistance>(&query_point, 2);
+    println!(
+        "2 nearest neighbors to {:?} (Euclidean, decoded): {:?}",
+        query_point, results_decoded
+    );
 }

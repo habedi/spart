@@ -1,3 +1,5 @@
+import os
+
 from pyspart import Octree, Point3D
 
 
@@ -27,6 +29,22 @@ def main():
 
     # Print the results
     print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.z, p.data) for p in results]}")
+
+    # Save the octree to a file
+    path = "octree.spart"
+    octree.save(path)
+
+    # Load the octree from the file
+    loaded_octree = Octree.load(path)
+
+    # Query the loaded octree
+    loaded_results = loaded_octree.knn_search(query_point, 2)
+    print(
+        f"2 nearest neighbors to query point from loaded octree: {[(p.x, p.y, p.z, p.data) for p in loaded_results]}"
+    )
+
+    # Clean up the file
+    os.remove(path)
 
 
 if __name__ == "__main__":

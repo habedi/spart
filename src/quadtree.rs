@@ -30,6 +30,8 @@
 use crate::exceptions::SpartError;
 use crate::geometry::{DistanceMetric, HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
@@ -43,6 +45,7 @@ use tracing::{debug, info};
 ///
 /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Quadtree<T: Clone + PartialEq> {
     boundary: Rectangle,
     points: Vec<Point2D<T>>,

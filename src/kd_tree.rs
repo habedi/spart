@@ -28,6 +28,8 @@
 use crate::exceptions::SpartError;
 use crate::geometry::DistanceMetric;
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::info;
@@ -122,6 +124,7 @@ impl<P> Ord for HeapItem<P> {
 
 /// A node in the Kd‑tree containing a point and references to its children.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct KdNode<P: KdPoint> {
     point: P,
     left: Option<Box<KdNode<P>>>,
@@ -144,6 +147,7 @@ impl<P: KdPoint> KdNode<P> {
 /// The tree stores points in k‑dimensional space (where `k` is provided during creation)
 /// and supports insertion, k‑nearest neighbor search, range search, and deletion.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct KdTree<P: KdPoint> {
     root: Option<Box<KdNode<P>>>,
     k: usize,

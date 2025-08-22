@@ -45,4 +45,17 @@ fn main() {
         "2 nearest neighbors to {:?} (Manhattan): {:?}",
         query_point, results_manhattan
     );
+
+    // Serialize the octree
+    let encoded: Vec<u8> = bincode::serialize(&octree).unwrap();
+
+    // Deserialize the octree
+    let decoded: Octree<u32> = bincode::deserialize(&encoded[..]).unwrap();
+
+    // Query the decoded octree
+    let results_decoded = decoded.knn_search::<EuclideanDistance>(&query_point, 2);
+    println!(
+        "2 nearest neighbors to {:?} (Euclidean, decoded): {:?}",
+        query_point, results_decoded
+    );
 }

@@ -1,4 +1,6 @@
-from pyspart import RStarTree2D, RStarTree3D, Point2D, Point3D
+import os
+
+from pyspart import Point2D, Point3D, RStarTree2D, RStarTree3D
 
 
 def main():
@@ -26,6 +28,16 @@ def main():
     # Print the results
     print(f"Points within 10 units of query point: {[(p.x, p.y, p.data) for p in results_2d]}")
 
+    # Save and load the 2D tree
+    path2d = "rstartree2d.spart"
+    tree2d.save(path2d)
+    loaded_tree2d = RStarTree2D.load(path2d)
+    loaded_results_2d = loaded_tree2d.knn_search(query_point_2d_knn, 1)
+    print(
+        f"1-NN search results from loaded 2D tree: {[(p.x, p.y, p.data) for p in loaded_results_2d]}"
+    )
+    os.remove(path2d)
+
     # --- 3D RStarTree Example ---
     print("\n--- 3D RStarTree Example ---")
     tree3d = RStarTree3D(4)
@@ -49,6 +61,16 @@ def main():
 
     # Print the results
     print(f"Points within 10 units of query point: {[(p.x, p.y, p.z, p.data) for p in results_3d]}")
+
+    # Save and load the 3D tree
+    path3d = "rstartree3d.spart"
+    tree3d.save(path3d)
+    loaded_tree3d = RStarTree3D.load(path3d)
+    loaded_results_3d = loaded_tree3d.knn_search(query_point_3d_knn, 1)
+    print(
+        f"1-NN search results from loaded 3D tree: {[(p.x, p.y, p.z, p.data) for p in loaded_results_3d]}"
+    )
+    os.remove(path3d)
 
 
 if __name__ == "__main__":

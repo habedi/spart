@@ -1,4 +1,6 @@
-from pyspart import Quadtree, Point2D
+import os
+
+from pyspart import Point2D, Quadtree
 
 
 def main():
@@ -20,6 +22,22 @@ def main():
 
     # Print the results
     print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.data) for p in results]}")
+
+    # Save the quadtree to a file
+    path = "quadtree.spart"
+    quadtree.save(path)
+
+    # Load the quadtree from the file
+    loaded_quadtree = Quadtree.load(path)
+
+    # Query the loaded quadtree
+    loaded_results = loaded_quadtree.knn_search(query_point, 2)
+    print(
+        f"2 nearest neighbors to query point from loaded quadtree: {[(p.x, p.y, p.data) for p in loaded_results]}"
+    )
+
+    # Clean up the file
+    os.remove(path)
 
 
 if __name__ == "__main__":

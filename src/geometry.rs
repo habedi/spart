@@ -8,6 +8,8 @@
 //! bounding volume calculations and minimum distance computations.
 
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use tracing::debug;
 
@@ -24,6 +26,7 @@ use crate::exceptions::SpartError;
 /// let pt: Point2D<()> = Point2D::new(1.0, 2.0, None);
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point2D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -133,6 +136,7 @@ impl<T> Point2D<T> {
 
 /// Represents a rectangle in 2D space.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rectangle {
     /// The x-coordinate of the rectangle's top-left corner.
     pub x: f64,
@@ -284,6 +288,7 @@ impl Rectangle {
 /// let pt: Point3D<()> = Point3D::new(1.0, 2.0, 3.0, None);
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point3D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -389,6 +394,7 @@ impl<T> Point3D<T> {
 
 /// Represents a cube (or cuboid) in 3D space.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cube {
     /// The x-coordinate of the cube's top-left-front corner.
     pub x: f64,

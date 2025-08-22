@@ -72,4 +72,22 @@ fn main() {
         "2 nearest neighbors to {:?} (Manhattan): {:?}",
         query_point_3d, results_3d_manhattan
     );
+
+    // Serialize the 2D tree
+    let encoded2d: Vec<u8> = bincode::serialize(&tree2d).unwrap();
+    let decoded2d: KdTree<Point2D<u32>> = bincode::deserialize(&encoded2d[..]).unwrap();
+    let results_2d_decoded = decoded2d.knn_search::<EuclideanDistance>(&query_point_2d, 2);
+    println!(
+        "2 nearest neighbors to {:?} (Euclidean, decoded): {:?}",
+        query_point_2d, results_2d_decoded
+    );
+
+    // Serialize the 3D tree
+    let encoded3d: Vec<u8> = bincode::serialize(&tree3d).unwrap();
+    let decoded3d: KdTree<Point3D<u32>> = bincode::deserialize(&encoded3d[..]).unwrap();
+    let results_3d_decoded = decoded3d.knn_search::<EuclideanDistance>(&query_point_3d, 2);
+    println!(
+        "2 nearest neighbors to {:?} (Euclidean, decoded): {:?}",
+        query_point_3d, results_3d_decoded
+    );
 }

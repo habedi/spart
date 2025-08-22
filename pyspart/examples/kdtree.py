@@ -1,3 +1,5 @@
+import os
+
 from pyspart import KdTree2D, KdTree3D, Point2D, Point3D
 
 
@@ -21,6 +23,16 @@ def main():
     # Print the results
     print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.data) for p in results_2d]}")
 
+    # Save and load the 2D tree
+    path2d = "kdtree2d.spart"
+    tree2d.save(path2d)
+    loaded_tree2d = KdTree2D.load(path2d)
+    loaded_results_2d = loaded_tree2d.knn_search(query_point_2d, 2)
+    print(
+        f"2 nearest neighbors from loaded 2D tree: {[(p.x, p.y, p.data) for p in loaded_results_2d]}"
+    )
+    os.remove(path2d)
+
     # --- 3D KdTree Example ---
     print("\n--- 3D KdTree Example ---")
     tree3d = KdTree3D()
@@ -39,6 +51,16 @@ def main():
 
     # Print the results
     print(f"2 nearest neighbors to query point: {[(p.x, p.y, p.z, p.data) for p in results_3d]}")
+
+    # Save and load the 3D tree
+    path3d = "kdtree3d.spart"
+    tree3d.save(path3d)
+    loaded_tree3d = KdTree3D.load(path3d)
+    loaded_results_3d = loaded_tree3d.knn_search(query_point_3d, 2)
+    print(
+        f"2 nearest neighbors from loaded 3D tree: {[(p.x, p.y, p.z, p.data) for p in loaded_results_3d]}"
+    )
+    os.remove(path3d)
 
 
 if __name__ == "__main__":

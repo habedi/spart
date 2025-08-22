@@ -34,6 +34,8 @@ use crate::geometry::{
     BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance, Point2D,
     Point3D, Rectangle,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
@@ -44,6 +46,18 @@ const EPSILON: f64 = 1e-10;
 /// Trait for points stored in an R‑tree.
 ///
 /// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
+#[cfg(feature = "serde")]
+pub trait RTreeObject: std::fmt::Debug + Clone {
+    /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
+    type B: BoundingVolume
+        + std::fmt::Debug
+        + Clone
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>;
+    /// Returns the minimum bounding volume of the object.
+    fn mbr(&self) -> Self::B;
+}
+#[cfg(not(feature = "serde"))]
 pub trait RTreeObject: std::fmt::Debug + Clone {
     /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
     type B: BoundingVolume + std::fmt::Debug + Clone;
@@ -53,6 +67,7 @@ pub trait RTreeObject: std::fmt::Debug + Clone {
 
 /// An entry in the R‑tree, which can be either a leaf or a node.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum RTreeEntry<T: RTreeObject> {
     Leaf { mbr: T::B, object: T },
     Node { mbr: T::B, child: Box<RTreeNode<T>> },
@@ -70,6 +85,7 @@ impl<T: RTreeObject> RTreeEntry<T> {
 
 /// A node in the R‑tree.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RTreeNode<T: RTreeObject> {
     /// The entries stored in this node.
     pub entries: Vec<RTreeEntry<T>>,
@@ -82,6 +98,7 @@ pub struct RTreeNode<T: RTreeObject> {
 /// The tree is initialized with a maximum number of entries per node. If a node exceeds this
 /// number, it will split. The tree supports insertion, deletion, and range searches.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RTree<T: RTreeObject> {
     root: RTreeNode<T>,
     max_entries: usize,
@@ -525,7 +542,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point2D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0.0 {
+                    if dist > worst_result.0 .0 {
                         break;
                     }
                 }
@@ -536,7 +553,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point2D<T>> {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0.0 {
+                    } else if d_sq < results.peek().unwrap().0 .0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -544,7 +561,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point2D<T>> {
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
@@ -615,7 +632,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point3D<T>> {
         while let Some(KnnCandidate { dist, entry }) = heap.pop() {
             if results.len() >= k {
                 if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.0.0 {
+                    if dist > worst_result.0 .0 {
                         break;
                     }
                 }
@@ -626,7 +643,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point3D<T>> {
                     let d_sq = M::distance_sq(query, object);
                     if results.len() < k {
                         results.push((OrdDist(d_sq), object));
-                    } else if d_sq < results.peek().unwrap().0.0 {
+                    } else if d_sq < results.peek().unwrap().0 .0 {
                         results.pop();
                         results.push((OrdDist(d_sq), object));
                     }
@@ -634,7 +651,7 @@ impl<T: std::fmt::Debug + Ord + Clone> RTree<Point3D<T>> {
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().0.0 {
+                        if results.len() < k || d_sq < results.peek().unwrap().0 .0 {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
