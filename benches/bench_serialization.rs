@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, Criterion};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
 use spart::octree::Octree;
@@ -133,4 +133,3 @@ criterion_group!(
     bench_rtree_serialization,
     bench_rstartree_serialization
 );
-criterion_main!(benches);
