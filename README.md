@@ -2,18 +2,23 @@
   <picture>
     <img alt="Spart Logo" src="logo.svg" height="25%" width="25%">
   </picture>
-</div>
 <br>
 
-## Spart
+<h2>Spart</h2>
 
-[<img alt="tests" src="https://img.shields.io/github/actions/workflow/status/habedi/spart/tests.yml?label=tests&style=flat&logo=github" height="20">](https://github.com/habedi/spart/actions/workflows/tests.yml)
-[<img alt="code coverage" src="https://img.shields.io/codecov/c/github/habedi/spart?style=flat&logo=codecov" height="20">](https://codecov.io/gh/habedi/spart)
-[<img alt="codefactor" src="https://img.shields.io/codefactor/grade/github/habedi/spart?style=flat&logo=codefactor" height="20">](https://www.codefactor.io/repository/github/habedi/spart)
-[<img alt="crates.io" src="https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/spart)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-spart-66c2a5?label=docs.rs&style=flat&logo=docs.rs" height="20">](https://docs.rs/spart)
-[<img alt="msrv" src="https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&logo=rust" height="20">](https://www.rust-lang.org)
-[<img alt="license" src="https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?label=license&style=flat&logo=open-source-initiative" height="20">](https://github.com/habedi/spart)
+[![Tests](https://img.shields.io/github/actions/workflow/status/habedi/spart/tests.yml?label=tests&style=flat&labelColor=282c34&logo=github)](https://github.com/habedi/spart/actions/workflows/tests.yml)
+[![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=code%20coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
+[![Code Quality](https://img.shields.io/codefactor/grade/github/habedi/spart?label=code%20quality&style=flat&labelColor=282c34&logo=codefactor)](https://www.codefactor.io/repository/github/habedi/spart)
+[![Crates.io](https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&labelColor=282c34&color=fc8d62&logo=rust)](https://crates.io/crates/spart)
+[![Docs.rs](https://img.shields.io/badge/docs-spart-66c2a5?style=flat&labelColor=282c34&logo=docs.rs)](https://docs.rs/spart)
+[![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart)
+
+A collection of space partitioning trees for Rust
+
+</div>
+
+---
 
 Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of popular
 space partitioning tree data structures for efficient indexing and searching of 2D and 3D point data.
@@ -114,10 +119,6 @@ A tree provides at least the following methods:
 >
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance.
 
-### Examples
-
-Check out the [examples](examples) directory for more detailed examples.
-
 ### Debugging Mode
 
 You can enable debugging mode for Spart by setting the `DEBUG_SPART` environment variable to `true` or `1`.
@@ -172,6 +173,12 @@ fn main() {
 }
 ```
 
+### Examples
+
+Check out the [examples](examples) directory for more detailed examples.
+
+---
+
 ### Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to make a contribution.
@@ -182,7 +189,6 @@ Spart is available under the terms of either of the following licenses:
 
 * MIT License ([LICENSE-MIT](LICENSE-MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-
 
 ### Acknowledgements
 
