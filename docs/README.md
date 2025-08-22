@@ -40,6 +40,7 @@ Currently, the following trees are implemented:
 - Octree (3D)
 - Kd-tree (2D and 3D)
 - R-tree (2D and 3D)
+- R*-tree (2D and 3D)
 
 A tree provides at least the following methods:
 
@@ -121,6 +122,68 @@ fn main() {
     tree.insert(point5);
 
     // Perform a k-nearest neighbor (kNN) search.
+    let neighbors = tree.knn_search(&point1, 2);
+    println!("kNN search results for {:?}: {:?}", point1, neighbors);
+
+    // Perform a range search with a radius of 5.0.
+    let range_points = tree.range_search(&point1, 5.0);
+    println!("Range search results for {:?}: {:?}", point1, range_points);
+
+    // Remove a point from the tree.
+    tree.delete(&point1);
+}
+```
+
+#### R*-tree (3D)
+
+```rust
+use spart::geometry::Point3D;
+use spart::r_star_tree::RStarTree;
+
+fn main() {
+    // Create a new R*-tree with a maximum capacity of 4 points per node.
+    let mut tree = RStarTree::new(4);
+
+    // Define some 3D points.
+    let point1 = Point3D {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+        data: Some("Point1"),
+    };
+    let point2 = Point3D {
+        x: 3.0,
+        y: 4.0,
+        z: 5.0,
+        data: Some("Point2"),
+    };
+    let point3 = Point3D {
+        x: 5.0,
+        y: 6.0,
+        z: 7.0,
+        data: Some("Point3"),
+    };
+    let point4 = Point3D {
+        x: 7.0,
+        y: 8.0,
+        z: 9.0,
+        data: Some("Point4"),
+    };
+    let point5 = Point3D {
+        x: 2.0,
+        y: 3.0,
+        z: 4.0,
+        data: Some("Point5"),
+    };
+
+    // Insert points into the R*-tree.
+    tree.insert(point1.clone());
+    tree.insert(point2);
+    tree.insert(point3);
+    tree.insert(point4);
+    tree.insert(point5);
+
+    // Perform a kNN search.
     let neighbors = tree.knn_search(&point1, 2);
     println!("kNN search results for {:?}: {:?}", point1, neighbors);
 

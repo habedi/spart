@@ -19,6 +19,7 @@ Currently, the following data structures are implemented:
 | 2     | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
 | 3     | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
 | 4     | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
+| 5     | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  | ✓          | ✓            |
 
 ---
 
