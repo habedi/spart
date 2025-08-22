@@ -62,6 +62,7 @@ run-py-examples: develop-py ## Run the Python examples
 	@bash -c "source .venv/bin/activate && python pyspart/examples/octree.py"
 	@bash -c "source .venv/bin/activate && python pyspart/examples/kdtree.py"
 	@bash -c "source .venv/bin/activate && python pyspart/examples/rtree.py"
+	@bash -c "source .venv/bin/activate && python pyspart/examples/rstar_tree.py"
 
 .PHONY: clean
 clean: ## Remove generated and temporary files

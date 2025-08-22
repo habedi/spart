@@ -57,7 +57,11 @@ You can install the Python bindings for Spart using pip:
 pip install pyspart
 ```
 
-Check out the [pyspart](pyspart) directory for more information about the Python bindings including Python examples.
+- Quick start examples (including R*-tree) are available under [pyspart/examples](pyspart/examples).
+- You can run all Python examples at once from the repo root:
+  - make run-py-examples
+- Or run the R*-tree example directly:
+  - python pyspart/examples/r_star_tree.py
 
 ---
 
@@ -195,7 +199,8 @@ fn main() {
 
 ### Examples
 
-Check out the [examples](examples) directory for more detailed examples.
+- For Rust examples, see the [examples](examples) directory.
+- For Python examples, see [pyspart/examples](pyspart/examples).
 
 ---
 
