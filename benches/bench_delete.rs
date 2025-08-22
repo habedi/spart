@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use spart::{kd_tree, octree, quadtree, r_tree};
+use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
 
@@ -146,6 +146,42 @@ fn benchmark_delete_rtree_3d(_c: &mut Criterion) {
     bench_delete_tree("delete_3d_rtree", points, delete_3d_rtree);
 }
 
+fn delete_2d_rstartree(points: Vec<Point2D<i32>>) {
+    info!("Starting deletion for 2D RStarTree");
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    for point in points.iter() {
+        tree.delete(point);
+    }
+    info!("Finished deletion for 2D RStarTree");
+}
+
+fn delete_3d_rstartree(points: Vec<Point3D<i32>>) {
+    info!("Starting deletion for 3D RStarTree");
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    for point in points.iter() {
+        tree.delete(point);
+    }
+    info!("Finished deletion for 3D RStarTree");
+}
+
+fn benchmark_delete_rstartree_2d(_c: &mut Criterion) {
+    let points = generate_2d_data();
+    info!("Benchmark 'delete_2d_rstartree' started");
+    bench_delete_tree("delete_2d_rstartree", points, delete_2d_rstartree);
+}
+
+fn benchmark_delete_rstartree_3d(_c: &mut Criterion) {
+    let points = generate_3d_data();
+    info!("Benchmark 'delete_3d_rstartree' started");
+    bench_delete_tree("delete_3d_rstartree", points, delete_3d_rstartree);
+}
+
 criterion_group!(
     benches,
     benchmark_delete_quadtree_2d,
@@ -153,5 +189,7 @@ criterion_group!(
     benchmark_delete_kdtree_2d,
     benchmark_delete_kdtree_3d,
     benchmark_delete_rtree_2d,
-    benchmark_delete_rtree_3d
+    benchmark_delete_rtree_3d,
+    benchmark_delete_rstartree_2d,
+    benchmark_delete_rstartree_3d
 );

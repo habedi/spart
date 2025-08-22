@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
-use spart::{kd_tree, octree, quadtree, r_tree};
+use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
 
@@ -208,6 +208,51 @@ fn benchmark_range_octree_3d(_c: &mut Criterion) {
     );
 }
 
+fn benchmark_range_rstartree_2d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_rstartree_2d");
+    let points = generate_2d_data();
+    let mut tree = r_star_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_point = Point2D {
+        x: 35.0,
+        y: 45.0,
+        data: None,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_2d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_rstartree_3d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_rstartree_3d");
+    let points = generate_3d_data();
+    let mut tree = r_star_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY);
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_point = Point3D {
+        x: 35.0,
+        y: 45.0,
+        z: 35.0,
+        data: None,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_3d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search(q, r),
+        &mut cc,
+    );
+}
+
 criterion_group!(
     benches,
     benchmark_range_kdtree_2d,
@@ -217,5 +262,7 @@ criterion_group!(
     benchmark_range_kdtree_3d,
     benchmark_range_rtree_3d,
     benchmark_range_bbox_rtree_3d,
-    benchmark_range_octree_3d
+    benchmark_range_octree_3d,
+    benchmark_range_rstartree_2d,
+    benchmark_range_rstartree_3d
 );

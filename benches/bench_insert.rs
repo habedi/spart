@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::{Point2D, Point3D, Rectangle};
-use spart::{kd_tree, octree, quadtree, r_tree};
+use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
 
@@ -133,6 +133,38 @@ fn bench_insert_rtree_3d(_c: &mut Criterion) {
     bench_insert("insert_3d_rtree", points, insert_3d_rtree, &mut cc);
 }
 
+fn insert_2d_rstartree(points: Vec<Point2D<i32>>) {
+    info!("Starting insertion for 2D RStarTree");
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    for point in points {
+        tree.insert(point);
+    }
+    info!("Finished insertion for 2D RStarTree");
+}
+
+fn insert_3d_rstartree(points: Vec<Point3D<i32>>) {
+    info!("Starting insertion for 3D RStarTree");
+    let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY);
+    for point in points {
+        tree.insert(point);
+    }
+    info!("Finished insertion for 3D RStarTree");
+}
+
+fn bench_insert_rstartree_2d(_c: &mut Criterion) {
+    let points = generate_2d_data();
+    info!("Benchmark 'insert_2d_rstartree' started");
+    let mut cc = configure_criterion();
+    bench_insert("insert_2d_rstartree", points, insert_2d_rstartree, &mut cc);
+}
+
+fn bench_insert_rstartree_3d(_c: &mut Criterion) {
+    let points = generate_3d_data();
+    info!("Benchmark 'insert_3d_rstartree' started");
+    let mut cc = configure_criterion();
+    bench_insert("insert_3d_rstartree", points, insert_3d_rstartree, &mut cc);
+}
+
 criterion_group!(
     benches,
     bench_insert_quadtree_2d,
@@ -140,5 +172,7 @@ criterion_group!(
     bench_insert_kdtree_2d,
     bench_insert_kdtree_3d,
     bench_insert_rtree_2d,
-    bench_insert_rtree_3d
+    bench_insert_rtree_3d,
+    bench_insert_rstartree_2d,
+    bench_insert_rstartree_3d
 );

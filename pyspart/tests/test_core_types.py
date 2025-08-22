@@ -1,6 +1,12 @@
 import pytest
 
-from pyspart import Point2D, Point3D, Quadtree, Octree, KdTree2D, KdTree3D, RTree2D, RTree3D
+from pyspart import (
+    Point2D, Point3D,
+    Quadtree, Octree,
+    KdTree2D, KdTree3D,
+    RTree2D, RTree3D,
+    RStarTree2D, RStarTree3D
+)
 
 
 def test_point2d_creation():
@@ -166,3 +172,57 @@ def test_rtree3d():
     assert rt.delete(p2)
     results = rt.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
     assert len(results) == 0
+
+
+def test_rstartree2d():
+    rst = RStarTree2D(4)
+    p1 = Point2D(10.0, 20.0, "p1")
+    p2 = Point2D(50.0, 50.0, "p2")
+    p3 = Point2D(90.0, 80.0, "p3")
+
+    rst.insert(p1)
+    rst.insert(p2)
+    rst.insert(p3)
+
+    # KNN Search
+    results = rst.knn_search(Point2D(12.0, 22.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
+
+    # Range Search
+    results = rst.range_search(Point2D(50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
+
+    # Deletion
+    assert rst.delete(p2)
+    results = rst.knn_search(Point2D(50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
+
+
+def test_rstartree3d():
+    rst = RStarTree3D(4)
+    p1 = Point3D(10.0, 20.0, 30.0, "p1")
+    p2 = Point3D(50.0, 50.0, 50.0, "p2")
+    p3 = Point3D(90.0, 80.0, 70.0, "p3")
+
+    rst.insert(p1)
+    rst.insert(p2)
+    rst.insert(p3)
+
+    # KNN Search
+    results = rst.knn_search(Point3D(12.0, 22.0, 32.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
+
+    # Range Search
+    results = rst.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
+    assert len(results) == 1
+    assert results[0].data == "p2"
+
+    # Deletion
+    assert rst.delete(p2)
+    results = rst.knn_search(Point3D(50.0, 50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"

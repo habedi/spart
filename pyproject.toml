@@ -27,7 +27,7 @@ testpaths = ["pyspart/tests"]
 addopts = [
     "--tb=short",
     #"--disable-warnings",
-    "--cov=library",
+    "--cov=pyspart",
     "--cov-branch",
     "--cov-report=term",
     "--cov-report=xml",

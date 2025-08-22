@@ -7,6 +7,7 @@ use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
 use spart::octree::Octree;
 use spart::quadtree::Quadtree;
+use spart::r_star_tree::RStarTree;
 use spart::r_tree::RTree;
 
 // A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.
@@ -31,6 +32,37 @@ impl PartialEq for PyData {
     }
 }
 impl Eq for PyData {}
+
+impl PartialOrd for PyData {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Python::with_gil(|py| {
+            let self_obj = self.0.bind(py);
+            let other_obj = other.0.bind(py);
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Lt) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Less);
+                }
+            }
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Gt) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Greater);
+                }
+            }
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Eq) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Equal);
+                }
+            }
+            None
+        })
+    }
+}
+
+impl Ord for PyData {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
 
 // Implement Debug manually since PyObject doesn't implement it.
 impl std::fmt::Debug for PyData {
@@ -382,6 +414,75 @@ impl PyRTree3D {
 }
 
 
+#[pyclass(name = "RStarTree2D")]
+struct PyRStarTree2D {
+    tree: RStarTree<Point2D<PyData>>,
+}
+
+#[pymethods]
+impl PyRStarTree2D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRStarTree2D {
+            tree: RStarTree::new(max_entries),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint2D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+    }
+
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().cloned().map(|p| p.into()).collect()
+    }
+}
+
+#[pyclass(name = "RStarTree3D")]
+struct PyRStarTree3D {
+    tree: RStarTree<Point3D<PyData>>,
+}
+
+#[pymethods]
+impl PyRStarTree3D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRStarTree3D {
+            tree: RStarTree::new(max_entries),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint3D) {
+        self.tree.insert(point.into())
+    }
+
+    fn delete(&mut self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree.knn_search(&p, k).into_iter().cloned().map(|p| p.into()).collect()
+    }
+}
+
+
 #[pymodule]
 fn pyspart(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPoint2D>()?;
@@ -392,5 +493,7 @@ fn pyspart(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyKdTree3D>()?;
     m.add_class::<PyRTree2D>()?;
     m.add_class::<PyRTree3D>()?;
+    m.add_class::<PyRStarTree2D>()?;
+    m.add_class::<PyRStarTree3D>()?;
     Ok(())
 }
