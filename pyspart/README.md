@@ -194,36 +194,6 @@ tree.delete(point1)
 
 Check out the [examples](https://github.com/habedi/spart/tree/main/pyspart/examples) directory for more examples.
 
-### Behavior Notes
-
-> [!NOTE]
-> Currently, the following properties hold for all trees:
-> - Duplicates are allowed: inserting a duplicate point will add another copy to the tree.
-> - Searches return duplicates: both `knn_search` and `range_search` can return duplicate points if they were previously
-    inserted.
-> - Deletion removes duplicates: the `delete` operation removes **all** instances of the point from the tree.
-> - A `knn_search` with `k=0` will return an empty list.
-> - A `knn_search` with `k` greater than the number of points in the tree will return all points.
-> - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
-
-### Debugging Mode
-
-You can enable debugging mode for Spart by setting the `DEBUG_SPART` environment variable to `true` or `1`.
-
-```bash
-# Enable debugging mode on Linux and macOS
-export DEBUG_SPART=true
-```
-
-```powershell
-# Enable debugging mode on Windows (PowerShell)
-$env:DEBUG_SPART = "true"
-```
-
-> [!NOTE]
-> When debugging mode is enabled, Spart will be very verbose.
-> It is recommended to use this only for debugging purposes.
-
 ### Serialization
 
 In Python, you can use the `save` and `load` methods to serialize and deserialize the tree to and from a file:
