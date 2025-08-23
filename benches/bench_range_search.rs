@@ -37,9 +37,9 @@ fn bench_range_search<'a, T, Q, R>(
 fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_kdtree_2d");
     let points = generate_2d_data();
-    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new(2).unwrap();
+    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new();
     for point in points.iter() {
-        tree.insert(point.clone());
+        let _ = tree.insert(point.clone());
     }
     let query = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
@@ -47,7 +47,7 @@ fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
         "range_kdtree_2d",
         &tree,
         &query,
-        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
+        |t: &kd_tree::KdTree<Point2D<i32>>, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -124,9 +124,9 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
 fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_kdtree_3d");
     let points = generate_3d_data();
-    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new(3).unwrap();
+    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new();
     for point in points.iter() {
-        tree.insert(point.clone());
+        let _ = tree.insert(point.clone());
     }
     let query = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
@@ -134,7 +134,7 @@ fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
         "range_kdtree_3d",
         &tree,
         &query,
-        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
+        |t: &kd_tree::KdTree<Point3D<i32>>, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }

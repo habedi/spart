@@ -16,7 +16,7 @@ fn configure_criterion() -> Criterion {
 fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_kdtree_2d");
     let points = generate_2d_data();
-    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new(2).unwrap();
+    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -76,7 +76,7 @@ fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
 fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_kdtree_3d");
     let points = generate_3d_data();
-    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new(3).unwrap();
+    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new();
     for point in points.iter() {
         tree.insert(point.clone());
     }

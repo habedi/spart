@@ -3,7 +3,7 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use spart::geometry::{Point2D, Point3D, Rectangle};
+use spart::geometry::Rectangle;
 use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 
@@ -67,9 +67,9 @@ fn bench_insert_kdtree_2d(_c: &mut Criterion) {
     cc.bench_function("insert_2d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = kd_tree::KdTree::new(2).unwrap();
+                let mut tree = kd_tree::KdTree::new();
                 for p in base_points.clone() {
-                    tree.insert(p);
+                    let _ = tree.insert(p);
                 }
                 tree
             },
@@ -89,9 +89,9 @@ fn bench_insert_kdtree_3d(_c: &mut Criterion) {
     cc.bench_function("insert_3d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = kd_tree::KdTree::new(3).unwrap();
+                let mut tree = kd_tree::KdTree::new();
                 for p in base_points.clone() {
-                    tree.insert(p);
+                    let _ = tree.insert(p);
                 }
                 tree
             },
