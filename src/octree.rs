@@ -691,13 +691,13 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             self.try_merge();
             return deleted;
         }
-        let initial_len = self.points.len();
-        self.points.retain(|p| p != point);
-        let deleted = self.points.len() < initial_len;
-        if deleted {
+        if let Some(pos) = self.points.iter().position(|p| p == point) {
+            self.points.remove(pos);
             info!("Deleting point {:?} from Octree", point);
+            true
+        } else {
+            false
         }
-        deleted
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.

@@ -85,12 +85,13 @@ where
     let mut deleted = false;
     if node.is_leaf() {
         let entries = node.entries_mut();
-        let initial_len = entries.len();
-        entries.retain(|e| match e.as_leaf_obj() {
-            Some(o) => o != object,
-            None => true,
-        });
-        deleted = entries.len() < initial_len;
+        if let Some(pos) = entries.iter().position(|e| match e.as_leaf_obj() {
+            Some(o) => o == object,
+            None => false,
+        }) {
+            entries.remove(pos);
+            deleted = true;
+        }
     } else {
         let entries = node.entries_mut();
         let mut to_delete_indices = Vec::new();

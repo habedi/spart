@@ -277,9 +277,10 @@ fn test_kdtree_duplicates() {
     assert!(deleted, "Deleting a duplicate point should succeed");
 
     let results_after_delete = tree.knn_search::<EuclideanDistance>(&target, 2);
-    assert!(
-        results_after_delete.is_empty(),
-        "Deleting a point should remove all its duplicates"
+    assert_eq!(
+        results_after_delete.len(),
+        1,
+        "Deleting a point should only remove one instance"
     );
 }
 

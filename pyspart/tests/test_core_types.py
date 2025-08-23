@@ -308,4 +308,4 @@ def test_duplicates():
     assert len(kd.knn_search(Point2D(1, 2, None), 2)) == 2
 
     assert kd.delete(p1)
-    assert not kd.knn_search(Point2D(1, 2, None), 1)
+    assert len(kd.knn_search(Point2D(1, 2, None), 1)) == 1

@@ -368,18 +368,9 @@ impl<P: KdPoint> KdTree<P> {
     /// `true` if the point was found and deleted, otherwise `false`.
     pub fn delete(&mut self, point: &P) -> bool {
         info!("Attempting to delete point: {:?}", point);
-        let mut deleted_any = false;
-        loop {
-            let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
-            self.root = new_root;
-            if deleted {
-                deleted_any = true;
-                // Continue to remove any additional duplicates.
-            } else {
-                break;
-            }
-        }
-        deleted_any
+        let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
+        self.root = new_root;
+        deleted
     }
 
     fn delete_rec(
