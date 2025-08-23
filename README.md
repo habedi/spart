@@ -201,14 +201,14 @@ $env:DEBUG_SPART = "true"
 
 ### Feature Roadmap
 
--   [x] **Core Data Structures**
+-   **Core Data Structures**
     -   [x] Quadtree (2D)
     -   [x] Octree (3D)
     -   [x] Kd-tree (2D & 3D)
     -   [x] R-tree (2D & 3D)
     -   [x] R*-tree (2D & 3D)
 
--   [x] **Supported Geometries & Queries**
+-   **Supported Geometries & Queries**
     -   [x] Point data (`Point2D`, `Point3D`)
     -   [x] K-Nearest Neighbor (kNN) search
     -   [x] Circular or Spherical range search
@@ -217,13 +217,13 @@ $env:DEBUG_SPART = "true"
     -   [ ] Support for storing non-point geometries (for example, lines, polygons)
     -   [ ] Advanced intersection queries (like finding all stored items that intersect a given polygon)
 
--   [x] **Performance & Optimization**
+-   **Performance & Optimization**
     -   [x] Bulk loading implementations for faster tree construction
     -   [ ] Thread-safety for concurrent reads (like `&Tree` accessible from multiple threads)
     -   [ ] Arena allocation for tree nodes to improve cache locality
     -   [ ] SIMD-accelerated distance and intersection calculations if possible
 
--   [x] **API & Developer Experience**
+-   **API & Developer Experience**
     -   [x] Simple API for tree creation and manipulation
     -   [x] Serialization and deserialization via `serde`
     -   [x] Custom distance metric support
@@ -231,7 +231,7 @@ $env:DEBUG_SPART = "true"
     -   [ ] Tree diagnostic methods (`height()`, `node_count()`, etc.)
     -   [ ] Replace internal panics with `Result`-based error handling (for example, for invalid dimensions)
 
--   [x] **Ecosystem & Bindings**
+-   **Ecosystem & Bindings**
     -   [x] Python bindings (`pyspart`) for all tree types
     -   [ ] Full feature parity for Python bindings (like bulk loading for all trees)
     -   [ ] WebAssembly support for browser and serverless environments

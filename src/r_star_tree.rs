@@ -34,7 +34,10 @@ use crate::geometry::{
     BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance,
     Point2D, Point3D, Rectangle,
 };
-use crate::rtree_common::{delete_entry as common_delete_entry, KnnCandidate};
+use crate::rtree_common::{
+    compute_group_mbr as common_compute_group_mbr, delete_entry as common_delete_entry,
+    search_node as common_search_node, KnnCandidate,
+};
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -244,8 +247,10 @@ impl<T: RStarTreeObject> RStarTree<T> {
                         entries: group2,
                         is_leaf: self.root.is_leaf,
                     };
-                    let mbr1 = compute_group_mbr(&child1.entries);
-                    let mbr2 = compute_group_mbr(&child2.entries);
+                    let mbr1 = common_compute_group_mbr(&child1.entries)
+                        .expect("Group 1 should have a bounding box");
+                    let mbr2 = common_compute_group_mbr(&child2.entries)
+                        .expect("Group 2 should have a bounding box");
                     self.root.is_leaf = false;
                     self.root.entries.clear();
                     self.root.entries.push(RStarTreeEntry::Node {
@@ -286,7 +291,7 @@ impl<T: RStarTreeObject> RStarTree<T> {
     pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
         info!("Performing range search with query: {:?}", query);
         let mut result = Vec::new();
-        search_node(&self.root, query, &mut result);
+        common_search_node(&self.root, query, &mut result);
         result
     }
 
@@ -321,11 +326,12 @@ impl<T: RStarTreeObject> RStarTree<T> {
                     entries: chunk.to_vec(),
                     is_leaf: self.root.is_leaf,
                 };
-                let mbr = compute_group_mbr(&child_node.entries);
-                new_level_entries.push(RStarTreeEntry::Node {
-                    mbr,
-                    child: Box::new(child_node),
-                });
+                if let Some(mbr) = common_compute_group_mbr(&child_node.entries) {
+                    new_level_entries.push(RStarTreeEntry::Node {
+                        mbr,
+                        child: Box::new(child_node),
+                    });
+                }
             }
             entries = new_level_entries;
             self.root.is_leaf = false;
@@ -468,8 +474,10 @@ where
                     entries: g2,
                     is_leaf: child.is_leaf,
                 };
-                let mbr1 = compute_group_mbr(&child1.entries);
-                let mbr2 = compute_group_mbr(&child2.entries);
+                let mbr1 = common_compute_group_mbr(&child1.entries)
+                    .expect("Group 1 should have a bounding box");
+                let mbr2 = common_compute_group_mbr(&child2.entries)
+                    .expect("Group 2 should have a bounding box");
                 node.entries[best_index] = RStarTreeEntry::Node {
                     mbr: mbr1,
                     child: Box::new(child1),
@@ -495,15 +503,16 @@ where
                 }
             }
         }
-        let new_mbr = compute_group_mbr(
+        if let Some(new_mbr) = common_compute_group_mbr(
             if let RStarTreeEntry::Node { child, .. } = &node.entries[best_index] {
                 &child.entries
             } else {
                 unreachable!()
             },
-        );
-        if let RStarTreeEntry::Node { mbr, .. } = &mut node.entries[best_index] {
-            *mbr = new_mbr;
+        ) {
+            if let RStarTreeEntry::Node { mbr, .. } = &mut node.entries[best_index] {
+                *mbr = new_mbr;
+            }
         }
     }
 
@@ -520,7 +529,11 @@ fn forced_reinsert<T: RStarTreeObject + Clone>(
 where
     T::B: BSPBounds,
 {
-    let node_mbr = compute_group_mbr(&node.entries);
+    let node_mbr = if let Some(mbr) = common_compute_group_mbr(&node.entries) {
+        mbr
+    } else {
+        return Vec::new();
+    };
     let reinsert_count = (max_entries as f64 * 0.3).ceil() as usize;
 
     node.entries.sort_by(|a, b| {
@@ -568,8 +581,10 @@ where
         for k in min_entries..=entries.len() - min_entries {
             let group1 = &entries[..k];
             let group2 = &entries[k..];
-            let mbr1 = compute_group_mbr(group1);
-            let mbr2 = compute_group_mbr(group2);
+            let mbr1 =
+                common_compute_group_mbr(group1).expect("Group 1 should have a bounding box");
+            let mbr2 =
+                common_compute_group_mbr(group2).expect("Group 2 should have a bounding box");
             let margin = mbr1.margin() + mbr2.margin();
             if margin < min_margin {
                 min_margin = margin;
@@ -592,8 +607,8 @@ where
     for k in min_entries..=entries.len() - min_entries {
         let group1 = &entries[..k];
         let group2 = &entries[k..];
-        let mbr1 = compute_group_mbr(group1);
-        let mbr2 = compute_group_mbr(group2);
+        let mbr1 = common_compute_group_mbr(group1).expect("Group 1 should have a bounding box");
+        let mbr2 = common_compute_group_mbr(group2).expect("Group 2 should have a bounding box");
         let overlap = mbr1.overlap(&mbr2);
         let area = mbr1.area() + mbr2.area();
 
@@ -609,40 +624,6 @@ where
 
     let (group1, group2) = entries.split_at(best_split_index);
     (group1.to_vec(), group2.to_vec())
-}
-
-fn compute_group_mbr<T: RStarTreeObject>(entries: &[RStarTreeEntry<T>]) -> T::B {
-    let mut iter = entries.iter();
-    let first = iter
-        .next()
-        .expect("At least one entry must be present")
-        .mbr()
-        .clone();
-    iter.fold(first, |acc, entry| acc.union(entry.mbr()))
-}
-
-fn search_node<'a, T: RStarTreeObject>(
-    node: &'a RStarTreeNode<T>,
-    query: &T::B,
-    result: &mut Vec<&'a T>,
-) {
-    if node.is_leaf {
-        for entry in &node.entries {
-            if let RStarTreeEntry::Leaf { mbr, object } = entry {
-                if mbr.intersects(query) {
-                    result.push(object);
-                }
-            }
-        }
-    } else {
-        for entry in &node.entries {
-            if let RStarTreeEntry::Node { mbr, child } = entry {
-                if mbr.intersects(query) {
-                    search_node(child, query, result);
-                }
-            }
-        }
-    }
 }
 
 impl<T: RStarTreeObject> RStarTree<T>
@@ -677,7 +658,7 @@ where
             }
 
             if !self.root.is_leaf && self.root.entries.len() == 1 {
-                if let RStarTreeEntry::Node { child, .. } = self.root.entries.pop().unwrap() {
+                if let Some(RStarTreeEntry::Node { child, .. }) = self.root.entries.pop() {
                     self.root = *child;
                 }
             }
@@ -801,24 +782,33 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
                             idx: counter,
                             obj: object,
                         });
-                    } else if d_sq < results.peek().unwrap().key.0 {
-                        results.pop();
-                        counter += 1;
-                        results.push(HeapItem {
-                            key: OrdDist(d_sq),
-                            idx: counter,
-                            obj: object,
-                        });
+                    } else if let Some(peek) = results.peek() {
+                        if d_sq < peek.key.0 {
+                            results.pop();
+                            counter += 1;
+                            results.push(HeapItem {
+                                key: OrdDist(d_sq),
+                                idx: counter,
+                                obj: object,
+                            });
+                        }
                     }
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().key.0 {
+                        if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
                             });
+                        } else if let Some(peek) = results.peek() {
+                            if d_sq < peek.key.0 {
+                                heap.push(KnnCandidate {
+                                    dist: d_sq,
+                                    entry: child_entry,
+                                });
+                            }
                         }
                     }
                 }
@@ -826,7 +816,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
         }
 
         let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap());
+        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap_or(Ordering::Equal));
         sorted_results.into_iter().map(|r| r.obj).collect()
     }
 }
@@ -920,24 +910,33 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
                             idx: counter,
                             obj: object,
                         });
-                    } else if d_sq < results.peek().unwrap().key.0 {
-                        results.pop();
-                        counter += 1;
-                        results.push(HeapItem {
-                            key: OrdDist(d_sq),
-                            idx: counter,
-                            obj: object,
-                        });
+                    } else if let Some(peek) = results.peek() {
+                        if d_sq < peek.key.0 {
+                            results.pop();
+                            counter += 1;
+                            results.push(HeapItem {
+                                key: OrdDist(d_sq),
+                                idx: counter,
+                                obj: object,
+                            });
+                        }
                     }
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
                         let d_sq = child_entry.mbr().min_distance(query).powi(2);
-                        if results.len() < k || d_sq < results.peek().unwrap().key.0 {
+                        if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
                                 entry: child_entry,
                             });
+                        } else if let Some(peek) = results.peek() {
+                            if d_sq < peek.key.0 {
+                                heap.push(KnnCandidate {
+                                    dist: d_sq,
+                                    entry: child_entry,
+                                });
+                            }
                         }
                     }
                 }
@@ -945,7 +944,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
         }
 
         let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap());
+        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap_or(Ordering::Equal));
         sorted_results.into_iter().map(|r| r.obj).collect()
     }
 }

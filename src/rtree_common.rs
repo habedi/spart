@@ -35,14 +35,10 @@ pub trait NodeAccess {
 }
 
 /// Generic helper to compute the group MBR of a slice of entries.
-pub fn compute_group_mbr<E: EntryAccess>(entries: &[E]) -> E::BV {
+pub fn compute_group_mbr<E: EntryAccess>(entries: &[E]) -> Option<E::BV> {
     let mut iter = entries.iter();
-    let first = iter
-        .next()
-        .expect("At least one entry must be present")
-        .mbr()
-        .clone();
-    iter.fold(first, |acc, entry| acc.union(entry.mbr()))
+    let first = iter.next()?.mbr().clone();
+    Some(iter.fold(first, |acc, entry| acc.union(entry.mbr())))
 }
 
 /// Generic range search on a node.
@@ -110,8 +106,7 @@ where
                         deleted = true;
                         if child.entries().len() < min_entries {
                             to_delete_indices.push(i);
-                        } else {
-                            let new_mbr = compute_group_mbr(child.entries());
+                        } else if let Some(new_mbr) = compute_group_mbr(child.entries()) {
                             entry.set_mbr(new_mbr);
                         }
                     }
