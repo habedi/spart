@@ -553,10 +553,6 @@ impl Cube {
 }
 
 /// Trait for types that can provide the center and extent along a specified dimension.
-///
-/// # Panics
-///
-/// The methods in this trait will panic if an invalid dimension is provided. The panic messages are generated using `SpartError`.
 pub trait BSPBounds {
     /// The number of dimensions supported.
     const DIM: usize;
@@ -566,80 +562,68 @@ pub trait BSPBounds {
     ///
     /// * `dim` - The dimension index.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidDimension` if `dim` is not within the valid range.
-    fn center(&self, dim: usize) -> f64;
+    /// Returns `SpartError::InvalidDimension` if `dim` is not within the valid range.
+    fn center(&self, dim: usize) -> Result<f64, SpartError>;
     /// Returns the extent (width, height, or depth) along the specified dimension.
     ///
     /// # Arguments
     ///
     /// * `dim` - The dimension index.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidDimension` if `dim` is not within the valid range.
-    fn extent(&self, dim: usize) -> f64;
+    /// Returns `SpartError::InvalidDimension` if `dim` is not within the valid range.
+    fn extent(&self, dim: usize) -> Result<f64, SpartError>;
 }
 
 impl BSPBounds for Rectangle {
     const DIM: usize = 2;
-    fn center(&self, dim: usize) -> f64 {
+    fn center(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.x + self.width / 2.0,
-            1 => self.y + self.height / 2.0,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 2
-                }
-            ),
+            0 => Ok(self.x + self.width / 2.0),
+            1 => Ok(self.y + self.height / 2.0),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 2,
+            }),
         }
     }
-    fn extent(&self, dim: usize) -> f64 {
+    fn extent(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.width,
-            1 => self.height,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 2
-                }
-            ),
+            0 => Ok(self.width),
+            1 => Ok(self.height),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 2,
+            }),
         }
     }
 }
 
 impl BSPBounds for Cube {
     const DIM: usize = 3;
-    fn center(&self, dim: usize) -> f64 {
+    fn center(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.x + self.width / 2.0,
-            1 => self.y + self.height / 2.0,
-            2 => self.z + self.depth / 2.0,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 3
-                }
-            ),
+            0 => Ok(self.x + self.width / 2.0),
+            1 => Ok(self.y + self.height / 2.0),
+            2 => Ok(self.z + self.depth / 2.0),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 3,
+            }),
         }
     }
-    fn extent(&self, dim: usize) -> f64 {
+    fn extent(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.width,
-            1 => self.height,
-            2 => self.depth,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 3
-                }
-            ),
+            0 => Ok(self.width),
+            1 => Ok(self.height),
+            2 => Ok(self.depth),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 3,
+            }),
         }
     }
 }

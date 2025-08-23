@@ -44,10 +44,10 @@ pub trait KdPoint: Clone + PartialEq + std::fmt::Debug {
     fn dims(&self) -> usize;
     /// Returns the coordinate along the specified axis.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidDimension` if the axis is invalid.
-    fn coord(&self, axis: usize) -> f64;
+    /// Returns `SpartError::InvalidDimension` if the axis is invalid.
+    fn coord(&self, axis: usize) -> Result<f64, SpartError>;
 }
 
 impl<T> KdPoint for crate::geometry::Point2D<T>
@@ -57,17 +57,14 @@ where
     fn dims(&self) -> usize {
         2
     }
-    fn coord(&self, axis: usize) -> f64 {
+    fn coord(&self, axis: usize) -> Result<f64, SpartError> {
         match axis {
-            0 => self.x,
-            1 => self.y,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: axis,
-                    available: 2
-                }
-            ),
+            0 => Ok(self.x),
+            1 => Ok(self.y),
+            _ => Err(SpartError::InvalidDimension {
+                requested: axis,
+                available: 2,
+            }),
         }
     }
 }
@@ -79,18 +76,15 @@ where
     fn dims(&self) -> usize {
         3
     }
-    fn coord(&self, axis: usize) -> f64 {
+    fn coord(&self, axis: usize) -> Result<f64, SpartError> {
         match axis {
-            0 => self.x,
-            1 => self.y,
-            2 => self.z,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: axis,
-                    available: 3
-                }
-            ),
+            0 => Ok(self.x),
+            1 => Ok(self.y),
+            2 => Ok(self.z),
+            _ => Err(SpartError::InvalidDimension {
+                requested: axis,
+                available: 3,
+            }),
         }
     }
 }
@@ -213,7 +207,12 @@ impl<P: KdPoint> KdTree<P> {
         }
 
         let axis = depth % self.k;
-        points.sort_by(|a, b| a.coord(axis).partial_cmp(&b.coord(axis)).unwrap());
+        points.sort_by(|a, b| {
+            a.coord(axis)
+                .unwrap()
+                .partial_cmp(&b.coord(axis).unwrap())
+                .unwrap()
+        });
         let median_idx = points.len() / 2;
 
         let mut node = KdNode::new(points[median_idx].clone());
@@ -234,7 +233,7 @@ impl<P: KdPoint> KdTree<P> {
     ) -> Box<KdNode<P>> {
         if let Some(mut current) = node {
             let axis = depth % k;
-            if point.coord(axis) < current.point.coord(axis) {
+            if point.coord(axis).unwrap() < current.point.coord(axis).unwrap() {
                 current.left = Some(Self::insert_rec(current.left.take(), point, depth + 1, k));
             } else {
                 current.right = Some(Self::insert_rec(current.right.take(), point, depth + 1, k));
@@ -298,8 +297,8 @@ impl<P: KdPoint> KdTree<P> {
                 }
             }
             let axis = depth % target.dims();
-            let target_coord = target.coord(axis);
-            let node_coord = n.point.coord(axis);
+            let target_coord = target.coord(axis).unwrap();
+            let node_coord = n.point.coord(axis).unwrap();
             let (first, second) = if target_coord < node_coord {
                 (&n.left, &n.right)
             } else {
@@ -346,8 +345,8 @@ impl<P: KdPoint> KdTree<P> {
                 found.push(n.point.clone());
             }
             let axis = depth % center.dims();
-            let center_coord = center.coord(axis);
-            let node_coord = n.point.coord(axis);
+            let center_coord = center.coord(axis).unwrap();
+            let node_coord = n.point.coord(axis).unwrap();
             if center_coord - radius <= node_coord {
                 Self::range_search_rec::<M>(&n.left, center, radius_sq, depth + 1, radius, found);
             }
@@ -398,7 +397,7 @@ impl<P: KdPoint> KdTree<P> {
                     } else {
                         (None, true)
                     }
-                } else if point.coord(axis) < current.point.coord(axis) {
+                } else if point.coord(axis).unwrap() < current.point.coord(axis).unwrap() {
                     let (new_left, deleted) =
                         Self::delete_rec(current.left.take(), point, depth + 1, k);
                     current.left = new_left;
@@ -420,20 +419,20 @@ impl<P: KdPoint> KdTree<P> {
         if axis == d {
             if let Some(ref left) = node.left {
                 let left_min = Self::find_min(left, d, depth + 1, k);
-                if left_min.coord(d) < min.coord(d) {
+                if left_min.coord(d).unwrap() < min.coord(d).unwrap() {
                     min = left_min;
                 }
             }
         } else {
             if let Some(ref left) = node.left {
                 let left_min = Self::find_min(left, d, depth + 1, k);
-                if left_min.coord(d) < min.coord(d) {
+                if left_min.coord(d).unwrap() < min.coord(d).unwrap() {
                     min = left_min;
                 }
             }
             if let Some(ref right) = node.right {
                 let right_min = Self::find_min(right, d, depth + 1, k);
-                if right_min.coord(d) < min.coord(d) {
+                if right_min.coord(d).unwrap() < min.coord(d).unwrap() {
                     min = right_min;
                 }
             }

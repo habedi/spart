@@ -537,9 +537,11 @@ where
     let reinsert_count = (max_entries as f64 * 0.3).ceil() as usize;
 
     node.entries.sort_by(|a, b| {
-        let center_a: Vec<f64> = (0..T::B::DIM).map(|d| a.mbr().center(d)).collect();
-        let center_b: Vec<f64> = (0..T::B::DIM).map(|d| b.mbr().center(d)).collect();
-        let node_center: Vec<f64> = (0..T::B::DIM).map(|d| node_mbr.center(d)).collect();
+        let center_a: Vec<f64> = (0..T::B::DIM).map(|d| a.mbr().center(d).unwrap()).collect();
+        let center_b: Vec<f64> = (0..T::B::DIM).map(|d| b.mbr().center(d).unwrap()).collect();
+        let node_center: Vec<f64> = (0..T::B::DIM)
+            .map(|d| node_mbr.center(d).unwrap())
+            .collect();
 
         let dist_a = center_a
             .iter()
@@ -574,7 +576,8 @@ where
         entries.sort_by(|a, b| {
             a.mbr()
                 .center(dim)
-                .partial_cmp(&b.mbr().center(dim))
+                .unwrap()
+                .partial_cmp(&b.mbr().center(dim).unwrap())
                 .unwrap_or(Ordering::Equal)
         });
 
@@ -597,7 +600,8 @@ where
     entries.sort_by(|a, b| {
         a.mbr()
             .center(best_axis)
-            .partial_cmp(&b.mbr().center(best_axis))
+            .unwrap()
+            .partial_cmp(&b.mbr().center(best_axis).unwrap())
             .unwrap_or(Ordering::Equal)
     });
 
