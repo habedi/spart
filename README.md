@@ -204,13 +204,13 @@ $env:DEBUG_SPART = "true"
 -   **Core Data Structures**
     -   [x] Quadtree (2D)
     -   [x] Octree (3D)
-    -   [x] Kd-tree (2D & 3D)
-    -   [x] R-tree (2D & 3D)
-    -   [x] R*-tree (2D & 3D)
+    -   [x] Kd-tree (2D and 3D)
+    -   [x] R-tree (2D and 3D)
+    -   [x] R*-tree (2D and 3D)
 
 -   **Supported Geometries & Queries**
     -   [x] Point data (`Point2D`, `Point3D`)
-    -   [x] K-Nearest Neighbor (kNN) search
+    -   [x] kNN search
     -   [x] Circular or Spherical range search
     -   [x] Rectangular/Cuboid range search (`range_search_bbox`)
     -   [ ] `update` method for moving points (currently needs delete + insert)
@@ -232,7 +232,7 @@ $env:DEBUG_SPART = "true"
     -   [ ] Replace internal panics with `Result`-based error handling (for example, for invalid dimensions)
 
 -   **Ecosystem & Bindings**
-    -   [x] Python bindings (`pyspart`) for all tree types
+    -   [x] Python bindings (`pyspart`) for all tree types (bindings added, but some features are missing)
     -   [ ] Full feature parity for Python bindings (like bulk loading for all trees)
     -   [ ] WebAssembly support for browser and serverless environments
 

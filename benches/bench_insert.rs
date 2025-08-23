@@ -74,7 +74,7 @@ fn bench_insert_kdtree_2d(_c: &mut Criterion) {
                 tree
             },
             |mut tree| {
-                black_box(tree.insert(to_insert.clone()));
+                _ = black_box(tree.insert(to_insert.clone()));
             },
         )
     });
@@ -96,7 +96,7 @@ fn bench_insert_kdtree_3d(_c: &mut Criterion) {
                 tree
             },
             |mut tree| {
-                black_box(tree.insert(to_insert.clone()));
+                _ = black_box(tree.insert(to_insert.clone()));
             },
         )
     });

@@ -63,7 +63,7 @@ fn benchmark_delete_kdtree_2d(_c: &mut Criterion) {
             || {
                 let mut tree = kd_tree::KdTree::new();
                 for p in points.clone() {
-                    tree.insert(p);
+                    _ = tree.insert(p);
                 }
                 tree
             },
@@ -83,7 +83,7 @@ fn benchmark_delete_kdtree_3d(_c: &mut Criterion) {
             || {
                 let mut tree = kd_tree::KdTree::new();
                 for p in points.clone() {
-                    tree.insert(p);
+                    _ = tree.insert(p);
                 }
                 tree
             },

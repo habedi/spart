@@ -142,6 +142,11 @@ def test_rtree2d():
     rt.insert(p2)
     rt.insert(p3)
 
+    # KNN Search
+    results = rt.knn_search(Point2D(12.0, 22.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
+
     # Range Search
     results = rt.range_search(Point2D(50.0, 50.0, None), 1.0)
     assert len(results) == 1
@@ -149,8 +154,9 @@ def test_rtree2d():
 
     # Deletion
     assert rt.delete(p2)
-    results = rt.range_search(Point2D(50.0, 50.0, None), 1.0)
-    assert len(results) == 0
+    results = rt.knn_search(Point2D(50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
 
 def test_rtree3d():
@@ -163,6 +169,11 @@ def test_rtree3d():
     rt.insert(p2)
     rt.insert(p3)
 
+    # KNN Search
+    results = rt.knn_search(Point3D(12.0, 22.0, 32.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data == "p1"
+
     # Range Search
     results = rt.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
     assert len(results) == 1
@@ -170,8 +181,9 @@ def test_rtree3d():
 
     # Deletion
     assert rt.delete(p2)
-    results = rt.range_search(Point3D(50.0, 50.0, 50.0, None), 1.0)
-    assert len(results) == 0
+    results = rt.knn_search(Point3D(50.0, 50.0, 50.0, None), 1)
+    assert len(results) == 1
+    assert results[0].data != "p2"
 
 
 def test_rstartree2d():

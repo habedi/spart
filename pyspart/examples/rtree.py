@@ -17,12 +17,15 @@ def main():
     tree2d.insert_bulk(points_to_insert_2d)
 
     # Query the tree for points within a radius
-    # Note: RTree in pyspart currently only supports range_search, not knn_search
     query_point_2d = Point2D(12.0, 22.0, None)
     results_2d = tree2d.range_search(query_point_2d, 10.0)
 
     # Print the results
     print(f"Points within 10 units of query point: {[(p.x, p.y, p.data) for p in results_2d]}")
+
+    # Query the tree for the nearest neighbor
+    knn_results_2d = tree2d.knn_search(query_point_2d, 1)
+    print(f"1 nearest neighbor: {[(p.x, p.y, p.data) for p in knn_results_2d]}")
 
     # Save and load the 2D tree
     path2d = "rtree2d.spart"
@@ -52,6 +55,10 @@ def main():
 
     # Print the results
     print(f"Points within 10 units of query point: {[(p.x, p.y, p.z, p.data) for p in results_3d]}")
+
+    # Query the tree for the nearest neighbor
+    knn_results_3d = tree3d.knn_search(query_point_3d, 1)
+    print(f"1 nearest neighbor: {[(p.x, p.y, p.z, p.data) for p in knn_results_3d]}")
 
     # Save and load the 3D tree
     path3d = "rtree3d.spart"

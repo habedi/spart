@@ -66,7 +66,7 @@ fn bench_kdtree_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("KdTree Serialization");
     let mut tree: KdTree<Point2D<i32>> = KdTree::new();
     for i in 0..10000 {
-        tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
+        _ = tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
     }
 
     group.bench_function("serialize", |b| {

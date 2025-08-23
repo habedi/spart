@@ -56,7 +56,7 @@ fn bench_insert_bulk_kdtree_2d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                _ = black_box(tree.insert_bulk(points));
             },
         )
     });
@@ -72,7 +72,7 @@ fn bench_insert_bulk_kdtree_3d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                _ = black_box(tree.insert_bulk(points));
             },
         )
     });
