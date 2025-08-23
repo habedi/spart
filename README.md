@@ -24,9 +24,9 @@ Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides imp
 common [space partitioning tree data structures](https://en.wikipedia.org/wiki/Space_partitioning) that can be used for
 indexing 2D and 3D point data to perform fast spatial queries, like k-nearest neighbor (kNN) and range search.
 
-The library also includes Python bindings (see [pyspart](pyspart)), so you can easily use it in your Python projects.
+The library also includes Python bindings (see [pyspart](pyspart)), so it can easily be used in Python applications.
 
-At the moment, the following tree data structures are implemented:
+At the moment, the following tree data structures and features are supported:
 
 | # | Tree Type                                          | 2D | 3D | kNN Search | Radius Search |
 |---|----------------------------------------------------|:--:|:--:|:----------:|:-------------:|

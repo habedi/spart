@@ -1,14 +1,12 @@
-[build-system]
-requires = ["maturin>=1.5,<2.0"]
-build-backend = "maturin"
-
 [project]
 name = "spart"
 version = "0.1.0"
 description = "Python environment for Spart library"
 
 requires-python = ">=3.10,<4.0"
-dependencies = []
+dependencies = [
+    "pre-commit (>=4.2.0,<5.0.0)"
+]
 
 [project.optional-dependencies]
 dev = [
@@ -18,7 +16,6 @@ dev = [
     "pytest-asyncio (>=0.26.0,<0.27.0)",
     "mypy>=1.11.1",
     "ruff>=0.9.3",
-    "pre-commit (>=4.2.0,<5.0.0)",
     "griffe (>=1.7.3,<2.0.0)",
     "types-requests (>=2.32.0.20250515,<3.0.0.0)",
     "maturin[zig]>=1.9.0",
