@@ -239,6 +239,7 @@ def test_rstartree3d():
     assert len(results) == 1
     assert results[0].data != "p2"
 
+
 def test_empty_trees():
     # Quadtree
     boundary = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
@@ -290,6 +291,7 @@ def test_empty_trees():
     assert not rst3.range_search(Point3D(0, 0, 0, None), 1)
     assert not rst3.delete(Point3D(0, 0, 0, None))
 
+
 def test_knn_edge_cases():
     kd = KdTree2D()
     points = [Point2D(1, 2, 'p1'), Point2D(3, 4, 'p2')]
@@ -301,6 +303,7 @@ def test_knn_edge_cases():
     # k > num_points
     assert len(kd.knn_search(Point2D(0, 0, None), 5)) == 2
 
+
 def test_range_zero_radius():
     kd = KdTree2D()
     p1 = Point2D(1, 2, 'p1')
@@ -309,6 +312,7 @@ def test_range_zero_radius():
     results = kd.range_search(Point2D(1, 2, None), 0)
     assert len(results) == 1
     assert results[0].data == 'p1'
+
 
 def test_duplicates():
     kd = KdTree2D()
