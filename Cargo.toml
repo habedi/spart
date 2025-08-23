@@ -68,6 +68,10 @@ path = "examples/kdtree.rs"
 name = "rtree"
 path = "examples/rtree.rs"
 
+[[example]]
+name = "rstar_tree"
+path = "examples/rstar_tree.rs"
+
 [package.metadata.rustfmt]
 max_width = 100
 hard_tabs = false
