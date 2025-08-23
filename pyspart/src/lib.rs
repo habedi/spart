@@ -398,12 +398,12 @@ impl PyKdTree2D {
     #[new]
     fn new() -> Self {
         PyKdTree2D {
-            tree: KdTree::new(2).unwrap(),
+            tree: KdTree::new(),
         }
     }
 
-    fn insert(&mut self, point: PyPoint2D) {
-        self.tree.insert(point.into())
+    fn insert(&mut self, point: PyPoint2D) -> PyResult<()> {
+        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
@@ -468,12 +468,12 @@ impl PyKdTree3D {
     #[new]
     fn new() -> Self {
         PyKdTree3D {
-            tree: KdTree::new(3).unwrap(),
+            tree: KdTree::new(),
         }
     }
 
-    fn insert(&mut self, point: PyPoint3D) {
-        self.tree.insert(point.into())
+    fn insert(&mut self, point: PyPoint3D) -> PyResult<()> {
+        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
