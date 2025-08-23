@@ -20,21 +20,21 @@ A collection of space partitioning trees for Rust
 
 ---
 
-Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of popular
-[space partitioning tree data structures](https://en.wikipedia.org/wiki/Space_partitioning) for efficient indexing and
-searching of 2D and 3D point data.
-Spart also provides Python bindings for the trees.
-So, you can use Spart from Python projects as well as from Rust projects.
+Spart (**spa**ce **par**titioning **t**rees) is a Rust library that provides implementations of several
+common [space partitioning tree data structures](https://en.wikipedia.org/wiki/Space_partitioning) that can be used for
+indexing 2D and 3D point data to perform fast spatial queries, like k-nearest neighbor (kNN) and range search.
 
-At the moment, the following data structures and features are supported:
+The library also includes Python bindings (see [pyspart](pyspart)), so you can easily use it in your Python projects.
 
-| # | Tree Type                                          | 2D | 3D | kNN Search | Range Search |
-|---|----------------------------------------------------|----|----|------------|--------------|
-| 1 | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    | ✓          | ✓            |
-| 2 | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  | ✓          | ✓            |
-| 3 | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  | ✓          | ✓            |
-| 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  | ✓          | ✓            |
-| 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  | ✓          | ✓            |
+At the moment, the following tree data structures are implemented:
+
+| # | Tree Type                                          | 2D | 3D | kNN Search | Radius Search |
+|---|----------------------------------------------------|:--:|:--:|:----------:|:-------------:|
+| 1 | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    |     ✓      |       ✓       |
+| 2 | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  |     ✓      |       ✓       |
+| 3 | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  |     ✓      |       ✓       |
+| 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  |     ✓      |       ✓       |
+| 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  |     ✓      |       ✓       |
 
 > [!IMPORTANT]
 > Spart is in early development, so bugs and breaking API changes are expected.
@@ -81,15 +81,19 @@ Example of 2D and 3D points:
 use spart::geometry::{Point2D, Point3D};
 
 fn main() {
-    // 2D point with coordinates (1.0, 2.0) and data "A 2D Point".
-    let point_2d = Point2D {
+    // There are two ways to create a point.
+
+    // 1. Using the `new` method:
+    let point_2d = Point2D::new(1.0, 2.0, Some("A 2D Point"));
+    let point_3d = Point3D::new(1.0, 2.0, 3.0, Some("A 3D Point"));
+
+    // 2. Using a struct literal:
+    let point_2d_literal = Point2D {
         x: 1.0,
         y: 2.0,
         data: Some("A 2D Point"),
     };
-
-    // 3D point with coordinates (1.0, 2.0, 3.0) and data "A 3D Point".
-    let point_3d = Point3D {
+    let point_3d_literal = Point3D {
         x: 1.0,
         y: 2.0,
         z: 3.0,
@@ -130,15 +134,32 @@ A tree provides at least the following methods:
 > - Duplicates are allowed: inserting a duplicate point will add another copy to the tree.
 > - Searches return duplicates: both `knn_search` and `range_search` can return duplicate points if they were previously
     inserted.
-> - Deletion removes duplicates: the `delete` operation removes **all** instances of the point from the tree.
+> - Deletion removes one instance: if there are duplicate points, the `delete` operation removes only one instance of
+    the point from the tree.
 > - A `knn_search` with `k=0` will return an empty list.
 > - A `knn_search` with `k` greater than the number of points in the tree will return all points.
 > - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
 >
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance by default.
 > However, you can use a custom distance metric by implementing the `DistanceMetric` trait.
-
-### Additional Information
+>
+> For example, here is how you can define and use the Manhattan distance:
+> ```rust
+> use spart::geometry::{Point2D, DistanceMetric};
+>
+> // 1. Define a struct for your distance metric.
+> struct ManhattanDistance;
+>
+> // 2. Implement the `DistanceMetric` trait for your point type.
+> impl<T> DistanceMetric<Point2D<T>> for ManhattanDistance {
+>     fn distance_sq(p1: &Point2D<T>, p2: &Point2D<T>) -> f64 {
+>         ((p1.x - p2.x).abs() + (p1.y - p2.y).abs()).powi(2)
+>     }
+> }
+>
+> // 3. Use it in a search function.
+> // tree.knn_search::<ManhattanDistance>(&query_point, 1);
+> ```
 
 #### Serialization
 
@@ -151,11 +172,14 @@ To enable serialization in Rust, you need to enable the `serde` feature in your 
 spart = { version = "0.3.0", features = ["serde"] }
 ```
 
-Then, you can use `bincode` (or any other serde-compatible library) to serialize and deserialize the tree:
+Then, you can use `bincode` (or any other serde-compatible library) to serialize and deserialize the tree.
+For example, you can save and load a tree to and from a file:
 
 ```rust
 use spart::geometry::{Point2D, Rectangle};
 use spart::quadtree::Quadtree;
+use std::fs::File;
+use std::io::{Read, Write};
 
 fn main() {
     let boundary = Rectangle {
@@ -164,14 +188,19 @@ fn main() {
         width: 100.0,
         height: 100.0,
     };
-    let mut qt = Quadtree::new(&boundary, 4);
+    let mut qt = Quadtree::new(&boundary, 4).unwrap();
     qt.insert(Point2D::new(10.0, 20.0, Some("point1".to_string())));
     qt.insert(Point2D::new(50.0, 50.0, Some("point2".to_string())));
 
-    // Serialize the tree
+    // Serialize the tree to a file
     let encoded: Vec<u8> = bincode::serialize(&qt).unwrap();
+    let mut file = File::create("tree.spart").unwrap();
+    file.write_all(&encoded).unwrap();
 
-    // Deserialize the tree
+    // Deserialize the tree from a file
+    let mut file = File::open("tree.spart").unwrap();
+    let mut encoded = Vec::new();
+    file.read_to_end(&mut encoded).unwrap();
     let decoded: Quadtree<String> = bincode::deserialize(&encoded[..]).unwrap();
 }
 ```
@@ -201,14 +230,14 @@ $env:DEBUG_SPART = "true"
 
 ### Feature Roadmap
 
--   **Core Data Structures**
+- **Core Data Structures**
     -   [x] Quadtree (2D)
     -   [x] Octree (3D)
     -   [x] Kd-tree (2D and 3D)
     -   [x] R-tree (2D and 3D)
     -   [x] R*-tree (2D and 3D)
 
--   **Supported Geometries & Queries**
+- **Supported Geometries and Queries**
     -   [x] Point data (`Point2D`, `Point3D`)
     -   [x] kNN search
     -   [x] Circular or Spherical range search
@@ -217,13 +246,13 @@ $env:DEBUG_SPART = "true"
     -   [ ] Support for storing non-point geometries (for example, lines, polygons)
     -   [ ] Advanced intersection queries (like finding all stored items that intersect a given polygon)
 
--   **Performance & Optimization**
+- **Performance and Optimization**
     -   [x] Bulk loading implementations for faster tree construction
     -   [ ] Thread-safety for concurrent reads (like `&Tree` accessible from multiple threads)
     -   [ ] Arena allocation for tree nodes to improve cache locality
     -   [ ] SIMD-accelerated distance and intersection calculations if possible
 
--   **API & Developer Experience**
+- **API and Developer Experience**
     -   [x] Simple API for tree creation and manipulation
     -   [x] Serialization and deserialization via `serde`
     -   [x] Custom distance metric support
@@ -231,10 +260,14 @@ $env:DEBUG_SPART = "true"
     -   [ ] Tree diagnostic methods (`height()`, `node_count()`, etc.)
     -   [ ] Replace internal panics with `Result`-based error handling (for example, for invalid dimensions)
 
--   **Ecosystem & Bindings**
-    -   [x] Python bindings (`pyspart`) for all tree types (bindings added, but some features are missing)
+- **Ecosystem and Bindings**
+    -   [x] Python bindings (`pyspart`) for all tree types
     -   [ ] Full feature parity for Python bindings (like bulk loading for all trees)
     -   [ ] WebAssembly support for browser and serverless environments
+
+- **Benchmarks**
+    -   [x] Benchmarks for comparing the performance of tree implementations and operations
+    -   [ ] Benchmarks for comparing the performance against other similar libraries
 
 ---
 
