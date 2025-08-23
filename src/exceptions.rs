@@ -5,7 +5,11 @@
 use std::error::Error;
 use std::fmt;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Represents errors specific to invalid operations or parameters in Spart.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum SpartError {
     /// Occurs when an invalid dimension is requested.
@@ -19,6 +23,13 @@ pub enum SpartError {
     InvalidCapacity {
         /// The capacity value that was provided.
         capacity: usize,
+    },
+    /// Occurs when a point's dimension does not match the tree's dimension.
+    DimensionMismatch {
+        /// The expected dimension.
+        expected: usize,
+        /// The actual dimension.
+        actual: usize,
     },
 }
 
@@ -38,6 +49,12 @@ impl fmt::Display for SpartError {
                 write!(
                     f,
                     "Invalid capacity: {capacity}. Capacity must be greater than zero."
+                )
+            }
+            SpartError::DimensionMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "Dimension mismatch: expected {expected}, but got {actual}"
                 )
             }
         }

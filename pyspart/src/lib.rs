@@ -1,12 +1,15 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyDict, PyType};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fs::File;
 
-use spart::geometry::{Point2D, Point3D, Rectangle, Cube};
-use spart::quadtree::Quadtree;
-use spart::octree::Octree;
+use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
 use spart::kd_tree::KdTree;
+use spart::octree::Octree;
+use spart::quadtree::Quadtree;
+use spart::r_star_tree::RStarTree;
 use spart::r_tree::RTree;
 
 // A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.
@@ -32,11 +35,66 @@ impl PartialEq for PyData {
 }
 impl Eq for PyData {}
 
+impl PartialOrd for PyData {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Python::with_gil(|py| {
+            let self_obj = self.0.bind(py);
+            let other_obj = other.0.bind(py);
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Lt) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Less);
+                }
+            }
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Gt) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Greater);
+                }
+            }
+            if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Eq) {
+                if result.is_truthy().unwrap_or(false) {
+                    return Some(std::cmp::Ordering::Equal);
+                }
+            }
+            None
+        })
+    }
+}
+
+
 // Implement Debug manually since PyObject doesn't implement it.
 impl std::fmt::Debug for PyData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Python::with_gil(|py| {
             write!(f, "PyData({})", self.0.bind(py).repr().unwrap())
+        })
+    }
+}
+
+impl Serialize for PyData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Python::with_gil(|py| {
+            let pickle = py.import("pickle").map_err(serde::ser::Error::custom)?;
+            let bound_self = self.0.bind(py);
+            let bytes = pickle.call_method1("dumps", (bound_self,)).map_err(serde::ser::Error::custom)?;
+            let bytes: &[u8] = bytes.extract().map_err(serde::ser::Error::custom)?;
+            serializer.serialize_bytes(bytes)
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for PyData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
+        Python::with_gil(|py| {
+            let pickle = py.import("pickle").map_err(serde::de::Error::custom)?;
+            let obj = pickle.call_method("loads", (PyBytes::new(py, &bytes),), None).map_err(serde::de::Error::custom)?;
+            Ok(PyData(obj.into()))
         })
     }
 }
@@ -87,16 +145,17 @@ impl From<PyPoint2D> for Point2D<PyData> {
     }
 }
 
-impl From<Point2D<PyData>> for PyPoint2D {
-    fn from(p: Point2D<PyData>) -> Self {
-        PyPoint2D {
-            x: p.x,
-            y: p.y,
-            data: p.data.unwrap().0,
-        }
+impl From<&Point2D<PyData>> for PyPoint2D {
+    fn from(p: &Point2D<PyData>) -> Self {
+        Python::with_gil(|py| {
+            PyPoint2D {
+                x: p.x,
+                y: p.y,
+                data: p.data.as_ref().unwrap().0.clone_ref(py),
+            }
+        })
     }
 }
-
 
 #[pyclass(name = "Point3D", get_all)]
 #[derive(Debug)]
@@ -145,14 +204,16 @@ impl From<PyPoint3D> for Point3D<PyData> {
     }
 }
 
-impl From<Point3D<PyData>> for PyPoint3D {
-    fn from(p: Point3D<PyData>) -> Self {
-        PyPoint3D {
-            x: p.x,
-            y: p.y,
-            z: p.z,
-            data: p.data.unwrap().0,
-        }
+impl From<&Point3D<PyData>> for PyPoint3D {
+    fn from(p: &Point3D<PyData>) -> Self {
+        Python::with_gil(|py| {
+            PyPoint3D {
+                x: p.x,
+                y: p.y,
+                z: p.z,
+                data: p.data.as_ref().unwrap().0.clone_ref(py),
+            }
+        })
     }
 }
 
@@ -197,12 +258,17 @@ impl PyQuadtree {
     #[new]
     fn new(boundary: PyRectangle, capacity: usize) -> Self {
         PyQuadtree {
-            tree: Quadtree::new(&boundary.0, capacity),
+            tree: Quadtree::new(&boundary.0, capacity).unwrap(),
         }
     }
 
     fn insert(&mut self, point: PyPoint2D) -> bool {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&rust_points);
     }
 
     fn delete(&mut self, point: PyPoint2D) -> bool {
@@ -212,12 +278,43 @@ impl PyQuadtree {
 
     fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyQuadtree { tree })
     }
 }
 
@@ -231,12 +328,17 @@ impl PyOctree {
     #[new]
     fn new(boundary: PyCube, capacity: usize) -> Self {
         PyOctree {
-            tree: Octree::new(&boundary.0, capacity),
+            tree: Octree::new(&boundary.0, capacity).unwrap(),
         }
     }
 
     fn insert(&mut self, point: PyPoint3D) -> bool {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(&rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -246,12 +348,43 @@ impl PyOctree {
 
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyOctree { tree })
     }
 }
 
@@ -265,12 +398,17 @@ impl PyKdTree2D {
     #[new]
     fn new() -> Self {
         PyKdTree2D {
-            tree: KdTree::new(2),
+            tree: KdTree::new(),
         }
     }
 
-    fn insert(&mut self, point: PyPoint2D) {
-        self.tree.insert(point.into())
+    fn insert(&mut self, point: PyPoint2D) -> PyResult<()> {
+        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        let _ = self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint2D) -> bool {
@@ -280,12 +418,43 @@ impl PyKdTree2D {
 
     fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyKdTree2D { tree })
     }
 }
 
@@ -299,12 +468,17 @@ impl PyKdTree3D {
     #[new]
     fn new() -> Self {
         PyKdTree3D {
-            tree: KdTree::new(3),
+            tree: KdTree::new(),
         }
     }
 
-    fn insert(&mut self, point: PyPoint3D) {
-        self.tree.insert(point.into())
+    fn insert(&mut self, point: PyPoint3D) -> PyResult<()> {
+        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        let _ = self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -314,12 +488,43 @@ impl PyKdTree3D {
 
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.knn_search(&p, k).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
     }
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| (&p).into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyKdTree3D { tree })
     }
 }
 
@@ -333,7 +538,7 @@ impl PyRTree2D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRTree2D {
-            tree: RTree::new(max_entries),
+            tree: RTree::new(max_entries).unwrap(),
         }
     }
 
@@ -341,14 +546,55 @@ impl PyRTree2D {
         self.tree.insert(point.into())
     }
 
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
+    }
+
     fn delete(&mut self, point: PyPoint2D) -> bool {
         let p: Point2D<PyData> = point.into();
         self.tree.delete(&p)
     }
 
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
     fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
         let p: Point2D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree2D { tree })
     }
 }
 
@@ -362,12 +608,158 @@ impl PyRTree3D {
     #[new]
     fn new(max_entries: usize) -> Self {
         PyRTree3D {
-            tree: RTree::new(max_entries),
+            tree: RTree::new(max_entries).unwrap(),
         }
     }
 
     fn insert(&mut self, point: PyPoint3D) {
         self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
+    }
+
+    fn delete(&mut self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree3D { tree })
+    }
+}
+
+
+#[pyclass(name = "RStarTree2D")]
+struct PyRStarTree2D {
+    tree: RStarTree<Point2D<PyData>>,
+}
+
+#[pymethods]
+impl PyRStarTree2D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRStarTree2D {
+            tree: RStarTree::new(max_entries).unwrap(),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint2D) {
+        self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+        let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
+    }
+
+    fn delete(&mut self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.delete(&p)
+    }
+
+    fn range_search(&self, point: PyPoint2D, radius: f64) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    fn knn_search(&self, point: PyPoint2D, k: usize) -> Vec<PyPoint2D> {
+        let p: Point2D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree2D { tree })
+    }
+}
+
+#[pyclass(name = "RStarTree3D")]
+struct PyRStarTree3D {
+    tree: RStarTree<Point3D<PyData>>,
+}
+
+#[pymethods]
+impl PyRStarTree3D {
+    #[new]
+    fn new(max_entries: usize) -> Self {
+        PyRStarTree3D {
+            tree: RStarTree::new(max_entries).unwrap(),
+        }
+    }
+
+    fn insert(&mut self, point: PyPoint3D) {
+        self.tree.insert(point.into())
+    }
+
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+        let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
+        self.tree.insert_bulk(rust_points);
     }
 
     fn delete(&mut self, point: PyPoint3D) -> bool {
@@ -377,7 +769,43 @@ impl PyRTree3D {
 
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
-        self.tree.range_search(&p, radius).into_iter().cloned().map(|p| p.into()).collect()
+        self.tree
+            .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
+        let p: Point3D<PyData> = point.into();
+        self.tree
+            .knn_search::<EuclideanDistance>(&p, k)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Saves the tree to a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    fn save(&self, path: &str) -> PyResult<()> {
+        let file = File::create(path)?;
+        bincode::serialize_into(file, &self.tree).map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    /// Loads a tree from a file.
+    ///
+    /// Args:
+    ///     path (str): The path to the file.
+    ///
+    /// Returns:
+    ///     The loaded tree.
+    #[classmethod]
+    fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
+        let file = File::open(path)?;
+        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree3D { tree })
     }
 }
 
@@ -392,5 +820,7 @@ fn pyspart(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyKdTree3D>()?;
     m.add_class::<PyRTree2D>()?;
     m.add_class::<PyRTree3D>()?;
+    m.add_class::<PyRStarTree2D>()?;
+    m.add_class::<PyRStarTree3D>()?;
     Ok(())
 }

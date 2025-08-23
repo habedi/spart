@@ -8,6 +8,8 @@
 //! bounding volume calculations and minimum distance computations.
 
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use tracing::debug;
 
@@ -24,6 +26,7 @@ use crate::exceptions::SpartError;
 /// let pt: Point2D<()> = Point2D::new(1.0, 2.0, None);
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point2D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -51,6 +54,27 @@ impl<T: PartialOrd> PartialOrd for Point2D<T> {
             Some(Ordering::Equal) => self.data.partial_cmp(&other.data),
             other => other,
         }
+    }
+}
+
+/// A trait for defining distance metrics.
+pub trait DistanceMetric<P> {
+    /// Computes the squared distance between two points.
+    fn distance_sq(p1: &P, p2: &P) -> f64;
+}
+
+/// A struct for Euclidean distance calculations.
+pub struct EuclideanDistance;
+
+impl<T> DistanceMetric<Point2D<T>> for EuclideanDistance {
+    fn distance_sq(p1: &Point2D<T>, p2: &Point2D<T>) -> f64 {
+        (p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2)
+    }
+}
+
+impl<T> DistanceMetric<Point3D<T>> for EuclideanDistance {
+    fn distance_sq(p1: &Point3D<T>, p2: &Point3D<T>) -> f64 {
+        (p1.x - p2.x).powi(2) + (p1.y - p2.y).powi(2) + (p1.z - p2.z).powi(2)
     }
 }
 
@@ -112,6 +136,7 @@ impl<T> Point2D<T> {
 
 /// Represents a rectangle in 2D space.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Rectangle {
     /// The x-coordinate of the rectangle's top-left corner.
     pub x: f64,
@@ -263,6 +288,7 @@ impl Rectangle {
 /// let pt: Point3D<()> = Point3D::new(1.0, 2.0, 3.0, None);
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Point3D<T> {
     /// The x-coordinate of the point.
     pub x: f64,
@@ -368,6 +394,7 @@ impl<T> Point3D<T> {
 
 /// Represents a cube (or cuboid) in 3D space.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Cube {
     /// The x-coordinate of the cube's top-left-front corner.
     pub x: f64,
@@ -526,10 +553,6 @@ impl Cube {
 }
 
 /// Trait for types that can provide the center and extent along a specified dimension.
-///
-/// # Panics
-///
-/// The methods in this trait will panic if an invalid dimension is provided. The panic messages are generated using `SpartError`.
 pub trait BSPBounds {
     /// The number of dimensions supported.
     const DIM: usize;
@@ -539,80 +562,68 @@ pub trait BSPBounds {
     ///
     /// * `dim` - The dimension index.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidDimension` if `dim` is not within the valid range.
-    fn center(&self, dim: usize) -> f64;
+    /// Returns `SpartError::InvalidDimension` if `dim` is not within the valid range.
+    fn center(&self, dim: usize) -> Result<f64, SpartError>;
     /// Returns the extent (width, height, or depth) along the specified dimension.
     ///
     /// # Arguments
     ///
     /// * `dim` - The dimension index.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidDimension` if `dim` is not within the valid range.
-    fn extent(&self, dim: usize) -> f64;
+    /// Returns `SpartError::InvalidDimension` if `dim` is not within the valid range.
+    fn extent(&self, dim: usize) -> Result<f64, SpartError>;
 }
 
 impl BSPBounds for Rectangle {
     const DIM: usize = 2;
-    fn center(&self, dim: usize) -> f64 {
+    fn center(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.x + self.width / 2.0,
-            1 => self.y + self.height / 2.0,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 2
-                }
-            ),
+            0 => Ok(self.x + self.width / 2.0),
+            1 => Ok(self.y + self.height / 2.0),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 2,
+            }),
         }
     }
-    fn extent(&self, dim: usize) -> f64 {
+    fn extent(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.width,
-            1 => self.height,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 2
-                }
-            ),
+            0 => Ok(self.width),
+            1 => Ok(self.height),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 2,
+            }),
         }
     }
 }
 
 impl BSPBounds for Cube {
     const DIM: usize = 3;
-    fn center(&self, dim: usize) -> f64 {
+    fn center(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.x + self.width / 2.0,
-            1 => self.y + self.height / 2.0,
-            2 => self.z + self.depth / 2.0,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 3
-                }
-            ),
+            0 => Ok(self.x + self.width / 2.0),
+            1 => Ok(self.y + self.height / 2.0),
+            2 => Ok(self.z + self.depth / 2.0),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 3,
+            }),
         }
     }
-    fn extent(&self, dim: usize) -> f64 {
+    fn extent(&self, dim: usize) -> Result<f64, SpartError> {
         match dim {
-            0 => self.width,
-            1 => self.height,
-            2 => self.depth,
-            _ => panic!(
-                "{}",
-                SpartError::InvalidDimension {
-                    requested: dim,
-                    available: 3
-                }
-            ),
+            0 => Ok(self.width),
+            1 => Ok(self.height),
+            2 => Ok(self.depth),
+            _ => Err(SpartError::InvalidDimension {
+                requested: dim,
+                available: 3,
+            }),
         }
     }
 }
@@ -633,6 +644,12 @@ pub trait BoundingVolume: Clone {
     }
     /// Determines whether the bounding volume intersects with another.
     fn intersects(&self, other: &Self) -> bool;
+
+    /// Computes the overlap between two bounding volumes
+    fn overlap(&self, other: &Self) -> f64;
+
+    /// Computes the margin of a bounding box
+    fn margin(&self) -> f64;
 }
 
 impl BoundingVolume for Rectangle {
@@ -651,6 +668,19 @@ impl BoundingVolume for Rectangle {
         debug!("BoundingVolume (Rectangle)::intersects() -> {}", i);
         i
     }
+    fn overlap(&self, other: &Self) -> f64 {
+        let overlap_x = (self.x + self.width).min(other.x + other.width) - self.x.max(other.x);
+        let overlap_y = (self.y + self.height).min(other.y + other.height) - self.y.max(other.y);
+        if overlap_x > 0.0 && overlap_y > 0.0 {
+            overlap_x * overlap_y
+        } else {
+            0.0
+        }
+    }
+
+    fn margin(&self) -> f64 {
+        2.0 * (self.width + self.height)
+    }
 }
 
 impl BoundingVolume for Cube {
@@ -668,6 +698,20 @@ impl BoundingVolume for Cube {
         let i = Cube::intersects(self, other);
         debug!("BoundingVolume (Cube)::intersects() -> {}", i);
         i
+    }
+    fn overlap(&self, other: &Self) -> f64 {
+        let overlap_x = (self.x + self.width).min(other.x + other.width) - self.x.max(other.x);
+        let overlap_y = (self.y + self.height).min(other.y + other.height) - self.y.max(other.y);
+        let overlap_z = (self.z + self.depth).min(other.z + other.depth) - self.z.max(other.z);
+        if overlap_x > 0.0 && overlap_y > 0.0 && overlap_z > 0.0 {
+            overlap_x * overlap_y * overlap_z
+        } else {
+            0.0
+        }
+    }
+
+    fn margin(&self) -> f64 {
+        2.0 * (self.width + self.height + self.depth)
     }
 }
 

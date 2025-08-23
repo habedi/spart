@@ -15,7 +15,7 @@ use tracing::{debug, info};
 // Benchmark Parameters
 //
 pub const BENCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-pub const BENCH_NUM_INSERT: i32 = 10;
+pub const BENCH_NUM_INSERT: i32 = 10_000;
 pub const BENCH_NODE_CAPACITY: usize = 5;
 
 pub const BENCH_KNN_SIZE: usize = 3;
@@ -64,5 +64,7 @@ pub fn generate_3d_data() -> Vec<Point3D<i32>> {
 
 // Configure Criterion with a timeout for benchmarks
 pub fn configure_criterion() -> Criterion {
-    Criterion::default().measurement_time(BENCH_TIMEOUT)
+    Criterion::default()
+        .measurement_time(BENCH_TIMEOUT)
+        .sample_size(10)
 }

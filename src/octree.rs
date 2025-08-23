@@ -7,13 +7,13 @@
 //! # Example
 //!
 //! ```
-//! use spart::geometry::{Cube, Point3D};
+//! use spart::geometry::{Cube, EuclideanDistance, Point3D};
 //! use spart::octree::Octree;
 //!
 //! // Define a cubic boundary for the octree.
 //! let boundary = Cube { x: 0.0, y: 0.0, z: 0.0, width: 100.0, height: 100.0, depth: 100.0 };
 //! // Create an octree with a capacity of 4 points per node.
-//! let mut octree = Octree::new(&boundary, 4);
+//! let mut octree = Octree::new(&boundary, 4).unwrap();
 //!
 //! // Insert some points.
 //! let pt1: Point3D<()> = Point3D::new(10.0, 20.0, 30.0, None);
@@ -22,15 +22,17 @@
 //! octree.insert(pt2);
 //!
 //! // Perform a k-nearest neighbor search.
-//! let neighbors = octree.knn_search(&Point3D::new(12.0, 22.0, 32.0, None), 1);
+//! let neighbors = octree.knn_search::<EuclideanDistance>(&Point3D::new(12.0, 22.0, 32.0, None), 1);
 //! assert!(!neighbors.is_empty());
 //! ```
 
 use crate::exceptions::SpartError;
-use crate::geometry::{Cube, HeapItem, Point3D};
+use crate::geometry::{Cube, DistanceMetric, HeapItem, Point3D};
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
-use tracing::{debug, info};
+use tracing::info;
 
 /// An octree for indexing of 3D points.
 ///
@@ -41,6 +43,8 @@ use tracing::{debug, info};
 /// # Panics
 ///
 /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Octree<T: Clone + PartialEq> {
     boundary: Cube,
     points: Vec<Point3D<T>>,
@@ -64,18 +68,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// * `boundary` - The cube defining the 3D region covered by this octree.
     /// * `capacity` - The maximum number of points a node can hold before subdividing.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-    pub fn new(boundary: &Cube, capacity: usize) -> Self {
+    /// Returns `SpartError::InvalidCapacity` if `capacity` is zero.
+    pub fn new(boundary: &Cube, capacity: usize) -> Result<Self, SpartError> {
         if capacity == 0 {
-            panic!("{}", SpartError::InvalidCapacity { capacity });
+            return Err(SpartError::InvalidCapacity { capacity });
         }
         info!(
             "Creating new Octree with boundary: {:?} and capacity: {}",
             boundary, capacity
         );
-        Octree {
+        Ok(Octree {
             boundary: boundary.clone(),
             points: Vec::new(),
             capacity,
@@ -88,7 +92,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             back_top_right: None,
             back_bottom_left: None,
             back_bottom_right: None,
-        }
+        })
     }
 
     /// Subdivides the current octree node into eight child octants.
@@ -103,94 +107,118 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         let h = self.boundary.height / 2.0;
         let d = self.boundary.depth / 2.0;
 
-        self.front_top_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_top_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_bottom_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y: y + h,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.front_bottom_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y: y + h,
-                z,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_top_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_top_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_bottom_left = Some(Box::new(Octree::new(
-            &Cube {
-                x,
-                y: y + h,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
-        self.back_bottom_right = Some(Box::new(Octree::new(
-            &Cube {
-                x: x + w,
-                y: y + h,
-                z: z + d,
-                width: w,
-                height: h,
-                depth: d,
-            },
-            self.capacity,
-        )));
+        self.front_top_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_top_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_bottom_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y: y + h,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.front_bottom_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y: y + h,
+                    z,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_top_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_top_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_bottom_left = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x,
+                    y: y + h,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.back_bottom_right = Some(Box::new(
+            Octree::new(
+                &Cube {
+                    x: x + w,
+                    y: y + h,
+                    z: z + d,
+                    width: w,
+                    height: h,
+                    depth: d,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
         self.divided = true;
 
         // Reinsert existing points into the appropriate children.
@@ -319,30 +347,224 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point3D<T>) -> bool {
         if !self.boundary.contains(&point) {
-            debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
-        if self.divided {
-            let children = self.children_mut();
-            let n = children.len();
-            for (i, child) in children.into_iter().enumerate() {
-                if i < n - 1 {
-                    if child.insert(point.clone()) {
-                        return true;
-                    }
-                } else {
-                    return child.insert(point);
-                }
+
+        if !self.divided {
+            if self.points.len() < self.capacity {
+                self.points.push(point);
+                return true;
             }
-            return false;
+            self.subdivide();
         }
-        if self.points.len() < self.capacity {
-            info!("Inserting point {:?} into Octree", point);
-            self.points.push(point);
+
+        if self.front_top_left.as_mut().unwrap().insert(point.clone()) {
             return true;
         }
-        self.subdivide();
-        self.insert(point)
+        if self.front_top_right.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self
+            .front_bottom_left
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self
+            .front_bottom_right
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self.back_top_left.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.back_top_right.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self
+            .back_bottom_left
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+        if self
+            .back_bottom_right
+            .as_mut()
+            .unwrap()
+            .insert(point.clone())
+        {
+            return true;
+        }
+
+        unreachable!("A point within the parent boundary should always fit in a child boundary.");
+    }
+
+    /// Inserts a bulk of points into the octree.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The points to insert.
+    pub fn insert_bulk(&mut self, points: &[Point3D<T>]) {
+        if points.is_empty() {
+            return;
+        }
+
+        let points_within_boundary: Vec<Point3D<T>> = points
+            .iter()
+            .filter(|p| self.boundary.contains(p))
+            .cloned()
+            .collect();
+
+        if points_within_boundary.is_empty() {
+            return;
+        }
+
+        if !self.divided && self.points.len() + points_within_boundary.len() <= self.capacity {
+            self.points.extend(points_within_boundary);
+            return;
+        }
+
+        if !self.divided {
+            self.subdivide();
+        }
+
+        let mut points_to_insert = points_within_boundary;
+        if self.divided {
+            let mut children_points: [Vec<Point3D<T>>; 8] = [
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            ];
+
+            for point in points_to_insert.drain(..) {
+                if self
+                    .front_top_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[0].push(point);
+                } else if self
+                    .front_top_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[1].push(point);
+                } else if self
+                    .front_bottom_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[2].push(point);
+                } else if self
+                    .front_bottom_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[3].push(point);
+                } else if self
+                    .back_top_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[4].push(point);
+                } else if self
+                    .back_top_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[5].push(point);
+                } else if self
+                    .back_bottom_left
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[6].push(point);
+                } else if self
+                    .back_bottom_right
+                    .as_ref()
+                    .unwrap()
+                    .boundary
+                    .contains(&point)
+                {
+                    children_points[7].push(point);
+                }
+            }
+
+            if !children_points[0].is_empty() {
+                self.front_top_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[0]);
+            }
+            if !children_points[1].is_empty() {
+                self.front_top_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[1]);
+            }
+            if !children_points[2].is_empty() {
+                self.front_bottom_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[2]);
+            }
+            if !children_points[3].is_empty() {
+                self.front_bottom_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[3]);
+            }
+            if !children_points[4].is_empty() {
+                self.back_top_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[4]);
+            }
+            if !children_points[5].is_empty() {
+                self.back_top_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[5]);
+            }
+            if !children_points[6].is_empty() {
+                self.back_bottom_left
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[6]);
+            }
+            if !children_points[7].is_empty() {
+                self.back_bottom_right
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[7]);
+            }
+        }
     }
 
     /// Performs a k-nearest neighbor search for the target point.
@@ -355,9 +577,22 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// # Returns
     ///
     /// A vector of the k nearest 3D points, ordered from nearest to farthest.
-    pub fn knn_search(&self, target: &Point3D<T>, k: usize) -> Vec<Point3D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn knn_search<M: DistanceMetric<Point3D<T>>>(
+        &self,
+        target: &Point3D<T>,
+        k: usize,
+    ) -> Vec<Point3D<T>> {
+        if k == 0 {
+            return Vec::new();
+        }
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
-        self.knn_search_helper(target, k, &mut heap);
+        self.knn_search_helper::<M>(target, k, &mut heap);
         heap.into_sorted_vec()
             .into_iter()
             .filter_map(|item| item.point_3d)
@@ -365,9 +600,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     }
 
     /// Helper method for recursively performing the k-nearest neighbor search.
-    fn knn_search_helper(&self, target: &Point3D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
+    fn knn_search_helper<M: DistanceMetric<Point3D<T>>>(
+        &self,
+        target: &Point3D<T>,
+        k: usize,
+        heap: &mut BinaryHeap<HeapItem<T>>,
+    ) {
         for point in &self.points {
-            let dist_sq = point.distance_sq(target);
+            let dist_sq = M::distance_sq(point, target);
             let item = HeapItem {
                 neg_distance: OrderedFloat(-dist_sq),
                 point_2d: None,
@@ -386,7 +626,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                         continue;
                     }
                 }
-                child.knn_search_helper(target, k, heap);
+                child.knn_search_helper::<M>(target, k, heap);
             }
         }
     }
@@ -401,20 +641,30 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     /// # Returns
     ///
     /// A vector of 3D points within the specified range.
-    pub fn range_search(&self, center: &Point3D<T>, radius: f64) -> Vec<Point3D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn range_search<M: DistanceMetric<Point3D<T>>>(
+        &self,
+        center: &Point3D<T>,
+        radius: f64,
+    ) -> Vec<Point3D<T>> {
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
             return found;
         }
         for point in &self.points {
-            if point.distance_sq(center) <= radius_sq {
+            if M::distance_sq(point, center) <= radius_sq {
                 found.push(point.clone());
             }
         }
         if self.divided {
             for child in self.children() {
-                found.extend(child.range_search(center, radius));
+                found.extend(child.range_search::<M>(center, radius));
             }
         }
         found
@@ -442,11 +692,12 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             return deleted;
         }
         if let Some(pos) = self.points.iter().position(|p| p == point) {
-            info!("Deleting point {:?} from Octree", point);
             self.points.remove(pos);
-            return true;
+            info!("Deleting point {:?} from Octree", point);
+            true
+        } else {
+            false
         }
-        false
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.

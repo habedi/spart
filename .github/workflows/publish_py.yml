@@ -10,8 +10,14 @@ permissions:
   contents: read
 
 jobs:
+  call_tests:
+    uses: ./.github/workflows/tests.yml
+
   publish_to_pypi:
     runs-on: ubuntu-latest
+    # Try to publish only if the tests pass
+    needs: call_tests
+    if: success()
 
     steps:
       - name: Checkout Repository
@@ -30,5 +36,6 @@ jobs:
 
       - name: Build and Publish Package
         run: |
+          source .venv/bin/activate
           make wheel-manylinux
           env PYPI_TOKEN=${{ secrets.PYPI_API_TOKEN }} make publish-py

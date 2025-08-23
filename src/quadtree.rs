@@ -8,13 +8,13 @@
 //! ### Example
 //!
 //! ```
-//! use spart::geometry::{Point2D, Rectangle};
+//! use spart::geometry::{EuclideanDistance, Point2D, Rectangle};
 //! use spart::quadtree::Quadtree;
 //!
 //! // Define a boundary for the quadtree.
 //! let boundary = Rectangle { x: 0.0, y: 0.0, width: 100.0, height: 100.0 };
 //! // Create a quadtree with capacity 4.
-//! let mut qt = Quadtree::new(&boundary, 4);
+//! let mut qt = Quadtree::new(&boundary, 4).unwrap();
 //!
 //! // Insert some points.
 //! let pt1: Point2D<()> = Point2D::new(10.0, 20.0, None);
@@ -23,13 +23,15 @@
 //! qt.insert(pt2);
 //!
 //! // Perform a k-nearest neighbor search.
-//! let neighbors = qt.knn_search(&Point2D::new(12.0, 22.0, None), 1);
+//! let neighbors = qt.knn_search::<EuclideanDistance>(&Point2D::new(12.0, 22.0, None), 1);
 //! assert!(!neighbors.is_empty());
 //! ```
 
 use crate::exceptions::SpartError;
-use crate::geometry::{HeapItem, Point2D, Rectangle};
+use crate::geometry::{DistanceMetric, HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
@@ -43,6 +45,7 @@ use tracing::{debug, info};
 ///
 /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Quadtree<T: Clone + PartialEq> {
     boundary: Rectangle,
     points: Vec<Point2D<T>>,
@@ -62,18 +65,18 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// * `boundary` - The rectangular region covered by this quadtree.
     /// * `capacity` - The maximum number of points a node can hold before subdividing.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-    pub fn new(boundary: &Rectangle, capacity: usize) -> Self {
+    /// Returns `SpartError::InvalidCapacity` if `capacity` is zero.
+    pub fn new(boundary: &Rectangle, capacity: usize) -> Result<Self, SpartError> {
         if capacity == 0 {
-            panic!("{}", SpartError::InvalidCapacity { capacity });
+            return Err(SpartError::InvalidCapacity { capacity });
         }
         info!(
             "Creating new Quadtree with boundary: {:?} and capacity: {}",
             boundary, capacity
         );
-        Quadtree {
+        Ok(Quadtree {
             boundary: boundary.clone(),
             points: Vec::new(),
             capacity,
@@ -82,7 +85,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             northwest: None,
             southeast: None,
             southwest: None,
-        }
+        })
     }
 
     /// Subdivides the current quadtree node into four child quadrants.
@@ -94,42 +97,54 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         let y = self.boundary.y;
         let w = self.boundary.width / 2.0;
         let h = self.boundary.height / 2.0;
-        self.northeast = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x: x + w,
-                y,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.northwest = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x,
-                y,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.southeast = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x: x + w,
-                y: y + h,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
-        self.southwest = Some(Box::new(Quadtree::new(
-            &Rectangle {
-                x,
-                y: y + h,
-                width: w,
-                height: h,
-            },
-            self.capacity,
-        )));
+        self.northeast = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x: x + w,
+                    y,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.northwest = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.southeast = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x: x + w,
+                    y: y + h,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
+        self.southwest = Some(Box::new(
+            Quadtree::new(
+                &Rectangle {
+                    x,
+                    y: y + h,
+                    width: w,
+                    height: h,
+                },
+                self.capacity,
+            )
+            .unwrap(),
+        ));
         self.divided = true;
         // Reinsert existing points into the appropriate children.
         let old_points = std::mem::take(&mut self.points);
@@ -155,31 +170,109 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// `true` if the point was successfully inserted, `false` otherwise.
     pub fn insert(&mut self, point: Point2D<T>) -> bool {
         if !self.boundary.contains(&point) {
-            debug!("Point {:?} is out of bounds of {:?}", point, self.boundary);
             return false;
         }
-        if self.divided {
-            let children = self.children_mut();
-            let num_children = children.len();
-            for (i, child) in children.into_iter().enumerate() {
-                // Insert into each child until one accepts the point.
-                if i < num_children - 1 {
-                    if child.insert(point.clone()) {
-                        return true;
-                    }
-                } else {
-                    return child.insert(point);
-                }
+
+        if !self.divided {
+            if self.points.len() < self.capacity {
+                self.points.push(point);
+                return true;
             }
-            return false;
+            self.subdivide();
         }
-        if self.points.len() < self.capacity {
-            info!("Inserting point {:?} into Quadtree", point);
-            self.points.push(point);
+
+        if self.northwest.as_mut().unwrap().insert(point.clone()) {
             return true;
         }
-        self.subdivide();
-        self.insert(point)
+        if self.northeast.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.southwest.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+        if self.southeast.as_mut().unwrap().insert(point.clone()) {
+            return true;
+        }
+
+        // This case should be unreachable if boundary logic is sound.
+        unreachable!("A point within the parent boundary should always fit in a child boundary.");
+    }
+
+    /// Inserts a bulk of points into the quadtree.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - The points to insert.
+    pub fn insert_bulk(&mut self, points: &[Point2D<T>]) {
+        if points.is_empty() {
+            return;
+        }
+
+        // Filter out points that are not within the boundary
+        let points_within_boundary: Vec<Point2D<T>> = points
+            .iter()
+            .filter(|p| self.boundary.contains(p))
+            .cloned()
+            .collect();
+
+        if points_within_boundary.is_empty() {
+            return;
+        }
+
+        // If the current node is not divided and has enough capacity, add the points
+        if !self.divided && self.points.len() + points_within_boundary.len() <= self.capacity {
+            self.points.extend(points_within_boundary);
+            return;
+        }
+
+        // If the current node is not divided but adding the new points would exceed the capacity,
+        // subdivide the node and distribute the existing and new points among the children.
+        if !self.divided {
+            self.subdivide();
+        }
+
+        // If the node is already divided, distribute the new points among the children.
+        let mut points_to_insert = points_within_boundary;
+        if self.divided {
+            let mut children_points: [Vec<Point2D<T>>; 4] = [vec![], vec![], vec![], vec![]];
+
+            for point in points_to_insert.drain(..) {
+                if self.northeast.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[0].push(point);
+                } else if self.northwest.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[1].push(point);
+                } else if self.southeast.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[2].push(point);
+                } else if self.southwest.as_ref().unwrap().boundary.contains(&point) {
+                    children_points[3].push(point);
+                }
+            }
+
+            if !children_points[0].is_empty() {
+                self.northeast
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[0]);
+            }
+            if !children_points[1].is_empty() {
+                self.northwest
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[1]);
+            }
+            if !children_points[2].is_empty() {
+                self.southeast
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[2]);
+            }
+            if !children_points[3].is_empty() {
+                self.southwest
+                    .as_mut()
+                    .unwrap()
+                    .insert_bulk(&children_points[3]);
+            }
+        }
     }
 
     /// Returns mutable references to the four child quadrants, if they exist.
@@ -251,9 +344,22 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// # Returns
     ///
     /// A vector of the k nearest points, ordered from nearest to farthest.
-    pub fn knn_search(&self, target: &Point2D<T>, k: usize) -> Vec<Point2D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn knn_search<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        target: &Point2D<T>,
+        k: usize,
+    ) -> Vec<Point2D<T>> {
+        if k == 0 {
+            return Vec::new();
+        }
         let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
-        self.knn_search_helper(target, k, &mut heap);
+        self.knn_search_helper::<M>(target, k, &mut heap);
         heap.into_sorted_vec()
             .into_iter()
             .filter_map(|item| item.point_2d)
@@ -261,9 +367,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     }
 
     /// Helper method for performing the recursive k-nearest neighbor search.
-    fn knn_search_helper(&self, target: &Point2D<T>, k: usize, heap: &mut BinaryHeap<HeapItem<T>>) {
+    fn knn_search_helper<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        target: &Point2D<T>,
+        k: usize,
+        heap: &mut BinaryHeap<HeapItem<T>>,
+    ) {
         for point in &self.points {
-            let dist_sq = point.distance_sq(target);
+            let dist_sq = M::distance_sq(point, target);
             let item = HeapItem {
                 neg_distance: OrderedFloat(-dist_sq),
                 point_2d: Some(point.clone()),
@@ -282,7 +393,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                         continue;
                     }
                 }
-                child.knn_search_helper(target, k, heap);
+                child.knn_search_helper::<M>(target, k, heap);
             }
         }
     }
@@ -297,20 +408,30 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// # Returns
     ///
     /// A vector of points within the range.
-    pub fn range_search(&self, center: &Point2D<T>, radius: f64) -> Vec<Point2D<T>> {
+    ///
+    /// # Note
+    ///
+    /// The pruning logic for the search is based on Euclidean distance. Custom distance metrics
+    /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
+    /// performance.
+    pub fn range_search<M: DistanceMetric<Point2D<T>>>(
+        &self,
+        center: &Point2D<T>,
+        radius: f64,
+    ) -> Vec<Point2D<T>> {
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
             return found;
         }
         for point in &self.points {
-            if point.distance_sq(center) <= radius_sq {
+            if M::distance_sq(point, center) <= radius_sq {
                 found.push(point.clone());
             }
         }
         if self.divided {
             for child in self.children() {
-                found.extend(child.range_search(center, radius));
+                found.extend(child.range_search::<M>(center, radius));
             }
         }
         found
@@ -338,11 +459,12 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             return deleted;
         }
         if let Some(pos) = self.points.iter().position(|p| p == point) {
-            info!("Deleting point {:?} from Quadtree", point);
             self.points.remove(pos);
-            return true;
+            info!("Deleting point {:?} from Quadtree", point);
+            true
+        } else {
+            false
         }
-        false
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.

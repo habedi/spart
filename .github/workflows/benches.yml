@@ -3,6 +3,9 @@ name: Run Benchmarks
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   benchmarks:
     runs-on: ubuntu-latest

@@ -58,17 +58,17 @@ run-examples: build ## Run the Rust examples
 .PHONY: run-py-examples
 run-py-examples: develop-py ## Run the Python examples
 	@echo "Running Python examples..."
-	@$(PY_DEP_MNGR) run python pyspart/examples/quadtree.py
-	@$(PY_DEP_MNGR) run python pyspart/examples/octree.py
-	@$(PY_DEP_MNGR) run python pyspart/examples/kdtree.py
-	@$(PY_DEP_MNGR) run python pyspart/examples/rtree.py
+	@bash -c "source .venv/bin/activate && python pyspart/examples/quadtree.py"
+	@bash -c "source .venv/bin/activate && python pyspart/examples/octree.py"
+	@bash -c "source .venv/bin/activate && python pyspart/examples/kdtree.py"
+	@bash -c "source .venv/bin/activate && python pyspart/examples/rtree.py"
+	@bash -c "source .venv/bin/activate && python pyspart/examples/rstar_tree.py"
 
 .PHONY: clean
 clean: ## Remove generated and temporary files
 	@echo "Cleaning up..."
 	@cargo clean
-	@rm -rf $(WHEEL_DIR) dist/ $(PYSPART_DIR)/$(WHEEL_DIR)
-	@rm -f $(PYSPART_DIR)/*.so
+	@rm -rf $(WHEEL_DIR) dist/ $(PYSPART_DIR)/$(WHEEL_DIR) $(PYSPART_DIR)/*.so $(PYSPART_DIR)/target
 
 .PHONY: install-snap
 install-snap: ## Install a few dependencies using Snapcraft
@@ -130,7 +130,7 @@ fix-lint: ## Fix the linter warnings
 develop-py: ## Build and install PySpart in the current Python environment
 	@echo "Building and installing PySpart..."
 	# Note: Maturin does not work when CONDA_PREFIX and VIRTUAL_ENV are both set
-	@(cd $(PYSPART_DIR) && unset CONDA_PREFIX && maturin develop)
+	@bash -c "source .venv/bin/activate && cd $(PYSPART_DIR) && unset CONDA_PREFIX && maturin develop"
 
 .PHONY: wheel
 wheel: ## Build the wheel file for PySpart
@@ -145,7 +145,7 @@ wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
 .PHONY: test-py
 test-py: develop-py ## Run Python tests
 	@echo "Running Python tests..."
-	@$(PY_DEP_MNGR) run pytest
+	@bash -c "source .venv/bin/activate && pytest"
 
 .PHONY: publish-py
 publish-py: wheel-manylinux ## Publish the PySpart wheel to PyPI (requires PYPI_TOKEN to be set)

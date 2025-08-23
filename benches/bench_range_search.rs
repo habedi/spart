@@ -3,8 +3,8 @@ mod shared;
 use shared::*;
 
 use criterion::{criterion_group, Criterion};
-use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
-use spart::{kd_tree, octree, quadtree, r_tree};
+use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
+use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
 
@@ -28,9 +28,7 @@ fn bench_range_search<'a, T, Q, R>(
 {
     cc.bench_function(name, |b| {
         b.iter(|| {
-            info!("Running range search benchmark: {}", name);
             let res = search_fn(tree, query, BENCH_RANGE_RADIUS);
-            info!("Completed range search benchmark: {}", name);
             black_box(res)
         })
     });
@@ -39,9 +37,9 @@ fn bench_range_search<'a, T, Q, R>(
 fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_kdtree_2d");
     let points = generate_2d_data();
-    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new(2);
+    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new();
     for point in points.iter() {
-        tree.insert(point.clone());
+        let _ = tree.insert(point.clone());
     }
     let query = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
@@ -49,7 +47,7 @@ fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
         "range_kdtree_2d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t: &kd_tree::KdTree<Point2D<i32>>, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -57,7 +55,7 @@ fn benchmark_range_kdtree_2d(_c: &mut Criterion) {
 fn benchmark_range_bbox_rtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_bbox_rtree_2d");
     let points = generate_2d_data();
-    let mut tree = r_tree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -80,7 +78,7 @@ fn benchmark_range_bbox_rtree_2d(_c: &mut Criterion) {
 fn benchmark_range_rtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_rtree_2d");
     let points = generate_2d_data();
-    let mut tree = r_tree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -94,7 +92,7 @@ fn benchmark_range_rtree_2d(_c: &mut Criterion) {
         "range_rtree_2d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -108,7 +106,7 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
         width: BENCH_BOUNDARY.width,
         height: BENCH_BOUNDARY.height,
     };
-    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = quadtree::Quadtree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -118,7 +116,7 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
         "range_quadtree_2d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -126,9 +124,9 @@ fn benchmark_range_quadtree_2d(_c: &mut Criterion) {
 fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_kdtree_3d");
     let points = generate_3d_data();
-    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new(3);
+    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new();
     for point in points.iter() {
-        tree.insert(point.clone());
+        let _ = tree.insert(point.clone());
     }
     let query = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
@@ -136,7 +134,7 @@ fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
         "range_kdtree_3d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t: &kd_tree::KdTree<Point3D<i32>>, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -144,7 +142,7 @@ fn benchmark_range_kdtree_3d(_c: &mut Criterion) {
 fn benchmark_range_bbox_rtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_bbox_rtree_3d");
     let points = generate_3d_data();
-    let mut tree = r_tree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -169,7 +167,7 @@ fn benchmark_range_bbox_rtree_3d(_c: &mut Criterion) {
 fn benchmark_range_rtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_rtree_3d");
     let points = generate_3d_data();
-    let mut tree = r_tree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY);
+    let mut tree = r_tree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -184,7 +182,7 @@ fn benchmark_range_rtree_3d(_c: &mut Criterion) {
         "range_rtree_3d",
         &tree,
         &query_point,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
         &mut cc,
     );
 }
@@ -193,7 +191,7 @@ fn benchmark_range_octree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark_range_octree_3d");
     let points = generate_3d_data();
     let boundary = BENCH_BOUNDARY;
-    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY);
+    let mut tree = octree::Octree::new(&boundary, BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -203,7 +201,100 @@ fn benchmark_range_octree_3d(_c: &mut Criterion) {
         "range_octree_3d",
         &tree,
         &query,
-        |t, q, r| t.range_search(q, r),
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_rstartree_2d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_rstartree_2d");
+    let points = generate_2d_data();
+    let mut tree = r_star_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_point = Point2D {
+        x: 35.0,
+        y: 45.0,
+        data: None,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_2d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_rstartree_3d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_rstartree_3d");
+    let points = generate_3d_data();
+    let mut tree = r_star_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_point = Point3D {
+        x: 35.0,
+        y: 45.0,
+        z: 35.0,
+        data: None,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_3d",
+        &tree,
+        &query_point,
+        |t, q, r| t.range_search::<EuclideanDistance>(q, r),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_bbox_rstartree_2d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_bbox_rstartree_2d");
+    let points = generate_2d_data();
+    let mut tree = r_star_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_rect = Rectangle {
+        x: 35.0 - BENCH_RANGE_RADIUS,
+        y: 45.0 - BENCH_RANGE_RADIUS,
+        width: 2.0 * BENCH_RANGE_RADIUS,
+        height: 2.0 * BENCH_RANGE_RADIUS,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_bbox_2d",
+        &tree,
+        &query_rect,
+        |t, q, _| t.range_search_bbox(q),
+        &mut cc,
+    );
+}
+
+fn benchmark_range_bbox_rstartree_3d(_c: &mut Criterion) {
+    info!("Setting up benchmark_range_bbox_rstartree_3d");
+    let points = generate_3d_data();
+    let mut tree = r_star_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    for point in points.iter() {
+        tree.insert(point.clone());
+    }
+    let query_cube = Cube {
+        x: 35.0 - BENCH_RANGE_RADIUS,
+        y: 45.0 - BENCH_RANGE_RADIUS,
+        z: 35.0 - BENCH_RANGE_RADIUS,
+        width: 2.0 * BENCH_RANGE_RADIUS,
+        height: 2.0 * BENCH_RANGE_RADIUS,
+        depth: 2.0 * BENCH_RANGE_RADIUS,
+    };
+    let mut cc = configure_criterion();
+    bench_range_search(
+        "range_rstartree_bbox_3d",
+        &tree,
+        &query_cube,
+        |t, q, _| t.range_search_bbox(q),
         &mut cc,
     );
 }
@@ -217,5 +308,9 @@ criterion_group!(
     benchmark_range_kdtree_3d,
     benchmark_range_rtree_3d,
     benchmark_range_bbox_rtree_3d,
-    benchmark_range_octree_3d
+    benchmark_range_octree_3d,
+    benchmark_range_rstartree_2d,
+    benchmark_range_rstartree_3d,
+    benchmark_range_bbox_rstartree_2d,
+    benchmark_range_bbox_rstartree_3d
 );
