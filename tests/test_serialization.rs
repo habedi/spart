@@ -67,9 +67,11 @@ mod tests {
 
     #[test]
     fn test_kdtree_serialization() -> Anyhow {
-        let mut tree: KdTree<Point2D<String>> = KdTree::new(2).unwrap();
-        tree.insert(Point2D::new(1.0, 2.0, Some("point1".to_string())));
-        tree.insert(Point2D::new(3.0, 4.0, Some("point2".to_string())));
+        let mut tree: KdTree<Point2D<String>> = KdTree::new();
+        tree.insert(Point2D::new(1.0, 2.0, Some("A".to_string())))
+            .unwrap();
+        tree.insert(Point2D::new(3.0, 4.0, Some("B".to_string())))
+            .unwrap();
 
         let encoded: Vec<u8> = bincode::serialize(&tree)?;
         let decoded: KdTree<Point2D<String>> = bincode::deserialize(&encoded[..])?;

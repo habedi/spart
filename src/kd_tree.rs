@@ -11,16 +11,16 @@
 //! use spart::kd_tree::{KdPoint, KdTree};
 //!
 //! // Create a 2D Kd‑tree and insert some points.
-//! let mut tree2d: KdTree<Point2D<()>> = KdTree::new(2).unwrap();
-//! tree2d.insert(Point2D::new(1.0, 2.0, None));
-//! tree2d.insert(Point2D::new(3.0, 4.0, None));
+//! let mut tree2d: KdTree<Point2D<()>> = KdTree::new();
+//! tree2d.insert(Point2D::new(1.0, 2.0, None)).unwrap();
+//! tree2d.insert(Point2D::new(3.0, 4.0, None)).unwrap();
 //! let neighbors2d = tree2d.knn_search::<EuclideanDistance>(&Point2D::new(2.0, 3.0, None), 1);
 //! assert!(!neighbors2d.is_empty());
 //!
 //! // Create a 3D Kd‑tree and insert some points.
-//! let mut tree3d: KdTree<Point3D<()>> = KdTree::new(3).unwrap();
-//! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None));
-//! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None));
+//! let mut tree3d: KdTree<Point3D<()>> = KdTree::new();
+//! tree3d.insert(Point3D::new(1.0, 2.0, 3.0, None)).unwrap();
+//! tree3d.insert(Point3D::new(4.0, 5.0, 6.0, None)).unwrap();
 //! let neighbors3d = tree3d.knn_search::<EuclideanDistance>(&Point3D::new(2.0, 3.0, 4.0, None), 1);
 //! assert!(!neighbors3d.is_empty());
 //! ```
@@ -144,48 +144,56 @@ impl<P: KdPoint> KdNode<P> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct KdTree<P: KdPoint> {
     root: Option<Box<KdNode<P>>>,
-    k: usize,
+    k: Option<usize>,
+}
+
+impl<P: KdPoint> Default for KdTree<P> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<P: KdPoint> KdTree<P> {
-    /// Creates a new Kd‑tree for points in `k` dimensions.
-    ///
-    /// # Arguments
-    ///
-    /// * `k` - The number of dimensions.
-    ///
-    /// # Errors
-    ///
-    /// Returns `SpartError::InvalidDimension` if `k` is zero.
-    pub fn new(k: usize) -> Result<Self, SpartError> {
-        if k == 0 {
-            return Err(SpartError::InvalidDimension {
-                requested: 0,
-                available: 0,
-            });
+    /// Creates a new, empty Kd-tree.
+    pub fn new() -> Self {
+        KdTree {
+            root: None,
+            k: None,
         }
-        Ok(KdTree { root: None, k })
     }
 
     /// Inserts a point into the Kd‑tree.
+    ///
+    /// If the tree is empty, the dimension of the tree is set to the dimension of the point.
     ///
     /// # Arguments
     ///
     /// * `point` - The point to insert.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the point's dimension does not match the tree's dimension.
-    pub fn insert(&mut self, point: P) {
-        if point.dims() != self.k {
-            panic!(
-                "Point dimension {} does not match KDTree dimension {}",
-                point.dims(),
-                self.k
-            );
-        }
+    /// Returns `SpartError::DimensionMismatch` if the point's dimension does not match
+    /// the dimension of the tree.
+    pub fn insert(&mut self, point: P) -> Result<(), SpartError> {
+        let k = match self.k {
+            Some(k) => {
+                if point.dims() != k {
+                    return Err(SpartError::DimensionMismatch {
+                        expected: k,
+                        actual: point.dims(),
+                    });
+                }
+                k
+            }
+            None => {
+                let k = point.dims();
+                self.k = Some(k);
+                k
+            }
+        };
         info!("Inserting point: {:?}", point);
-        self.root = Some(Self::insert_rec(self.root.take(), point, 0, self.k));
+        self.root = Some(Self::insert_rec(self.root.take(), point, 0, k));
+        Ok(())
     }
 
     /// Inserts a bulk of points into the Kd-tree.
@@ -194,11 +202,33 @@ impl<P: KdPoint> KdTree<P> {
     ///
     /// * `points` - The points to insert. This method takes ownership of the vector
     ///   to avoid mutating the caller's data (e.g., reordering during bulk build).
-    pub fn insert_bulk(&mut self, mut points: Vec<P>) {
+    ///
+    /// # Errors
+    ///
+    /// Returns `SpartError::DimensionMismatch` if the points have inconsistent dimensions
+    /// or conflict with the tree's dimension.
+    pub fn insert_bulk(&mut self, mut points: Vec<P>) -> Result<(), SpartError> {
         if points.is_empty() {
-            return;
+            return Ok(());
+        }
+        let k = match self.k {
+            Some(k) => k,
+            None => {
+                let k = points[0].dims();
+                self.k = Some(k);
+                k
+            }
+        };
+        for p in &points {
+            if p.dims() != k {
+                return Err(SpartError::DimensionMismatch {
+                    expected: k,
+                    actual: p.dims(),
+                });
+            }
         }
         self.root = self.insert_bulk_rec(&mut points[..], 0);
+        Ok(())
     }
 
     fn insert_bulk_rec(&mut self, points: &mut [P], depth: usize) -> Option<Box<KdNode<P>>> {
@@ -206,7 +236,7 @@ impl<P: KdPoint> KdTree<P> {
             return None;
         }
 
-        let axis = depth % self.k;
+        let axis = depth % self.k.unwrap();
         points.sort_by(|a, b| {
             a.coord(axis)
                 .unwrap()
@@ -366,9 +396,16 @@ impl<P: KdPoint> KdTree<P> {
     ///
     /// `true` if the point was found and deleted, otherwise `false`.
     pub fn delete(&mut self, point: &P) -> bool {
+        if self.root.is_none() {
+            return false;
+        }
         info!("Attempting to delete point: {:?}", point);
-        let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, self.k);
+        let k = self.k.unwrap();
+        let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, k);
         self.root = new_root;
+        if self.root.is_none() {
+            self.k = None;
+        }
         deleted
     }
 

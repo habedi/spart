@@ -24,6 +24,13 @@ pub enum SpartError {
         /// The capacity value that was provided.
         capacity: usize,
     },
+    /// Occurs when a point's dimension does not match the tree's dimension.
+    DimensionMismatch {
+        /// The expected dimension.
+        expected: usize,
+        /// The actual dimension.
+        actual: usize,
+    },
 }
 
 impl fmt::Display for SpartError {
@@ -42,6 +49,12 @@ impl fmt::Display for SpartError {
                 write!(
                     f,
                     "Invalid capacity: {capacity}. Capacity must be greater than zero."
+                )
+            }
+            SpartError::DimensionMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "Dimension mismatch: expected {expected}, but got {actual}"
                 )
             }
         }
