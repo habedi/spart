@@ -162,6 +162,14 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Creates a new, empty Kd-tree with the specified dimension.
+    pub fn with_dimension(k: usize) -> Self {
+        KdTree {
+            root: None,
+            k: Some(k),
+        }
+    }
+
     /// Inserts a point into the Kd‑tree.
     ///
     /// If the tree is empty, the dimension of the tree is set to the dimension of the point.

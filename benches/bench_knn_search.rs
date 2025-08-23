@@ -8,9 +8,21 @@ use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
 use std::hint::black_box;
 use tracing::info;
 
-/// Configures Criterion using the shared benchmark timeout.
-fn configure_criterion() -> Criterion {
-    Criterion::default().measurement_time(BENCH_TIMEOUT)
+fn bench_knn_search<'a, T, P, R>(
+    name: &str,
+    tree: &'a T,
+    query: &P,
+    search_fn: impl Fn(&'a T, &P, usize) -> R,
+    cc: &mut Criterion,
+) where
+    R: 'a,
+{
+    cc.bench_function(name, |b| {
+        b.iter(|| {
+            let res = search_fn(tree, query, BENCH_KNN_SIZE);
+            black_box(res)
+        })
+    });
 }
 
 fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
@@ -22,13 +34,13 @@ fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_kdtree_2d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_kdtree_2d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
@@ -40,13 +52,13 @@ fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_rtree_2d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_rtree_2d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
@@ -64,13 +76,13 @@ fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_quadtree_2d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_quadtree_2d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
@@ -82,13 +94,13 @@ fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_kdtree_3d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_kdtree_3d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
@@ -100,13 +112,13 @@ fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_rtree_3d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_rtree_3d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_octree_3d(_c: &mut Criterion) {
@@ -119,13 +131,13 @@ fn benchmark_knn_octree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_octree_3d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_octree_3d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_rstartree_2d(_c: &mut Criterion) {
@@ -137,13 +149,13 @@ fn benchmark_knn_rstartree_2d(_c: &mut Criterion) {
     }
     let target = Point2D::new(35.0, 45.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_rstartree_2d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_rstartree_2d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 fn benchmark_knn_rstartree_3d(_c: &mut Criterion) {
@@ -155,17 +167,19 @@ fn benchmark_knn_rstartree_3d(_c: &mut Criterion) {
     }
     let target = Point3D::new(35.0, 45.0, 35.0, None);
     let mut cc = configure_criterion();
-    let name = "knn_rstartree_3d";
-    cc.bench_function(name, |b| {
-        b.iter(|| {
-            let res = tree.knn_search::<EuclideanDistance>(&target, BENCH_KNN_SIZE);
-            black_box(res)
-        })
-    });
+    bench_knn_search(
+        "knn_rstartree_3d",
+        &tree,
+        &target,
+        |t, q, k| t.knn_search::<EuclideanDistance>(q, k),
+        &mut cc,
+    );
 }
 
 criterion_group!(
-    benches,
+    name = benches;
+    config = configure_criterion();
+    targets =
     benchmark_knn_kdtree_2d,
     benchmark_knn_rtree_2d,
     benchmark_knn_quadtree_2d,

@@ -28,10 +28,6 @@ testpaths = ["pyspart/tests"]
 addopts = [
     "--tb=short",
     #"--disable-warnings",
-    "--cov=pyspart",
-    "--cov-branch",
-    "--cov-report=term",
-    "--cov-report=xml",
     "-rs"
 ]
 asyncio_mode = "auto"
