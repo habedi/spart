@@ -145,13 +145,15 @@ impl From<PyPoint2D> for Point2D<PyData> {
     }
 }
 
-impl From<Point2D<PyData>> for PyPoint2D {
-    fn from(p: Point2D<PyData>) -> Self {
-        PyPoint2D {
-            x: p.x,
-            y: p.y,
-            data: p.data.unwrap().0,
-        }
+impl From<&Point2D<PyData>> for PyPoint2D {
+    fn from(p: &Point2D<PyData>) -> Self {
+        Python::with_gil(|py| {
+            PyPoint2D {
+                x: p.x,
+                y: p.y,
+                data: p.data.as_ref().unwrap().0.clone_ref(py),
+            }
+        })
     }
 }
 
@@ -202,14 +204,16 @@ impl From<PyPoint3D> for Point3D<PyData> {
     }
 }
 
-impl From<Point3D<PyData>> for PyPoint3D {
-    fn from(p: Point3D<PyData>) -> Self {
-        PyPoint3D {
-            x: p.x,
-            y: p.y,
-            z: p.z,
-            data: p.data.unwrap().0,
-        }
+impl From<&Point3D<PyData>> for PyPoint3D {
+    fn from(p: &Point3D<PyData>) -> Self {
+        Python::with_gil(|py| {
+            PyPoint3D {
+                x: p.x,
+                y: p.y,
+                z: p.z,
+                data: p.data.as_ref().unwrap().0.clone_ref(py),
+            }
+        })
     }
 }
 
@@ -277,7 +281,7 @@ impl PyQuadtree {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -286,7 +290,7 @@ impl PyQuadtree {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -347,7 +351,7 @@ impl PyOctree {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -356,7 +360,7 @@ impl PyOctree {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -417,7 +421,7 @@ impl PyKdTree2D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -426,7 +430,7 @@ impl PyKdTree2D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -487,7 +491,7 @@ impl PyKdTree3D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -496,7 +500,7 @@ impl PyKdTree3D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .map(|p| p.into())
+            .map(|p| (&p).into())
             .collect()
     }
 
@@ -557,7 +561,6 @@ impl PyRTree2D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -567,7 +570,6 @@ impl PyRTree2D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -629,7 +631,6 @@ impl PyRTree3D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -639,7 +640,6 @@ impl PyRTree3D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -702,7 +702,6 @@ impl PyRStarTree2D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -712,7 +711,6 @@ impl PyRStarTree2D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -774,7 +772,6 @@ impl PyRStarTree3D {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
@@ -784,7 +781,6 @@ impl PyRStarTree3D {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .cloned()
             .map(|p| p.into())
             .collect()
     }
