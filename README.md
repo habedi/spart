@@ -14,7 +14,7 @@
 [![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart)
 
-A collection of space partitioning trees for Rust
+A collection of space partitioning trees for Rust with Python bindings
 
 </div>
 
@@ -240,8 +240,8 @@ $env:DEBUG_SPART = "true"
 - **Supported Geometries and Queries**
     -   [x] Point data (`Point2D`, `Point3D`)
     -   [x] kNN search
-    -   [x] Circular or Spherical range search
-    -   [x] Rectangular/Cuboid range search (`range_search_bbox`)
+    -   [x] Circular or spherical range search
+    -   [x] Rectangular and cuboid range search (`range_search_bbox`)
     -   [ ] `update` method for moving points (currently needs delete + insert)
     -   [ ] Support for storing non-point geometries (for example, lines, polygons)
     -   [ ] Advanced intersection queries (like finding all stored items that intersect a given polygon)
