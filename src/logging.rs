@@ -8,6 +8,7 @@
 use ctor::ctor;
 use tracing::Level;
 
+#[ cfg( feature = "log" ) ]
 #[ctor]
 fn set_debug_level() {
     // If DEBUG_SPART is not set or set to a falsy value, disable logging.
