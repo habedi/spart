@@ -5,9 +5,12 @@
 //! If `DEBUG_SPART` is not set or is set to a falsy value ("0", "false", or empty),
 //! logging will remain disabled. Otherwise, logging is enabled with a maximum level of DEBUG.
 
+#[cfg(feature = "setup_tracing")]
 use ctor::ctor;
+#[cfg(feature = "setup_tracing")]
 use tracing::Level;
 
+#[cfg(feature = "setup_tracing")]
 #[ctor]
 fn set_debug_level() {
     // If DEBUG_SPART is not set or set to a falsy value, disable logging.
