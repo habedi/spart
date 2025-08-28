@@ -14,7 +14,7 @@
 [![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart)
 
-A collection of space partitioning trees for Rust with Python bindings
+A collection of space partitioning trees for Rust
 
 </div>
 

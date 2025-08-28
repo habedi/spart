@@ -23,7 +23,8 @@ fn bench_insert_bulk_quadtree_2d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(&points));
+                tree.insert_bulk(&points);
+                black_box(());
             },
         )
     });
@@ -40,7 +41,8 @@ fn bench_insert_bulk_octree_3d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(&points));
+                tree.insert_bulk(&points);
+                black_box(());
             },
         )
     });
@@ -88,7 +90,8 @@ fn bench_insert_bulk_rtree_2d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                tree.insert_bulk(points);
+                black_box(());
             },
         )
     });
@@ -104,7 +107,8 @@ fn bench_insert_bulk_rtree_3d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                tree.insert_bulk(points);
+                black_box(());
             },
         )
     });
@@ -120,7 +124,8 @@ fn bench_insert_bulk_rstartree_2d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                tree.insert_bulk(points);
+                black_box(());
             },
         )
     });
@@ -136,7 +141,8 @@ fn bench_insert_bulk_rstartree_3d(_c: &mut Criterion) {
                 (tree, points.clone())
             },
             |(mut tree, points)| {
-                black_box(tree.insert_bulk(points));
+                tree.insert_bulk(points);
+                black_box(());
             },
         )
     });
