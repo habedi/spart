@@ -240,8 +240,8 @@ $env:DEBUG_SPART = "true"
 - **Supported Geometries and Queries**
     -   [x] Point data (`Point2D`, `Point3D`)
     -   [x] kNN search
-    -   [x] Circular or Spherical range search
-    -   [x] Rectangular/Cuboid range search (`range_search_bbox`)
+    -   [x] Circular or spherical range search
+    -   [x] Rectangular and cuboid range search (`range_search_bbox`)
     -   [ ] `update` method for moving points (currently needs delete + insert)
     -   [ ] Support for storing non-point geometries (for example, lines, polygons)
     -   [ ] Advanced intersection queries (like finding all stored items that intersect a given polygon)
