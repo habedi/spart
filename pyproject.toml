@@ -1,7 +1,7 @@
 [project]
 name = "spart"
 version = "0.1.0"
-description = "Python environment for Spart library"
+description = "Python environment for the Spart project"
 
 requires-python = ">=3.10,<4.0"
 dependencies = [
