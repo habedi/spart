@@ -17,13 +17,10 @@ fn bench_insert<'a, T, P>(
     P: Clone,
 {
     c.bench_function(name, |b| {
-        b.iter_with_setup(
-            || setup(),
-            |(mut tree, point)| {
-                insert(&mut tree, point.clone());
-                black_box(tree);
-            },
-        )
+        b.iter_with_setup(&mut setup, |(mut tree, point)| {
+            insert(&mut tree, point.clone());
+            black_box(tree);
+        })
     });
 }
 
