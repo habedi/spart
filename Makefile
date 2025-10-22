@@ -81,7 +81,6 @@ install-snap: ## Install a few dependencies using Snapcraft
 .PHONY: install-deps
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
-	@rustup
 	@cargo install cargo-tarpaulin cargo-nextest cargo-audit cargo-careful
 	@cargo install --locked cargo-nextest --version 0.9.97-b.2
 	@sudo apt-get install -y python3-pip
