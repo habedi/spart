@@ -230,10 +230,10 @@ impl<T: RTreeObject> RTree<T> {
             entries: group2,
             is_leaf: self.root.is_leaf,
         };
-        let mbr1 =
-            common_compute_group_mbr(&child1.entries).expect("Group 1 should have a bounding box");
-        let mbr2 =
-            common_compute_group_mbr(&child2.entries).expect("Group 2 should have a bounding box");
+        let mbr1 = common_compute_group_mbr(&child1.entries)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
+        let mbr2 = common_compute_group_mbr(&child2.entries)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
         self.root.is_leaf = false;
         self.root.entries.push(RTreeEntry::Node {
             mbr: mbr1,
@@ -352,8 +352,10 @@ fn split_entries<T: RTreeObject>(
     let mut group1 = vec![seed1];
     let mut group2 = vec![seed2];
     for entry in entries {
-        let mbr1 = common_compute_group_mbr(&group1).expect("Group 1 should have a bounding box");
-        let mbr2 = common_compute_group_mbr(&group2).expect("Group 2 should have a bounding box");
+        let mbr1 = common_compute_group_mbr(&group1)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
+        let mbr2 = common_compute_group_mbr(&group2)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
         let enlargement1 = mbr1.enlargement(entry.mbr());
         let enlargement2 = mbr2.enlargement(entry.mbr());
         if enlargement1 < enlargement2 {

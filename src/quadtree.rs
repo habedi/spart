@@ -97,8 +97,8 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         let y = self.boundary.y;
         let w = self.boundary.width / 2.0;
         let h = self.boundary.height / 2.0;
-        self.northeast = Some(Box::new(
-            Quadtree::new(
+        self.northeast = Some(Box::new({
+            let child = Quadtree::new(
                 &Rectangle {
                     x: x + w,
                     y,
@@ -106,11 +106,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     height: h,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.northwest = Some(Box::new(
-            Quadtree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.northwest = Some(Box::new({
+            let child = Quadtree::new(
                 &Rectangle {
                     x,
                     y,
@@ -118,11 +121,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     height: h,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.southeast = Some(Box::new(
-            Quadtree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.southeast = Some(Box::new({
+            let child = Quadtree::new(
                 &Rectangle {
                     x: x + w,
                     y: y + h,
@@ -130,11 +136,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     height: h,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.southwest = Some(Box::new(
-            Quadtree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.southwest = Some(Box::new({
+            let child = Quadtree::new(
                 &Rectangle {
                     x,
                     y: y + h,
@@ -142,9 +151,12 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                     height: h,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
         self.divided = true;
         // Reinsert existing points into the appropriate children.
         let old_points = std::mem::take(&mut self.points);
@@ -181,16 +193,32 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             self.subdivide();
         }
 
-        if self.northwest.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .northwest
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
-        if self.northeast.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .northeast
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
-        if self.southwest.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .southwest
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
-        if self.southeast.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .southeast
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
 
@@ -237,40 +265,56 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             let mut children_points: [Vec<Point2D<T>>; 4] = [vec![], vec![], vec![], vec![]];
 
             for point in points_to_insert.drain(..) {
-                if self.northeast.as_ref().unwrap().boundary.contains(&point) {
+                if self
+                    .northeast
+                    .as_ref()
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
+                {
                     children_points[0].push(point);
-                } else if self.northwest.as_ref().unwrap().boundary.contains(&point) {
+                } else if self
+                    .northwest
+                    .as_ref()
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
+                {
                     children_points[1].push(point);
-                } else if self.southeast.as_ref().unwrap().boundary.contains(&point) {
+                } else if self
+                    .southeast
+                    .as_ref()
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
+                {
                     children_points[2].push(point);
-                } else if self.southwest.as_ref().unwrap().boundary.contains(&point) {
+                } else if self
+                    .southwest
+                    .as_ref()
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
+                {
                     children_points[3].push(point);
                 }
             }
 
             if !children_points[0].is_empty() {
-                self.northeast
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[0]);
+                if let Some(c) = self.northeast.as_mut() {
+                    c.insert_bulk(&children_points[0]);
+                }
             }
             if !children_points[1].is_empty() {
-                self.northwest
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[1]);
+                if let Some(c) = self.northwest.as_mut() {
+                    c.insert_bulk(&children_points[1]);
+                }
             }
             if !children_points[2].is_empty() {
-                self.southeast
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[2]);
+                if let Some(c) = self.southeast.as_mut() {
+                    c.insert_bulk(&children_points[2]);
+                }
             }
             if !children_points[3].is_empty() {
-                self.southwest
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[3]);
+                if let Some(c) = self.southwest.as_mut() {
+                    c.insert_bulk(&children_points[3]);
+                }
             }
         }
     }
@@ -388,9 +432,11 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         if self.divided {
             for child in self.children() {
                 if heap.len() == k {
-                    let current_farthest = -heap.peek().unwrap().neg_distance.into_inner();
-                    if child.min_distance_sq(target) > current_farthest {
-                        continue;
+                    if let Some(top) = heap.peek() {
+                        let current_farthest = -top.neg_distance.into_inner();
+                        if child.min_distance_sq(target) > current_farthest {
+                            continue;
+                        }
                     }
                 }
                 child.knn_search_helper::<M>(target, k, heap);

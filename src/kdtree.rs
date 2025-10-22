@@ -235,21 +235,25 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
-        self.root = self.insert_bulk_rec(&mut points[..], 0);
+        // Pass k explicitly to avoid unwraps inside recursion
+        self.root = Self::insert_bulk_rec(&mut points[..], 0, k);
         Ok(())
     }
 
-    fn insert_bulk_rec(&mut self, points: &mut [P], depth: usize) -> Option<Box<KdNode<P>>> {
+    fn insert_bulk_rec(points: &mut [P], depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
         if points.is_empty() {
             return None;
         }
 
-        let axis = depth % self.k.unwrap();
+        let axis = depth % k;
         points.sort_by(|a, b| {
-            a.coord(axis)
-                .unwrap()
-                .partial_cmp(&b.coord(axis).unwrap())
-                .unwrap()
+            let ac = a
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            let bc = b
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            ac.partial_cmp(&bc).unwrap_or(Ordering::Equal)
         });
         let median_idx = points.len() / 2;
 
@@ -257,8 +261,8 @@ impl<P: KdPoint> KdTree<P> {
         let (left_slice, right_slice) = points.split_at_mut(median_idx);
         let right_slice = &mut right_slice[1..];
 
-        node.left = self.insert_bulk_rec(left_slice, depth + 1);
-        node.right = self.insert_bulk_rec(right_slice, depth + 1);
+        node.left = Self::insert_bulk_rec(left_slice, depth + 1, k);
+        node.right = Self::insert_bulk_rec(right_slice, depth + 1, k);
 
         Some(Box::new(node))
     }
@@ -271,7 +275,14 @@ impl<P: KdPoint> KdTree<P> {
     ) -> Box<KdNode<P>> {
         if let Some(mut current) = node {
             let axis = depth % k;
-            if point.coord(axis).unwrap() < current.point.coord(axis).unwrap() {
+            let p_coord = point
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            let c_coord = current
+                .point
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            if p_coord < c_coord {
                 current.left = Some(Self::insert_rec(current.left.take(), point, depth + 1, k));
             } else {
                 current.right = Some(Self::insert_rec(current.right.take(), point, depth + 1, k));
@@ -306,7 +317,7 @@ impl<P: KdPoint> KdTree<P> {
             .into_iter()
             .map(|item| (item.dist.into_inner(), item.point))
             .collect();
-        result.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        result.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
         result.into_iter().map(|(_d, p)| p).collect()
     }
 
@@ -335,8 +346,13 @@ impl<P: KdPoint> KdTree<P> {
                 }
             }
             let axis = depth % target.dims();
-            let target_coord = target.coord(axis).unwrap();
-            let node_coord = n.point.coord(axis).unwrap();
+            let target_coord = target
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            let node_coord = n
+                .point
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
             let (first, second) = if target_coord < node_coord {
                 (&n.left, &n.right)
             } else {
@@ -345,7 +361,12 @@ impl<P: KdPoint> KdTree<P> {
             Self::knn_search_rec::<M>(first, target, k_neighbors, depth + 1, heap);
             let diff = (target_coord - node_coord).abs();
             let diff_sq = diff * diff;
-            if heap.len() < k_neighbors || diff_sq < heap.peek().unwrap().dist.into_inner() {
+            if heap.len() < k_neighbors
+                || heap
+                    .peek()
+                    .map(|h| diff_sq < h.dist.into_inner())
+                    .unwrap_or(true)
+            {
                 Self::knn_search_rec::<M>(second, target, k_neighbors, depth + 1, heap);
             }
         }
@@ -383,8 +404,13 @@ impl<P: KdPoint> KdTree<P> {
                 found.push(n.point.clone());
             }
             let axis = depth % center.dims();
-            let center_coord = center.coord(axis).unwrap();
-            let node_coord = n.point.coord(axis).unwrap();
+            let center_coord = center
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+            let node_coord = n
+                .point
+                .coord(axis)
+                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
             if center_coord - radius <= node_coord {
                 Self::range_search_rec::<M>(&n.left, center, radius_sq, depth + 1, radius, found);
             }
@@ -408,7 +434,10 @@ impl<P: KdPoint> KdTree<P> {
             return false;
         }
         info!("Attempting to delete point: {:?}", point);
-        let k = self.k.unwrap();
+        let k = match self.k {
+            Some(k) => k,
+            None => return false,
+        };
         let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, k);
         self.root = new_root;
         if self.root.is_none() {
@@ -442,7 +471,14 @@ impl<P: KdPoint> KdTree<P> {
                     } else {
                         (None, true)
                     }
-                } else if point.coord(axis).unwrap() < current.point.coord(axis).unwrap() {
+                } else if point
+                    .coord(axis)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"))
+                    < current
+                        .point
+                        .coord(axis)
+                        .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"))
+                {
                     let (new_left, deleted) =
                         Self::delete_rec(current.left.take(), point, depth + 1, k);
                     current.left = new_left;
@@ -464,20 +500,38 @@ impl<P: KdPoint> KdTree<P> {
         if axis == d {
             if let Some(ref left) = node.left {
                 let left_min = Self::find_min(left, d, depth + 1, k);
-                if left_min.coord(d).unwrap() < min.coord(d).unwrap() {
+                let left_c = left_min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                let min_c = min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                if left_c < min_c {
                     min = left_min;
                 }
             }
         } else {
             if let Some(ref left) = node.left {
                 let left_min = Self::find_min(left, d, depth + 1, k);
-                if left_min.coord(d).unwrap() < min.coord(d).unwrap() {
+                let left_c = left_min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                let min_c = min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                if left_c < min_c {
                     min = left_min;
                 }
             }
             if let Some(ref right) = node.right {
                 let right_min = Self::find_min(right, d, depth + 1, k);
-                if right_min.coord(d).unwrap() < min.coord(d).unwrap() {
+                let right_c = right_min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                let min_c = min
+                    .coord(d)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                if right_c < min_c {
                     min = right_min;
                 }
             }

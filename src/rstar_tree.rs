@@ -248,9 +248,9 @@ impl<T: RStarTreeObject> RStarTree<T> {
                         is_leaf: self.root.is_leaf,
                     };
                     let mbr1 = common_compute_group_mbr(&child1.entries)
-                        .expect("Group 1 should have a bounding box");
+                        .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
                     let mbr2 = common_compute_group_mbr(&child2.entries)
-                        .expect("Group 2 should have a bounding box");
+                        .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
                     self.root.is_leaf = false;
                     self.root.entries.clear();
                     self.root.entries.push(RStarTreeEntry::Node {
@@ -475,9 +475,9 @@ where
                     is_leaf: child.is_leaf,
                 };
                 let mbr1 = common_compute_group_mbr(&child1.entries)
-                    .expect("Group 1 should have a bounding box");
+                    .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
                 let mbr2 = common_compute_group_mbr(&child2.entries)
-                    .expect("Group 2 should have a bounding box");
+                    .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
                 node.entries[best_index] = RStarTreeEntry::Node {
                     mbr: mbr1,
                     child: Box::new(child1),
@@ -537,10 +537,26 @@ where
     let reinsert_count = (max_entries as f64 * 0.3).ceil() as usize;
 
     node.entries.sort_by(|a, b| {
-        let center_a: Vec<f64> = (0..T::B::DIM).map(|d| a.mbr().center(d).unwrap()).collect();
-        let center_b: Vec<f64> = (0..T::B::DIM).map(|d| b.mbr().center(d).unwrap()).collect();
+        let center_a: Vec<f64> = (0..T::B::DIM)
+            .map(|d| {
+                a.mbr()
+                    .center(d)
+                    .unwrap_or_else(|_| unreachable!("dim valid"))
+            })
+            .collect();
+        let center_b: Vec<f64> = (0..T::B::DIM)
+            .map(|d| {
+                b.mbr()
+                    .center(d)
+                    .unwrap_or_else(|_| unreachable!("dim valid"))
+            })
+            .collect();
         let node_center: Vec<f64> = (0..T::B::DIM)
-            .map(|d| node_mbr.center(d).unwrap())
+            .map(|d| {
+                node_mbr
+                    .center(d)
+                    .unwrap_or_else(|_| unreachable!("dim valid"))
+            })
             .collect();
 
         let dist_a = center_a
@@ -574,20 +590,24 @@ where
 
     for dim in 0..T::B::DIM {
         entries.sort_by(|a, b| {
-            a.mbr()
+            let ca = a
+                .mbr()
                 .center(dim)
-                .unwrap()
-                .partial_cmp(&b.mbr().center(dim).unwrap())
-                .unwrap_or(Ordering::Equal)
+                .unwrap_or_else(|_| unreachable!("dim valid"));
+            let cb = b
+                .mbr()
+                .center(dim)
+                .unwrap_or_else(|_| unreachable!("dim valid"));
+            ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
         });
 
         for k in min_entries..=entries.len() - min_entries {
             let group1 = &entries[..k];
             let group2 = &entries[k..];
-            let mbr1 =
-                common_compute_group_mbr(group1).expect("Group 1 should have a bounding box");
-            let mbr2 =
-                common_compute_group_mbr(group2).expect("Group 2 should have a bounding box");
+            let mbr1 = common_compute_group_mbr(group1)
+                .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
+            let mbr2 = common_compute_group_mbr(group2)
+                .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
             let margin = mbr1.margin() + mbr2.margin();
             if margin < min_margin {
                 min_margin = margin;
@@ -598,11 +618,15 @@ where
     }
 
     entries.sort_by(|a, b| {
-        a.mbr()
+        let ca = a
+            .mbr()
             .center(best_axis)
-            .unwrap()
-            .partial_cmp(&b.mbr().center(best_axis).unwrap())
-            .unwrap_or(Ordering::Equal)
+            .unwrap_or_else(|_| unreachable!("dim valid"));
+        let cb = b
+            .mbr()
+            .center(best_axis)
+            .unwrap_or_else(|_| unreachable!("dim valid"));
+        ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
     });
 
     let mut best_overlap = f64::INFINITY;
@@ -611,8 +635,10 @@ where
     for k in min_entries..=entries.len() - min_entries {
         let group1 = &entries[..k];
         let group2 = &entries[k..];
-        let mbr1 = common_compute_group_mbr(group1).expect("Group 1 should have a bounding box");
-        let mbr2 = common_compute_group_mbr(group2).expect("Group 2 should have a bounding box");
+        let mbr1 = common_compute_group_mbr(group1)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
+        let mbr2 = common_compute_group_mbr(group2)
+            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
         let overlap = mbr1.overlap(&mbr2);
         let area = mbr1.area() + mbr2.area();
 
