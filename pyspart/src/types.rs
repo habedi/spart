@@ -52,7 +52,15 @@ impl PartialOrd for PyData {
 
 impl std::fmt::Debug for PyData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Python::with_gil(|py| write!(f, "PyData({})", self.0.bind(py).repr().unwrap()))
+        Python::with_gil(|py| {
+            let repr = self
+                .0
+                .bind(py)
+                .repr()
+                .map(|r| r.to_string())
+                .unwrap_or_else(|_| "<repr failed>".to_string());
+            write!(f, "PyData({})", repr)
+        })
     }
 }
 

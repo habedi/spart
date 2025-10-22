@@ -44,6 +44,18 @@ impl PyPoint3D {
     fn new(x: f64, y: f64, z: f64, data: PyObject) -> Self {
         PyPoint3D { x, y, z, data }
     }
+
+    /// Python equality comparison.
+    fn __eq__(&self, other: &Self) -> bool {
+        self.eq(other)
+    }
+
+    /// Python hash function (not hashable due to mutable data).
+    fn __hash__(&self) -> PyResult<isize> {
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "Point3D objects are not hashable",
+        ))
+    }
 }
 
 impl From<PyPoint3D> for Point3D<PyData> {
@@ -58,7 +70,18 @@ impl From<&Point3D<PyData>> for PyPoint3D {
             x: p.x,
             y: p.y,
             z: p.z,
-            data: p.data.as_ref().unwrap().0.clone_ref(py),
+            data: p
+                .data
+                .as_ref()
+                .expect("Point3D data should not be None in Python bindings")
+                .0
+                .clone_ref(py),
         })
+    }
+}
+
+impl From<Point3D<PyData>> for PyPoint3D {
+    fn from(p: Point3D<PyData>) -> Self {
+        (&p).into()
     }
 }

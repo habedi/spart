@@ -24,20 +24,46 @@ impl PyOctree {
         Ok(PyOctree { tree })
     }
 
+    /// Inserts a point into the octree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to insert.
+    ///
+    /// Returns:
+    ///     bool: True if the point was successfully inserted, False otherwise.
     fn insert(&mut self, point: PyPoint3D) -> bool {
         self.tree.insert(point.into())
     }
 
+    /// Inserts multiple points into the octree efficiently.
+    ///
+    /// Args:
+    ///     points (list[Point3D]): A list of points to insert.
     fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
         let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
         self.tree.insert_bulk(&rust_points);
     }
 
+    /// Deletes a point from the octree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to delete.
+    ///
+    /// Returns:
+    ///     bool: True if the point was found and deleted, False otherwise.
     fn delete(&mut self, point: PyPoint3D) -> bool {
         let p: Point3D<PyData> = point.into();
         self.tree.delete(&p)
     }
 
+    /// Finds the k nearest neighbors to the given point.
+    ///
+    /// Args:
+    ///     point (Point3D): The query point to search from.
+    ///     k (int): The number of nearest neighbors to find.
+    ///
+    /// Returns:
+    ///     list[Point3D]: A list of the k nearest points found.
     fn knn_search(&self, point: PyPoint3D, k: usize) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
         self.tree
@@ -47,6 +73,14 @@ impl PyOctree {
             .collect()
     }
 
+    /// Finds all points within a given radius of the query point.
+    ///
+    /// Args:
+    ///     point (Point3D): The center point to search from.
+    ///     radius (float): The search radius (using Euclidean distance).
+    ///
+    /// Returns:
+    ///     list[Point3D]: All points within the specified radius.
     fn range_search(&self, point: PyPoint3D, radius: f64) -> Vec<PyPoint3D> {
         let p: Point3D<PyData> = point.into();
         self.tree

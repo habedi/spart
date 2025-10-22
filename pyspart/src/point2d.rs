@@ -41,6 +41,18 @@ impl PyPoint2D {
     fn new(x: f64, y: f64, data: PyObject) -> Self {
         PyPoint2D { x, y, data }
     }
+
+    /// Python equality comparison.
+    fn __eq__(&self, other: &Self) -> bool {
+        self.eq(other)
+    }
+
+    /// Python hash function (not hashable due to mutable data).
+    fn __hash__(&self) -> PyResult<isize> {
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "Point2D objects are not hashable",
+        ))
+    }
 }
 
 impl From<PyPoint2D> for Point2D<PyData> {
@@ -54,7 +66,18 @@ impl From<&Point2D<PyData>> for PyPoint2D {
         Python::with_gil(|py| PyPoint2D {
             x: p.x,
             y: p.y,
-            data: p.data.as_ref().unwrap().0.clone_ref(py),
+            data: p
+                .data
+                .as_ref()
+                .expect("Point2D data should not be None in Python bindings")
+                .0
+                .clone_ref(py),
         })
+    }
+}
+
+impl From<Point2D<PyData>> for PyPoint2D {
+    fn from(p: Point2D<PyData>) -> Self {
+        (&p).into()
     }
 }
