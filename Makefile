@@ -144,7 +144,7 @@ wheel: ## Build the wheel file for PySpart
 
 .PHONY: wheel-manylinux
 wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
-	@echo "Building the manylinux PySpart wheel..."
+	@echo "Building the `manylinux` PySpart wheel..."
 	@(cd $(PYSPART_DIR) && maturin build --release --out $(WHEEL_DIR) --auditwheel check --zig)
 
 .PHONY: test-py
