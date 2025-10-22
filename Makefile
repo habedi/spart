@@ -11,6 +11,12 @@ PYSPART_DIR     := pyspart
 PY_DEP_MNGR     := uv
 WHEEL_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-*.whl 2>/dev/null | head -n 1)
 
+# Pinned versions for Rust development tools
+TARPAULIN_VERSION=0.32.0
+NEXTEST_VERSION=0.9.101
+AUDIT_VERSION=0.21.2
+CAREFUL_VERSION=0.4.8
+
 # Default target
 .DEFAULT_GOAL := help
 
@@ -54,6 +60,7 @@ run-examples: build ## Run the Rust examples
 	@cargo run --example octree
 	@cargo run --example kdtree
 	@cargo run --example rtree
+	@cargo run --example rstar_tree
 
 .PHONY: run-py-examples
 run-py-examples: develop-py ## Run the Python examples
@@ -81,8 +88,14 @@ install-snap: ## Install a few dependencies using Snapcraft
 .PHONY: install-deps
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
-	@cargo install cargo-tarpaulin cargo-nextest cargo-audit cargo-careful
-	@cargo install --locked cargo-nextest --version 0.9.97-b.2
+	@rustup component add rustfmt clippy
+
+	# Install each tool with a specific, pinned version
+	@cargo install cargo-tarpaulin --version ${TARPAULIN_VERSION}
+	@cargo install cargo-nextest --version ${NEXTEST_VERSION}
+	@cargo install cargo-audit --version ${AUDIT_VERSION}
+	@cargo install cargo-careful --version ${CAREFUL_VERSION}
+
 	@sudo apt-get install -y python3-pip
 	@pip install $(PY_DEP_MNGR)
 
