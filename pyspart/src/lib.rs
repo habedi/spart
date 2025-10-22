@@ -1,22 +1,22 @@
 use pyo3::prelude::*;
 
-mod types;
 mod geometry;
+mod kdtree;
+mod octree;
 mod point2d;
 mod point3d;
 mod quadtree;
-mod octree;
-mod kdtree;
-mod rtree;
 mod rstar_tree;
+mod rtree;
+mod types;
 
+use kdtree::{PyKdTree2D, PyKdTree3D};
+use octree::PyOctree;
 use point2d::PyPoint2D;
 use point3d::PyPoint3D;
 use quadtree::PyQuadtree;
-use octree::PyOctree;
-use kdtree::{PyKdTree2D, PyKdTree3D};
-use rtree::{PyRTree2D, PyRTree3D};
 use rstar_tree::{PyRStarTree2D, PyRStarTree3D};
+use rtree::{PyRTree2D, PyRTree3D};
 
 #[pymodule]
 fn pyspart(m: &Bound<'_, PyModule>) -> PyResult<()> {

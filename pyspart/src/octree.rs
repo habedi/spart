@@ -19,8 +19,8 @@ pub struct PyOctree {
 impl PyOctree {
     #[new]
     fn new(boundary: PyCube, capacity: usize) -> PyResult<Self> {
-        let tree = Octree::new(&boundary.0, capacity)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            Octree::new(&boundary.0, capacity).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyOctree { tree })
     }
 
@@ -75,8 +75,8 @@ impl PyOctree {
     #[classmethod]
     fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
         let file = File::open(path)?;
-        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyOctree { tree })
     }
 }
-

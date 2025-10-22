@@ -15,25 +15,26 @@ pub struct PyPoint3D {
 
 impl Clone for PyPoint3D {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| {
-            PyPoint3D {
-                x: self.x,
-                y: self.y,
-                z: self.z,
-                data: self.data.clone_ref(py),
-            }
+        Python::with_gil(|py| PyPoint3D {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            data: self.data.clone_ref(py),
         })
     }
 }
 
 impl PartialEq for PyPoint3D {
     fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y && self.z == other.z && Python::with_gil(|py| {
-            match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
-                Ok(result) => result.is_truthy().unwrap_or(false),
-                Err(_) => false,
-            }
-        })
+        self.x == other.x
+            && self.y == other.y
+            && self.z == other.z
+            && Python::with_gil(|py| {
+                match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
+                    Ok(result) => result.is_truthy().unwrap_or(false),
+                    Err(_) => false,
+                }
+            })
     }
 }
 
@@ -53,14 +54,11 @@ impl From<PyPoint3D> for Point3D<PyData> {
 
 impl From<&Point3D<PyData>> for PyPoint3D {
     fn from(p: &Point3D<PyData>) -> Self {
-        Python::with_gil(|py| {
-            PyPoint3D {
-                x: p.x,
-                y: p.y,
-                z: p.z,
-                data: p.data.as_ref().unwrap().0.clone_ref(py),
-            }
+        Python::with_gil(|py| PyPoint3D {
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            data: p.data.as_ref().unwrap().0.clone_ref(py),
         })
     }
 }
-

@@ -14,24 +14,24 @@ pub struct PyPoint2D {
 
 impl Clone for PyPoint2D {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| {
-            PyPoint2D {
-                x: self.x,
-                y: self.y,
-                data: self.data.clone_ref(py),
-            }
+        Python::with_gil(|py| PyPoint2D {
+            x: self.x,
+            y: self.y,
+            data: self.data.clone_ref(py),
         })
     }
 }
 
 impl PartialEq for PyPoint2D {
     fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y && Python::with_gil(|py| {
-            match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
-                Ok(result) => result.is_truthy().unwrap_or(false),
-                Err(_) => false,
-            }
-        })
+        self.x == other.x
+            && self.y == other.y
+            && Python::with_gil(|py| {
+                match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
+                    Ok(result) => result.is_truthy().unwrap_or(false),
+                    Err(_) => false,
+                }
+            })
     }
 }
 
@@ -51,13 +51,10 @@ impl From<PyPoint2D> for Point2D<PyData> {
 
 impl From<&Point2D<PyData>> for PyPoint2D {
     fn from(p: &Point2D<PyData>) -> Self {
-        Python::with_gil(|py| {
-            PyPoint2D {
-                x: p.x,
-                y: p.y,
-                data: p.data.as_ref().unwrap().0.clone_ref(py),
-            }
+        Python::with_gil(|py| PyPoint2D {
+            x: p.x,
+            y: p.y,
+            data: p.data.as_ref().unwrap().0.clone_ref(py),
         })
     }
 }
-

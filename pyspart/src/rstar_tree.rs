@@ -19,8 +19,7 @@ pub struct PyRStarTree2D {
 impl PyRStarTree2D {
     #[new]
     fn new(max_entries: usize) -> PyResult<Self> {
-        let tree = RStarTree::new(max_entries)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree = RStarTree::new(max_entries).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyRStarTree2D { tree })
     }
 
@@ -75,7 +74,8 @@ impl PyRStarTree2D {
     #[classmethod]
     fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
         let file = File::open(path)?;
-        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyRStarTree2D { tree })
     }
 }
@@ -89,8 +89,7 @@ pub struct PyRStarTree3D {
 impl PyRStarTree3D {
     #[new]
     fn new(max_entries: usize) -> PyResult<Self> {
-        let tree = RStarTree::new(max_entries)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree = RStarTree::new(max_entries).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyRStarTree3D { tree })
     }
 
@@ -145,8 +144,8 @@ impl PyRStarTree3D {
     #[classmethod]
     fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
         let file = File::open(path)?;
-        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyRStarTree3D { tree })
     }
 }
-

@@ -25,7 +25,9 @@ impl PyKdTree2D {
     }
 
     fn insert(&mut self, point: PyPoint2D) -> PyResult<()> {
-        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
+        self.tree
+            .insert(point.into())
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
@@ -75,7 +77,8 @@ impl PyKdTree2D {
     #[classmethod]
     fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
         let file = File::open(path)?;
-        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyKdTree2D { tree })
     }
 }
@@ -95,7 +98,9 @@ impl PyKdTree3D {
     }
 
     fn insert(&mut self, point: PyPoint3D) -> PyResult<()> {
-        self.tree.insert(point.into()).map_err(|e| PyValueError::new_err(e.to_string()))
+        self.tree
+            .insert(point.into())
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
@@ -145,8 +150,8 @@ impl PyKdTree3D {
     #[classmethod]
     fn load(_cls: &Bound<PyType>, path: &str) -> PyResult<Self> {
         let file = File::open(path)?;
-        let tree = bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let tree =
+            bincode::deserialize_from(file).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(PyKdTree3D { tree })
     }
 }
-

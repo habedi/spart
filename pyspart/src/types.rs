@@ -8,20 +8,18 @@ pub struct PyData(pub PyObject);
 
 impl Clone for PyData {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| {
-            PyData(self.0.clone_ref(py))
-        })
+        Python::with_gil(|py| PyData(self.0.clone_ref(py)))
     }
 }
 
 impl PartialEq for PyData {
     fn eq(&self, other: &Self) -> bool {
-        Python::with_gil(|py| {
-            match self.0.bind(py).rich_compare(&other.0, CompareOp::Eq) {
+        Python::with_gil(
+            |py| match self.0.bind(py).rich_compare(&other.0, CompareOp::Eq) {
                 Ok(result) => result.is_truthy().unwrap_or(false),
                 Err(_) => false,
-            }
-        })
+            },
+        )
     }
 }
 
@@ -54,9 +52,7 @@ impl PartialOrd for PyData {
 
 impl std::fmt::Debug for PyData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Python::with_gil(|py| {
-            write!(f, "PyData({})", self.0.bind(py).repr().unwrap())
-        })
+        Python::with_gil(|py| write!(f, "PyData({})", self.0.bind(py).repr().unwrap()))
     }
 }
 
@@ -68,7 +64,9 @@ impl Serialize for PyData {
         Python::with_gil(|py| {
             let pickle = py.import("pickle").map_err(serde::ser::Error::custom)?;
             let bound_self = self.0.bind(py);
-            let bytes = pickle.call_method1("dumps", (bound_self,)).map_err(serde::ser::Error::custom)?;
+            let bytes = pickle
+                .call_method1("dumps", (bound_self,))
+                .map_err(serde::ser::Error::custom)?;
             let bytes: &[u8] = bytes.extract().map_err(serde::ser::Error::custom)?;
             serializer.serialize_bytes(bytes)
         })
@@ -83,9 +81,10 @@ impl<'de> Deserialize<'de> for PyData {
         let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
         Python::with_gil(|py| {
             let pickle = py.import("pickle").map_err(serde::de::Error::custom)?;
-            let obj = pickle.call_method("loads", (PyBytes::new(py, &bytes),), None).map_err(serde::de::Error::custom)?;
+            let obj = pickle
+                .call_method("loads", (PyBytes::new(py, &bytes),), None)
+                .map_err(serde::de::Error::custom)?;
             Ok(PyData(obj.into()))
         })
     }
 }
-
