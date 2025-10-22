@@ -256,10 +256,10 @@ struct PyQuadtree {
 #[pymethods]
 impl PyQuadtree {
     #[new]
-    fn new(boundary: PyRectangle, capacity: usize) -> Self {
-        PyQuadtree {
-            tree: Quadtree::new(&boundary.0, capacity).unwrap(),
-        }
+    fn new(boundary: PyRectangle, capacity: usize) -> PyResult<Self> {
+        let tree = Quadtree::new(&boundary.0, capacity)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyQuadtree { tree })
     }
 
     fn insert(&mut self, point: PyPoint2D) -> bool {
@@ -326,10 +326,10 @@ struct PyOctree {
 #[pymethods]
 impl PyOctree {
     #[new]
-    fn new(boundary: PyCube, capacity: usize) -> Self {
-        PyOctree {
-            tree: Octree::new(&boundary.0, capacity).unwrap(),
-        }
+    fn new(boundary: PyCube, capacity: usize) -> PyResult<Self> {
+        let tree = Octree::new(&boundary.0, capacity)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyOctree { tree })
     }
 
     fn insert(&mut self, point: PyPoint3D) -> bool {
@@ -536,10 +536,10 @@ struct PyRTree2D {
 #[pymethods]
 impl PyRTree2D {
     #[new]
-    fn new(max_entries: usize) -> Self {
-        PyRTree2D {
-            tree: RTree::new(max_entries).unwrap(),
-        }
+    fn new(max_entries: usize) -> PyResult<Self> {
+        let tree = RTree::new(max_entries)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree2D { tree })
     }
 
     fn insert(&mut self, point: PyPoint2D) {
@@ -606,10 +606,10 @@ struct PyRTree3D {
 #[pymethods]
 impl PyRTree3D {
     #[new]
-    fn new(max_entries: usize) -> Self {
-        PyRTree3D {
-            tree: RTree::new(max_entries).unwrap(),
-        }
+    fn new(max_entries: usize) -> PyResult<Self> {
+        let tree = RTree::new(max_entries)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRTree3D { tree })
     }
 
     fn insert(&mut self, point: PyPoint3D) {
@@ -677,10 +677,10 @@ struct PyRStarTree2D {
 #[pymethods]
 impl PyRStarTree2D {
     #[new]
-    fn new(max_entries: usize) -> Self {
-        PyRStarTree2D {
-            tree: RStarTree::new(max_entries).unwrap(),
-        }
+    fn new(max_entries: usize) -> PyResult<Self> {
+        let tree = RStarTree::new(max_entries)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree2D { tree })
     }
 
     fn insert(&mut self, point: PyPoint2D) {
@@ -747,10 +747,10 @@ struct PyRStarTree3D {
 #[pymethods]
 impl PyRStarTree3D {
     #[new]
-    fn new(max_entries: usize) -> Self {
-        PyRStarTree3D {
-            tree: RStarTree::new(max_entries).unwrap(),
-        }
+    fn new(max_entries: usize) -> PyResult<Self> {
+        let tree = RStarTree::new(max_entries)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyRStarTree3D { tree })
     }
 
     fn insert(&mut self, point: PyPoint3D) {
