@@ -88,14 +88,11 @@ install-snap: ## Install a few dependencies using Snapcraft
 .PHONY: install-deps
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
-	@rustup component add rustfmt clippy
-
 	# Install each tool with a specific, pinned version
 	@cargo install cargo-tarpaulin --version ${TARPAULIN_VERSION}
 	@cargo install cargo-nextest --version ${NEXTEST_VERSION}
 	@cargo install cargo-audit --version ${AUDIT_VERSION}
 	@cargo install cargo-careful --version ${CAREFUL_VERSION}
-
 	@sudo apt-get install -y python3-pip
 	@pip install $(PY_DEP_MNGR)
 
