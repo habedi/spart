@@ -53,8 +53,8 @@ proptest! {
 
         // Check that results are sorted by distance
         for i in 1..results.len() {
-            let d1 = target.distance_sq(&results[i - 1]);
-            let d2 = target.distance_sq(&results[i]);
+            let d1 = target.distance_sq(results[i - 1]);
+            let d2 = target.distance_sq(results[i]);
             prop_assert!(d1 <= d2 + 1e-9, "kNN results should be sorted by distance");
         }
     }
