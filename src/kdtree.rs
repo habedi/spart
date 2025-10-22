@@ -25,7 +25,7 @@
 //! assert!(!neighbors3d.is_empty());
 //! ```
 
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 use crate::geometry::DistanceMetric;
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]

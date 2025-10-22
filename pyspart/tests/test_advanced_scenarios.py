@@ -1,8 +1,8 @@
 """
 Test advanced use cases and real-world scenarios for pyspart
 """
-import pytest
 import math
+import pytest
 
 from pyspart import (
     Point2D, Point3D,
@@ -64,9 +64,9 @@ class TestRealWorldScenarios:
     def test_clustering_points(self):
         """Test finding clusters of points"""
         # Create three clusters of points
-        cluster1 = [Point2D(10.0 + i*0.5, 10.0 + i*0.5, f"c1_{i}") for i in range(10)]
-        cluster2 = [Point2D(50.0 + i*0.5, 50.0 + i*0.5, f"c2_{i}") for i in range(10)]
-        cluster3 = [Point2D(90.0 + i*0.5, 90.0 + i*0.5, f"c3_{i}") for i in range(10)]
+        cluster1 = [Point2D(10.0 + i * 0.5, 10.0 + i * 0.5, f"c1_{i}") for i in range(10)]
+        cluster2 = [Point2D(50.0 + i * 0.5, 50.0 + i * 0.5, f"c2_{i}") for i in range(10)]
+        cluster3 = [Point2D(90.0 + i * 0.5, 90.0 + i * 0.5, f"c3_{i}") for i in range(10)]
 
         all_points = cluster1 + cluster2 + cluster3
 
@@ -93,7 +93,8 @@ class TestRealWorldScenarios:
                         {"voxel_id": f"{x}_{y}_{z}", "density": x + y + z}
                     ))
 
-        octree = Octree({"x": 0.0, "y": 0.0, "z": 0.0, "width": 10.0, "height": 10.0, "depth": 10.0}, 8)
+        octree = Octree(
+            {"x": 0.0, "y": 0.0, "z": 0.0, "width": 10.0, "height": 10.0, "depth": 10.0}, 8)
         octree.insert_bulk(voxels)
 
         # Find voxels near a point
@@ -104,7 +105,7 @@ class TestRealWorldScenarios:
 
         # Verify they are actually close
         for voxel in nearby_voxels:
-            dist = math.sqrt((voxel.x - 5.0)**2 + (voxel.y - 5.0)**2 + (voxel.z - 5.0)**2)
+            dist = math.sqrt((voxel.x - 5.0) ** 2 + (voxel.y - 5.0) ** 2 + (voxel.z - 5.0) ** 2)
             assert dist < 3.0  # Should be relatively close
 
     def test_dynamic_updates(self):
@@ -112,7 +113,7 @@ class TestRealWorldScenarios:
         kd = KdTree2D()
 
         # Initial points
-        initial_points = [Point2D(float(i*10), float(i*10), f"init_{i}") for i in range(10)]
+        initial_points = [Point2D(float(i * 10), float(i * 10), f"init_{i}") for i in range(10)]
         kd.insert_bulk(initial_points)
 
         # Remove some points (simulate objects moving out of area)
@@ -120,7 +121,7 @@ class TestRealWorldScenarios:
             kd.delete(point)
 
         # Add new points (simulate new objects entering area)
-        new_points = [Point2D(float(i*10 + 5), float(i*10 + 5), f"new_{i}") for i in range(5)]
+        new_points = [Point2D(float(i * 10 + 5), float(i * 10 + 5), f"new_{i}") for i in range(5)]
         for point in new_points:
             kd.insert(point)
 
@@ -131,7 +132,7 @@ class TestRealWorldScenarios:
     def test_path_planning_waypoints(self):
         """Test finding waypoints along a path"""
         # Simulate waypoints along a route
-        waypoints = [Point2D(float(i*10), float(i*5), f"waypoint_{i}") for i in range(20)]
+        waypoints = [Point2D(float(i * 10), float(i * 5), f"waypoint_{i}") for i in range(20)]
 
         kd = KdTree2D()
         kd.insert_bulk(waypoints)
@@ -196,8 +197,10 @@ class TestAdvancedQueries:
 
         # First 5 of nearest_10 should be among the nearest_5 (order may vary with equal distances)
         import math
-        nearest_5_dists = sorted([math.sqrt((p.x - target.x)**2 + (p.y - target.y)**2) for p in nearest_5])
-        nearest_10_first_5_dists = sorted([math.sqrt((p.x - target.x)**2 + (p.y - target.y)**2) for p in nearest_10[:5]])
+        nearest_5_dists = sorted(
+            [math.sqrt((p.x - target.x) ** 2 + (p.y - target.y) ** 2) for p in nearest_5])
+        nearest_10_first_5_dists = sorted(
+            [math.sqrt((p.x - target.x) ** 2 + (p.y - target.y) ** 2) for p in nearest_10[:5]])
 
         # The 5th farthest distance in nearest_5 should match the 5th in nearest_10
         assert abs(nearest_5_dists[-1] - nearest_10_first_5_dists[-1]) < 0.001
@@ -265,6 +268,8 @@ class TestAdvancedQueries:
         priorities = [p.data["priority"] for p in neighbors]
         assert max(priorities) == 5
         assert min(priorities) == 1
+
+
 """
 Test performance and scalability of pyspart data structures
 """
@@ -462,8 +467,8 @@ class TestTreeComparison:
         assert len(kd_results) == len(qt_results)
 
         # Calculate distances for both
-        kd_distances = [((p.x - target.x)**2 + (p.y - target.y)**2)**0.5 for p in kd_results]
-        qt_distances = [((p.x - target.x)**2 + (p.y - target.y)**2)**0.5 for p in qt_results]
+        kd_distances = [((p.x - target.x) ** 2 + (p.y - target.y) ** 2) ** 0.5 for p in kd_results]
+        qt_distances = [((p.x - target.x) ** 2 + (p.y - target.y) ** 2) ** 0.5 for p in qt_results]
 
         # Both should return similar nearest neighbors
         assert abs(sum(kd_distances) - sum(qt_distances)) < 1.0
@@ -519,15 +524,14 @@ class TestTreeComparison:
 
         # Calculate distances to verify all found the nearest neighbor (may be different due to ties)
         import math
-        kd_dist = math.sqrt((kd_result.x - target.x)**2 + (kd_result.y - target.y)**2)
-        qt_dist = math.sqrt((qt_result.x - target.x)**2 + (qt_result.y - target.y)**2)
-        rt_dist = math.sqrt((rt_result.x - target.x)**2 + (rt_result.y - target.y)**2)
-        rst_dist = math.sqrt((rst_result.x - target.x)**2 + (rst_result.y - target.y)**2)
+        kd_dist = math.sqrt((kd_result.x - target.x) ** 2 + (kd_result.y - target.y) ** 2)
+        qt_dist = math.sqrt((qt_result.x - target.x) ** 2 + (qt_result.y - target.y) ** 2)
+        rt_dist = math.sqrt((rt_result.x - target.x) ** 2 + (rt_result.y - target.y) ** 2)
+        rst_dist = math.sqrt((rst_result.x - target.x) ** 2 + (rst_result.y - target.y) ** 2)
 
         # All should return points at the same distance (p2 and p3 are equidistant from target)
         assert abs(kd_dist - qt_dist) < 0.001
         assert abs(kd_dist - rt_dist) < 0.001
-
 
     def test_all_trees_consistency_3d(self):
         """Verify all 3D tree types return consistent results"""
@@ -539,7 +543,8 @@ class TestTreeComparison:
 
         # Create all 3D tree types
         kd = KdTree3D()
-        ot = Octree({"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0}, 4)
+        ot = Octree({"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0},
+                    4)
         rt = RTree3D(4)
         rst = RStarTree3D(4)
 
@@ -559,13 +564,16 @@ class TestTreeComparison:
 
         # Calculate distances to verify all found the nearest neighbor
         import math
-        kd_dist = math.sqrt((kd_result.x - target.x)**2 + (kd_result.y - target.y)**2 + (kd_result.z - target.z)**2)
-        ot_dist = math.sqrt((ot_result.x - target.x)**2 + (ot_result.y - target.y)**2 + (ot_result.z - target.z)**2)
-        rt_dist = math.sqrt((rt_result.x - target.x)**2 + (rt_result.y - target.y)**2 + (rt_result.z - target.z)**2)
-        rst_dist = math.sqrt((rst_result.x - target.x)**2 + (rst_result.y - target.y)**2 + (rst_result.z - target.z)**2)
+        kd_dist = math.sqrt((kd_result.x - target.x) ** 2 + (kd_result.y - target.y) ** 2 + (
+                kd_result.z - target.z) ** 2)
+        ot_dist = math.sqrt((ot_result.x - target.x) ** 2 + (ot_result.y - target.y) ** 2 + (
+                ot_result.z - target.z) ** 2)
+        rt_dist = math.sqrt((rt_result.x - target.x) ** 2 + (rt_result.y - target.y) ** 2 + (
+                rt_result.z - target.z) ** 2)
+        rst_dist = math.sqrt((rst_result.x - target.x) ** 2 + (rst_result.y - target.y) ** 2 + (
+                rst_result.z - target.z) ** 2)
 
         # All should return points at the same distance
         assert abs(kd_dist - ot_dist) < 0.001
         assert abs(kd_dist - rt_dist) < 0.001
         assert abs(kd_dist - rst_dist) < 0.001
-

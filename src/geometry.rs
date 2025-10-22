@@ -14,7 +14,7 @@ use std::cmp::Ordering;
 use tracing::debug;
 
 // Import custom errors from the exceptions module.
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 
 /// Represents a 2D point with an optional payload.
 ///

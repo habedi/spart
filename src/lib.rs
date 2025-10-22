@@ -1,4 +1,4 @@
-pub mod exceptions;
+pub mod errors;
 pub mod geometry;
 pub mod kdtree;
 mod logging;

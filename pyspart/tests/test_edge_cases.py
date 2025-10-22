@@ -233,7 +233,7 @@ class TestDataIntegrity:
         # Calculate distances
         distances = []
         for p in results:
-            dist = ((p.x - target.x)**2 + (p.y - target.y)**2)**0.5
+            dist = ((p.x - target.x) ** 2 + (p.y - target.y) ** 2) ** 0.5
             distances.append(dist)
 
         # Verify sorted by distance
@@ -244,7 +244,7 @@ class TestDataIntegrity:
         kd = KdTree2D()
         kd.insert(Point2D(0.0, 0.0, "center"))
         kd.insert(Point2D(10.0, 0.0, "on_boundary"))  # Exactly 10 units away
-        kd.insert(Point2D(10.1, 0.0, "outside"))      # Just outside
+        kd.insert(Point2D(10.1, 0.0, "outside"))  # Just outside
 
         results = kd.range_search(Point2D(0.0, 0.0, None), 10.0)
 
@@ -253,4 +253,3 @@ class TestDataIntegrity:
         assert "center" in data_list
         assert "on_boundary" in data_list
         assert "outside" not in data_list
-

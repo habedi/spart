@@ -4,9 +4,10 @@ Integration tests for serialization/deserialization with PyData.
 Tests that Python objects can be properly serialized and deserialized
 through Rust's bincode serialization.
 """
+import os
 import pytest
 import tempfile
-import os
+
 from pyspart import (
     Point2D, Point3D,
     Quadtree, Octree,
@@ -330,6 +331,8 @@ class TestSerializationWithComplexPyData:
         finally:
             if os.path.exists(filepath):
                 os.unlink(filepath)
+
+
 """
 Unit tests for edge cases in Python bindings point conversions.
 """
@@ -361,6 +364,7 @@ class TestPoint2DEdgeCases:
 
     def test_point2d_with_custom_object(self):
         """Test Point2D with custom Python object."""
+
         class CustomObject:
             def __init__(self, value):
                 self.value = value
@@ -534,4 +538,3 @@ class TestPointConversionEdgeCases:
         assert kd_result.data == "p1"
         assert rt_result.data == "p1"
         assert rst_result.data == "p1"
-

@@ -27,7 +27,7 @@
 //! assert!(!neighbors.is_empty());
 //! ```
 
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 use crate::geometry::{DistanceMetric, HeapItem, Point2D, Rectangle};
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]

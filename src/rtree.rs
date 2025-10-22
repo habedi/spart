@@ -29,7 +29,7 @@
 //! assert!(!results3d.is_empty());
 //! ```
 
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 use crate::geometry::{
     BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance, Point2D,
     Point3D, Rectangle,
