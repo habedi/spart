@@ -82,7 +82,7 @@ install-snap: ## Install a few dependencies using Snapcraft
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
 	@rustup component add rustfmt clippy
-	@cargo install cargo-tarpaulin cargo-nextest cargo-audit cargo-careful
+	@cargo install cargo-tarpaulin cargo-nextest cargo-audit
 	@cargo install --locked cargo-nextest --version 0.9.97-b.2
 	@sudo apt-get install -y python3-pip
 	@pip install $(PY_DEP_MNGR)
@@ -106,11 +106,6 @@ bench: ## Run benchmarks
 audit: ## Run security audit on Rust dependencies
 	@echo "Running security audit..."
 	@cargo audit
-
-.PHONY: careful
-careful: ## Run security checks on Rust code
-	@echo "Running security checks..."
-	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo careful run
 
 .PHONY: nextest
 nextest: ## Run tests using nextest

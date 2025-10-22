@@ -27,6 +27,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust-version }}
+          cache: true
 
       - name: Install Dependencies
         run: |
