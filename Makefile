@@ -88,6 +88,7 @@ install-snap: ## Install a few dependencies using Snapcraft
 .PHONY: install-deps
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
+	@rustup component add rustfmt clippy
 	# Install each tool with a specific, pinned version
 	@cargo install --locked cargo-tarpaulin --version ${TARPAULIN_VERSION}
 	@cargo install --locked cargo-nextest --version ${NEXTEST_VERSION}
