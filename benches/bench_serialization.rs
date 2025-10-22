@@ -1,10 +1,10 @@
 use criterion::{criterion_group, Criterion};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
-use spart::kd_tree::KdTree;
+use spart::kdtree::KdTree;
 use spart::octree::Octree;
 use spart::quadtree::Quadtree;
-use spart::r_star_tree::RStarTree;
-use spart::r_tree::RTree;
+use spart::rstar_tree::RStarTree;
+use spart::rtree::RTree;
 
 fn bench_quadtree_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("Quadtree Serialization");

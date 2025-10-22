@@ -3,18 +3,18 @@ mod shared;
 use shared::*;
 
 use spart::geometry::{EuclideanDistance, Point2D, Point3D};
-use spart::r_tree::RTree;
+use spart::rstar_tree::RStarTree;
 use tracing::{debug, info};
 
-fn run_rtree_2d_test() {
-    info!("Starting RTree 2D test");
+fn run_rstar_tree_2d_test() {
+    info!("Starting RStarTree 2D test");
 
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
 
     let points = common_points_2d();
     for pt in &points {
         tree.insert(pt.clone());
-        debug!("Inserted 2D point into RTree: {:?}", pt);
+        debug!("Inserted 2D point into RStarTree: {:?}", pt);
     }
     info!("Finished inserting {} points", points.len());
 
@@ -25,17 +25,17 @@ fn run_rtree_2d_test() {
     assert_eq!(
         knn_results.len(),
         KNN_COUNT,
-        "Expected {} nearest neighbors (RTree 2D), got {}",
+        "Expected {} nearest neighbors (RStarTree 2D), got {}",
         KNN_COUNT,
         knn_results.len()
     );
     let mut prev_dist = 0.0;
     for pt in &knn_results {
         let d = distance_2d(&target, pt);
-        debug!("RTree 2D kNN: Point {:?} at distance {}", pt, d);
+        debug!("RStarTree 2D kNN: Point {:?} at distance {}", pt, d);
         assert!(
             d >= prev_dist,
-            "RTree 2D kNN results not sorted by increasing distance"
+            "RStarTree 2D kNN results not sorted by increasing distance"
         );
         prev_dist = d;
     }
@@ -51,7 +51,7 @@ fn run_rtree_2d_test() {
         range_results_bbox.len()
     );
     for pt in &range_results_bbox {
-        debug!("RTree 2D range result: {:?}", pt);
+        debug!("RStarTree 2D range result: {:?}", pt);
         assert!(
             pt.x >= rect.x
                 && pt.x <= rect.x + rect.width
@@ -64,7 +64,7 @@ fn run_rtree_2d_test() {
     }
     assert!(
         range_results_bbox.len() >= 5,
-        "Expected at least 5 points in RTree 2D range, got {}",
+        "Expected at least 5 points in RStarTree 2D range, got {}",
         range_results_bbox.len()
     );
 
@@ -75,7 +75,7 @@ fn run_rtree_2d_test() {
         range_results_radius.len()
     );
     for pt in &range_results_radius {
-        debug!("RTree 2D range (radius) result: {:?}", pt);
+        debug!("RStarTree 2D range (radius) result: {:?}", pt);
         let d = distance_2d(&target, pt);
         assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
     }
@@ -84,7 +84,7 @@ fn run_rtree_2d_test() {
     info!("Deleting point {:?}", delete_point);
     let deleted = tree.delete(&delete_point);
     info!("Deletion result: {}", deleted);
-    assert!(deleted, "Deletion in RTree 2D should succeed");
+    assert!(deleted, "Deletion in RStarTree 2D should succeed");
     assert!(
         !tree.delete(&delete_point),
         "Deleting non-existent point should return false"
@@ -92,26 +92,26 @@ fn run_rtree_2d_test() {
 
     let knn_after = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     for pt in &knn_after {
-        debug!("RTree 2D kNN after deletion: {:?}", pt);
+        debug!("RStarTree 2D kNN after deletion: {:?}", pt);
         assert_ne!(
             pt.data,
             Some("F"),
-            "Deleted point still present in RTree 2D kNN search"
+            "Deleted point still present in RStarTree 2D kNN search"
         );
     }
 
-    info!("RTree 2D test completed successfully");
+    info!("RStarTree 2D test completed successfully");
 }
 
-fn run_rtree_3d_test() {
-    info!("Starting RTree 3D test");
+fn run_rstar_tree_3d_test() {
+    info!("Starting RStarTree 3D test");
 
-    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY).unwrap();
+    let mut tree: RStarTree<Point3D<&str>> = RStarTree::new(CAPACITY).unwrap();
 
     let points = common_points_3d();
     for pt in &points {
         tree.insert(pt.clone());
-        debug!("Inserted 3D point into RTree: {:?}", pt);
+        debug!("Inserted 3D point into RStarTree: {:?}", pt);
     }
     info!("Finished inserting {} points", points.len());
 
@@ -122,17 +122,17 @@ fn run_rtree_3d_test() {
     assert_eq!(
         knn_results.len(),
         KNN_COUNT,
-        "Expected {} nearest neighbors (RTree 3D), got {}",
+        "Expected {} nearest neighbors (RStarTree 3D), got {}",
         KNN_COUNT,
         knn_results.len()
     );
     let mut prev_dist = 0.0;
     for pt in &knn_results {
         let d = distance_3d(&target, pt);
-        debug!("RTree 3D kNN: Point {:?} at distance {}", pt, d);
+        debug!("RStarTree 3D kNN: Point {:?} at distance {}", pt, d);
         assert!(
             d >= prev_dist,
-            "RTree 3D kNN results not sorted by increasing distance"
+            "RStarTree 3D kNN results not sorted by increasing distance"
         );
         prev_dist = d;
     }
@@ -145,7 +145,7 @@ fn run_rtree_3d_test() {
         range_results_bbox.len()
     );
     for pt in &range_results_bbox {
-        debug!("RTree 3D range result: {:?}", pt);
+        debug!("RStarTree 3D range result: {:?}", pt);
         assert!(
             pt.x >= cube.x
                 && pt.x <= cube.x + cube.width
@@ -160,7 +160,7 @@ fn run_rtree_3d_test() {
     }
     assert!(
         range_results_bbox.len() >= 5,
-        "Expected at least 5 points in RTree 3D range, got {}",
+        "Expected at least 5 points in RStarTree 3D range, got {}",
         range_results_bbox.len()
     );
 
@@ -171,7 +171,7 @@ fn run_rtree_3d_test() {
         range_results_radius.len()
     );
     for pt in &range_results_radius {
-        debug!("RTree 3D range result: {:?}", pt);
+        debug!("RStarTree 3D range result: {:?}", pt);
         let d = distance_3d(&target, pt);
         assert!(d <= 5.0, "Point {:?} is outside the radius 5.0", pt);
     }
@@ -180,7 +180,7 @@ fn run_rtree_3d_test() {
     info!("Deleting 3D point {:?}", delete_point);
     let deleted = tree.delete(&delete_point);
     info!("Deletion result: {}", deleted);
-    assert!(deleted, "Deletion in RTree 3D should succeed");
+    assert!(deleted, "Deletion in RStarTree 3D should succeed");
     assert!(
         !tree.delete(&delete_point),
         "Deleting non-existent 3D point should return false"
@@ -188,30 +188,30 @@ fn run_rtree_3d_test() {
 
     let knn_after = tree.knn_search::<EuclideanDistance>(&target, KNN_COUNT);
     for pt in &knn_after {
-        debug!("RTree 3D kNN after deletion: {:?}", pt);
+        debug!("RStarTree 3D kNN after deletion: {:?}", pt);
         assert_ne!(
             pt.data,
             Some("F"),
-            "Deleted 3D point still present in RTree 3D kNN search"
+            "Deleted 3D point still present in RStarTree 3D kNN search"
         );
     }
 
-    info!("RTree 3D test completed successfully");
+    info!("RStarTree 3D test completed successfully");
 }
 
 #[test]
-fn test_rtree_2d() {
-    run_rtree_2d_test();
+fn test_rstar_tree_2d() {
+    run_rstar_tree_2d_test();
 }
 
 #[test]
-fn test_rtree_3d() {
-    run_rtree_3d_test();
+fn test_rstar_tree_3d() {
+    run_rstar_tree_3d_test();
 }
 
 #[test]
-fn test_rtree_insert_bulk_2d() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_insert_bulk_2d() {
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points);
 
@@ -227,8 +227,45 @@ fn test_rtree_insert_bulk_2d() {
 }
 
 #[test]
-fn test_rtree_delete_underflow() {
-    let mut tree: RTree<Point2D<i32>> = RTree::new(4).unwrap();
+fn test_rstar_tree_forced_reinsertion() {
+    let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(4).unwrap();
+    let points: Vec<_> = (0..5)
+        .map(|i| Point2D::new(i as f64, i as f64, Some(i)))
+        .collect();
+
+    for p in &points {
+        tree.insert(p.clone());
+    }
+
+    assert_eq!(
+        tree.height(),
+        2,
+        "Tree height should be 2 after 5 insertions"
+    );
+
+    // Insert more points to trigger overflow in a child node.
+    for i in 5..10 {
+        tree.insert(Point2D::new(i as f64, i as f64, Some(i)));
+    }
+
+    assert_eq!(
+        tree.height(),
+        2,
+        "Tree height should still be 2 after forced reinsertion"
+    );
+
+    let all_points = tree.range_search_bbox(&spart::geometry::Rectangle {
+        x: -1.0,
+        y: -1.0,
+        width: 11.0,
+        height: 11.0,
+    });
+    assert_eq!(all_points.len(), 10, "All points should be in the tree");
+}
+
+#[test]
+fn test_rstar_tree_delete_underflow() {
+    let mut tree: RStarTree<Point2D<i32>> = RStarTree::new(4).unwrap();
     let points: Vec<_> = (0..10)
         .map(|i| Point2D::new(i as f64, i as f64, Some(i)))
         .collect();
@@ -239,9 +276,6 @@ fn test_rtree_delete_underflow() {
 
     // min_entries is (4 * 0.4).ceil() = 2.
     // Deleting points to trigger underflow.
-    // Let's say we have a node with [p0, p1, p2, p3] and another with [p4, p5, p6, p7]
-    // and a root.
-    // If we delete p0, p1, p2, one of the nodes will underflow.
     assert!(tree.delete(&points[0]));
     assert!(tree.delete(&points[1]));
     assert!(tree.delete(&points[2]));
@@ -269,8 +303,8 @@ fn test_rtree_delete_underflow() {
 }
 
 #[test]
-fn test_rtree_empty() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_empty() {
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let target = target_point_2d();
 
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
@@ -292,8 +326,8 @@ fn test_rtree_empty() {
 }
 
 #[test]
-fn test_rtree_knn_edge_cases() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_knn_edge_cases() {
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points.clone());
 
@@ -315,8 +349,8 @@ fn test_rtree_knn_edge_cases() {
 }
 
 #[test]
-fn test_rtree_range_zero_radius() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_range_zero_radius() {
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let points = common_points_2d();
     tree.insert_bulk(points.clone());
 
@@ -331,8 +365,8 @@ fn test_rtree_range_zero_radius() {
 }
 
 #[test]
-fn test_rtree_duplicates() {
-    let mut tree: RTree<Point2D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_duplicates() {
+    let mut tree: RStarTree<Point2D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let p1 = common_points_2d()[0].clone();
     let p2 = p1.clone();
     tree.insert(p1.clone());
@@ -356,8 +390,8 @@ fn test_rtree_duplicates() {
 }
 
 #[test]
-fn test_rtree_insert_bulk_3d() {
-    let mut tree: RTree<Point3D<&str>> = RTree::new(CAPACITY).unwrap();
+fn test_rstar_tree_insert_bulk_3d() {
+    let mut tree: RStarTree<Point3D<&str>> = RStarTree::new(CAPACITY).unwrap();
     let points = common_points_3d();
     tree.insert_bulk(points);
 

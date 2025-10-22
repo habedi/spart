@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::Rectangle;
-use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
+use spart::{kdtree, octree, quadtree, rstar_tree, rtree};
 use std::hint::black_box;
 
 fn bench_insert_bulk_quadtree_2d(_c: &mut Criterion) {
@@ -54,7 +54,7 @@ fn bench_insert_bulk_kdtree_2d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_2d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let tree = kd_tree::KdTree::new();
+                let tree = kdtree::KdTree::new();
                 (tree, points.clone())
             },
             |(mut tree, points)| {
@@ -70,7 +70,7 @@ fn bench_insert_bulk_kdtree_3d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_3d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let tree = kd_tree::KdTree::new();
+                let tree = kdtree::KdTree::new();
                 (tree, points.clone())
             },
             |(mut tree, points)| {
@@ -86,7 +86,7 @@ fn bench_insert_bulk_rtree_2d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_2d_rtree", |b| {
         b.iter_with_setup(
             || {
-                let tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let tree = rtree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
                 (tree, points.clone())
             },
             |(mut tree, points)| {
@@ -103,7 +103,7 @@ fn bench_insert_bulk_rtree_3d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_3d_rtree", |b| {
         b.iter_with_setup(
             || {
-                let tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let tree = rtree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
                 (tree, points.clone())
             },
             |(mut tree, points)| {
@@ -120,7 +120,7 @@ fn bench_insert_bulk_rstartree_2d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_2d_rstartree", |b| {
         b.iter_with_setup(
             || {
-                let tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let tree = rstar_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
                 (tree, points.clone())
             },
             |(mut tree, points)| {
@@ -137,7 +137,7 @@ fn bench_insert_bulk_rstartree_3d(_c: &mut Criterion) {
     cc.bench_function("insert_bulk_3d_rstartree", |b| {
         b.iter_with_setup(
             || {
-                let tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let tree = rstar_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
                 (tree, points.clone())
             },
             |(mut tree, points)| {

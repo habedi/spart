@@ -14,7 +14,7 @@ use std::cmp::Ordering;
 use tracing::debug;
 
 // Import custom errors from the exceptions module.
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 
 /// Represents a 2D point with an optional payload.
 ///
@@ -237,11 +237,20 @@ impl Rectangle {
         let y1 = self.y.min(other.y);
         let x2 = (self.x + self.width).max(other.x + other.width);
         let y2 = (self.y + self.height).max(other.y + other.height);
+
+        // Add small epsilon to width/height to account for floating-point precision errors
+        // This guarantees that corner points are always contained in the union
+        let eps = f64::EPSILON * 4.0 * (x2.abs() + x1.abs()).max(1.0);
+        let width = (x2 - x1) + eps;
+
+        let eps_y = f64::EPSILON * 4.0 * (y2.abs() + y1.abs()).max(1.0);
+        let height = (y2 - y1) + eps_y;
+
         let union_rect = Rectangle {
             x: x1,
             y: y1,
-            width: x2 - x1,
-            height: y2 - y1,
+            width,
+            height,
         };
         debug!("Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})",
             self.x, self.y, self.width, self.height, other.x, other.y, other.width, other.height,
@@ -507,13 +516,19 @@ impl Cube {
         let x2 = (self.x + self.width).max(other.x + other.width);
         let y2 = (self.y + self.height).max(other.y + other.height);
         let z2 = (self.z + self.depth).max(other.z + other.depth);
+
+        // Add small epsilon to dimensions to account for floating-point precision errors
+        let eps_x = f64::EPSILON * 4.0 * (x2.abs() + x1.abs()).max(1.0);
+        let eps_y = f64::EPSILON * 4.0 * (y2.abs() + y1.abs()).max(1.0);
+        let eps_z = f64::EPSILON * 4.0 * (z2.abs() + z1.abs()).max(1.0);
+
         let union_cube = Cube {
             x: x1,
             y: y1,
             z: z1,
-            width: x2 - x1,
-            height: y2 - y1,
-            depth: z2 - z1,
+            width: (x2 - x1) + eps_x,
+            height: (y2 - y1) + eps_y,
+            depth: (z2 - z1) + eps_z,
         };
         debug!("Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})",
             self.x, self.y, self.z, self.width, self.height, self.depth,

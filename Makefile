@@ -82,7 +82,7 @@ install-snap: ## Install a few dependencies using Snapcraft
 install-deps: install-snap ## Install development dependencies
 	@echo "Installing dependencies..."
 	@rustup component add rustfmt clippy
-	@cargo install cargo-tarpaulin
+	@cargo install cargo-tarpaulin cargo-nextest cargo-audit cargo-careful
 	@cargo install --locked cargo-nextest --version 0.9.97-b.2
 	@sudo apt-get install -y python3-pip
 	@pip install $(PY_DEP_MNGR)
@@ -90,7 +90,7 @@ install-deps: install-snap ## Install development dependencies
 .PHONY: lint
 lint: format ## Run linters on Rust files
 	@echo "Linting Rust files..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo clippy -- -D warnings
+	@DEBUG_SPART=$(DEBUG_SPART) cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 .PHONY: publish
 publish: ## Publish the package to crates.io (requires CARGO_REGISTRY_TOKEN to be set)
@@ -107,6 +107,11 @@ audit: ## Run security audit on Rust dependencies
 	@echo "Running security audit..."
 	@cargo audit
 
+.PHONY: careful
+careful: ## Run security checks on Rust code
+	@echo "Running security checks..."
+	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo careful run
+
 .PHONY: nextest
 nextest: ## Run tests using nextest
 	@echo "Running tests using nextest..."
@@ -120,7 +125,7 @@ docs: format ## Generate the documentation
 .PHONY: fix-lint
 fix-lint: ## Fix the linter warnings
 	@echo "Fixing linter warnings..."
-	@cargo clippy --fix --allow-dirty --allow-staged --all-targets --workspace --all-features -- -D warnings
+	@cargo clippy --fix --allow-dirty --allow-staged --all-targets --workspace --all-features -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 ########################################################################################
 ## Python targets
@@ -139,7 +144,7 @@ wheel: ## Build the wheel file for PySpart
 
 .PHONY: wheel-manylinux
 wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
-	@echo "Building the manylinux PySpart wheel..."
+	@echo "Building the `manylinux` PySpart wheel..."
 	@(cd $(PYSPART_DIR) && maturin build --release --out $(WHEEL_DIR) --auditwheel check --zig)
 
 .PHONY: test-py

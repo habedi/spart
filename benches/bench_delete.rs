@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::Rectangle;
-use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
+use spart::{kdtree, octree, quadtree, rstar_tree, rtree};
 use std::hint::black_box;
 
 fn benchmark_delete_quadtree_2d(_c: &mut Criterion) {
@@ -61,7 +61,7 @@ fn benchmark_delete_kdtree_2d(_c: &mut Criterion) {
     cc.bench_function("delete_2d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = kd_tree::KdTree::new();
+                let mut tree = kdtree::KdTree::new();
                 for p in points.clone() {
                     _ = tree.insert(p);
                 }
@@ -81,7 +81,7 @@ fn benchmark_delete_kdtree_3d(_c: &mut Criterion) {
     cc.bench_function("delete_3d_kdtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = kd_tree::KdTree::new();
+                let mut tree = kdtree::KdTree::new();
                 for p in points.clone() {
                     _ = tree.insert(p);
                 }
@@ -101,7 +101,7 @@ fn benchmark_delete_rtree_2d(_c: &mut Criterion) {
     cc.bench_function("delete_2d_rtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let mut tree = rtree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
                 for p in points.clone() {
                     tree.insert(p);
                 }
@@ -121,7 +121,7 @@ fn benchmark_delete_rtree_3d(_c: &mut Criterion) {
     cc.bench_function("delete_3d_rtree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = r_tree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let mut tree = rtree::RTree::new(BENCH_NODE_CAPACITY).unwrap();
                 for p in points.clone() {
                     tree.insert(p);
                 }
@@ -141,7 +141,7 @@ fn benchmark_delete_rstartree_2d(_c: &mut Criterion) {
     cc.bench_function("delete_2d_rstartree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let mut tree = rstar_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
                 for p in points.clone() {
                     tree.insert(p);
                 }
@@ -161,7 +161,7 @@ fn benchmark_delete_rstartree_3d(_c: &mut Criterion) {
     cc.bench_function("delete_3d_rstartree", |b| {
         b.iter_with_setup(
             || {
-                let mut tree = r_star_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
+                let mut tree = rstar_tree::RStarTree::new(BENCH_NODE_CAPACITY).unwrap();
                 for p in points.clone() {
                     tree.insert(p);
                 }

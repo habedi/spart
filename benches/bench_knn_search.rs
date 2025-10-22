@@ -4,7 +4,7 @@ use shared::*;
 
 use criterion::{criterion_group, Criterion};
 use spart::geometry::{EuclideanDistance, Point2D, Point3D, Rectangle};
-use spart::{kd_tree, octree, quadtree, r_star_tree, r_tree};
+use spart::{kdtree, octree, quadtree, rstar_tree, rtree};
 use std::hint::black_box;
 use tracing::info;
 
@@ -28,7 +28,7 @@ fn bench_knn_search<'a, T, P, R>(
 fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_kdtree_2d");
     let points = generate_2d_data();
-    let mut tree = kd_tree::KdTree::<Point2D<i32>>::new();
+    let mut tree = kdtree::KdTree::<Point2D<i32>>::new();
     for point in points.iter() {
         _ = tree.insert(point.clone());
     }
@@ -46,7 +46,7 @@ fn benchmark_knn_kdtree_2d(_c: &mut Criterion) {
 fn benchmark_knn_rtree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_rtree_2d");
     let points = generate_2d_data();
-    let mut tree = r_tree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    let mut tree = rtree::RTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -88,7 +88,7 @@ fn benchmark_knn_quadtree_2d(_c: &mut Criterion) {
 fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_kdtree_3d");
     let points = generate_3d_data();
-    let mut tree = kd_tree::KdTree::<Point3D<i32>>::new();
+    let mut tree = kdtree::KdTree::<Point3D<i32>>::new();
     for point in points.iter() {
         _ = tree.insert(point.clone());
     }
@@ -106,7 +106,7 @@ fn benchmark_knn_kdtree_3d(_c: &mut Criterion) {
 fn benchmark_knn_rtree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_rtree_3d");
     let points = generate_3d_data();
-    let mut tree = r_tree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    let mut tree = rtree::RTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -143,7 +143,7 @@ fn benchmark_knn_octree_3d(_c: &mut Criterion) {
 fn benchmark_knn_rstartree_2d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_rstartree_2d");
     let points = generate_2d_data();
-    let mut tree = r_star_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    let mut tree = rstar_tree::RStarTree::<Point2D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }
@@ -161,7 +161,7 @@ fn benchmark_knn_rstartree_2d(_c: &mut Criterion) {
 fn benchmark_knn_rstartree_3d(_c: &mut Criterion) {
     info!("Setting up benchmark: knn_rstartree_3d");
     let points = generate_3d_data();
-    let mut tree = r_star_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
+    let mut tree = rstar_tree::RStarTree::<Point3D<i32>>::new(BENCH_NODE_CAPACITY).unwrap();
     for point in points.iter() {
         tree.insert(point.clone());
     }

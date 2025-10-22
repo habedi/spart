@@ -26,7 +26,7 @@
 //! assert!(!neighbors.is_empty());
 //! ```
 
-use crate::exceptions::SpartError;
+use crate::errors::SpartError;
 use crate::geometry::{Cube, DistanceMetric, HeapItem, Point3D};
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
@@ -107,8 +107,8 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         let h = self.boundary.height / 2.0;
         let d = self.boundary.depth / 2.0;
 
-        self.front_top_left = Some(Box::new(
-            Octree::new(
+        self.front_top_left = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x,
                     y,
@@ -118,11 +118,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.front_top_right = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.front_top_right = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x: x + w,
                     y,
@@ -132,11 +135,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.front_bottom_left = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.front_bottom_left = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x,
                     y: y + h,
@@ -146,11 +152,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.front_bottom_right = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.front_bottom_right = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x: x + w,
                     y: y + h,
@@ -160,11 +169,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.back_top_left = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.back_top_left = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x,
                     y,
@@ -174,11 +186,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.back_top_right = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.back_top_right = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x: x + w,
                     y,
@@ -188,11 +203,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.back_bottom_left = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.back_bottom_left = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x,
                     y: y + h,
@@ -202,11 +220,14 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
-        self.back_bottom_right = Some(Box::new(
-            Octree::new(
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
+        self.back_bottom_right = Some(Box::new({
+            let child = Octree::new(
                 &Cube {
                     x: x + w,
                     y: y + h,
@@ -216,9 +237,12 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                     depth: d,
                 },
                 self.capacity,
-            )
-            .unwrap(),
-        ));
+            );
+            match child {
+                Ok(c) => c,
+                Err(_) => unreachable!("capacity validated at construction"),
+            }
+        }));
         self.divided = true;
 
         // Reinsert existing points into the appropriate children.
@@ -358,47 +382,59 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             self.subdivide();
         }
 
-        if self.front_top_left.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .front_top_left
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
-        if self.front_top_right.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .front_top_right
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
         if self
             .front_bottom_left
             .as_mut()
-            .unwrap()
-            .insert(point.clone())
+            .map_or(false, |c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .front_bottom_right
             .as_mut()
-            .unwrap()
-            .insert(point.clone())
+            .map_or(false, |c| c.insert(point.clone()))
         {
             return true;
         }
-        if self.back_top_left.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .back_top_left
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
-        if self.back_top_right.as_mut().unwrap().insert(point.clone()) {
+        if self
+            .back_top_right
+            .as_mut()
+            .map_or(false, |c| c.insert(point.clone()))
+        {
             return true;
         }
         if self
             .back_bottom_left
             .as_mut()
-            .unwrap()
-            .insert(point.clone())
+            .map_or(false, |c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .back_bottom_right
             .as_mut()
-            .unwrap()
-            .insert(point.clone())
+            .map_or(false, |c| c.insert(point.clone()))
         {
             return true;
         }
@@ -452,117 +488,101 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                 if self
                     .front_top_left
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[0].push(point);
                 } else if self
                     .front_top_right
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[1].push(point);
                 } else if self
                     .front_bottom_left
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[2].push(point);
                 } else if self
                     .front_bottom_right
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[3].push(point);
                 } else if self
                     .back_top_left
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[4].push(point);
                 } else if self
                     .back_top_right
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[5].push(point);
                 } else if self
                     .back_bottom_left
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[6].push(point);
                 } else if self
                     .back_bottom_right
                     .as_ref()
-                    .unwrap()
-                    .boundary
-                    .contains(&point)
+                    .map(|c| c.boundary.contains(&point))
+                    .unwrap_or(false)
                 {
                     children_points[7].push(point);
                 }
             }
 
             if !children_points[0].is_empty() {
-                self.front_top_left
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[0]);
+                if let Some(c) = self.front_top_left.as_mut() {
+                    c.insert_bulk(&children_points[0]);
+                }
             }
             if !children_points[1].is_empty() {
-                self.front_top_right
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[1]);
+                if let Some(c) = self.front_top_right.as_mut() {
+                    c.insert_bulk(&children_points[1]);
+                }
             }
             if !children_points[2].is_empty() {
-                self.front_bottom_left
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[2]);
+                if let Some(c) = self.front_bottom_left.as_mut() {
+                    c.insert_bulk(&children_points[2]);
+                }
             }
             if !children_points[3].is_empty() {
-                self.front_bottom_right
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[3]);
+                if let Some(c) = self.front_bottom_right.as_mut() {
+                    c.insert_bulk(&children_points[3]);
+                }
             }
             if !children_points[4].is_empty() {
-                self.back_top_left
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[4]);
+                if let Some(c) = self.back_top_left.as_mut() {
+                    c.insert_bulk(&children_points[4]);
+                }
             }
             if !children_points[5].is_empty() {
-                self.back_top_right
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[5]);
+                if let Some(c) = self.back_top_right.as_mut() {
+                    c.insert_bulk(&children_points[5]);
+                }
             }
             if !children_points[6].is_empty() {
-                self.back_bottom_left
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[6]);
+                if let Some(c) = self.back_bottom_left.as_mut() {
+                    c.insert_bulk(&children_points[6]);
+                }
             }
             if !children_points[7].is_empty() {
-                self.back_bottom_right
-                    .as_mut()
-                    .unwrap()
-                    .insert_bulk(&children_points[7]);
+                if let Some(c) = self.back_bottom_right.as_mut() {
+                    c.insert_bulk(&children_points[7]);
+                }
             }
         }
     }
@@ -621,9 +641,11 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         if self.divided {
             for child in self.children() {
                 if heap.len() == k {
-                    let current_farthest = -heap.peek().unwrap().neg_distance.into_inner();
-                    if child.min_distance_sq(target) > current_farthest {
-                        continue;
+                    if let Some(top) = heap.peek() {
+                        let current_farthest = -top.neg_distance.into_inner();
+                        if child.min_distance_sq(target) > current_farthest {
+                            continue;
+                        }
                     }
                 }
                 child.knn_search_helper::<M>(target, k, heap);
