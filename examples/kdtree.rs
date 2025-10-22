@@ -1,5 +1,5 @@
 use spart::geometry::{DistanceMetric, EuclideanDistance, Point2D, Point3D};
-use spart::kd_tree::KdTree;
+use spart::kdtree::KdTree;
 
 // Define a custom distance metric (Manhattan distance)
 struct ManhattanDistance;

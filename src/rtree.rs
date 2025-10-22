@@ -10,7 +10,7 @@
 //!
 //! ```
 //! use spart::geometry::{Point2D, Rectangle, Point3D, Cube};
-//! use spart::r_tree::{RTree, RTreeObject};
+//! use spart::rtree::{RTree, RTreeObject};
 //!
 //! // Create an R‑tree for 2D points.
 //! let mut tree2d: RTree<Point2D<()>> = RTree::new(4).unwrap();

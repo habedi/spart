@@ -1,9 +1,9 @@
 pub mod exceptions;
 pub mod geometry;
-pub mod kd_tree;
+pub mod kdtree;
 mod logging;
 pub mod octree;
 pub mod quadtree;
-pub mod r_star_tree;
-pub mod r_tree;
+pub mod rstar_tree;
+pub mod rtree;
 mod rtree_common;

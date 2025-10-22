@@ -6,11 +6,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fs::File;
 
 use spart::geometry::{Cube, EuclideanDistance, Point2D, Point3D, Rectangle};
-use spart::kd_tree::KdTree;
+use spart::kdtree::KdTree;
 use spart::octree::Octree;
 use spart::quadtree::Quadtree;
-use spart::r_star_tree::RStarTree;
-use spart::r_tree::RTree;
+use spart::rstar_tree::RStarTree;
+use spart::rtree::RTree;
 
 // A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.
 struct PyData(PyObject);

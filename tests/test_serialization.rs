@@ -4,11 +4,11 @@ mod helpers;
 mod tests {
     use super::helpers::Anyhow;
     use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
-    use spart::kd_tree::KdTree;
+    use spart::kdtree::KdTree;
     use spart::octree::Octree;
     use spart::quadtree::Quadtree;
-    use spart::r_star_tree::RStarTree;
-    use spart::r_tree::RTree;
+    use spart::rstar_tree::RStarTree;
+    use spart::rtree::RTree;
 
     #[test]
     fn test_quadtree_serialization() -> Anyhow {

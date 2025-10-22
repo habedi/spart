@@ -8,7 +8,7 @@
 //!
 //! ```
 //! use spart::geometry::{EuclideanDistance, Point2D, Point3D};
-//! use spart::kd_tree::{KdPoint, KdTree};
+//! use spart::kdtree::{KdPoint, KdTree};
 //!
 //! // Create a 2D Kd‑tree and insert some points.
 //! let mut tree2d: KdTree<Point2D<()>> = KdTree::new();

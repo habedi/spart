@@ -3,7 +3,7 @@ mod shared;
 use shared::*;
 
 use spart::geometry::{EuclideanDistance, Point2D, Point3D};
-use spart::kd_tree::KdTree;
+use spart::kdtree::KdTree;
 use tracing::{debug, info};
 
 fn run_kdtree_2d_test() {
