@@ -43,7 +43,7 @@ use tracing::info;
 /// # Panics
 ///
 /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Octree<T: Clone + PartialEq> {
     boundary: Cube,

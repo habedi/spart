@@ -44,7 +44,7 @@ use tracing::{debug, info};
 /// # Panics
 ///
 /// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Quadtree<T: Clone + PartialEq> {
     boundary: Rectangle,

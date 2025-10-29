@@ -102,7 +102,7 @@ pub struct RTreeNode<T: RTreeObject> {
 ///
 /// The tree is initialized with a maximum number of entries per node. If a node exceeds this
 /// number, it will split. The tree supports insertion, deletion, and range searches.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RTree<T: RTreeObject> {
     root: RTreeNode<T>,

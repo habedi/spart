@@ -90,7 +90,7 @@ where
 }
 
 /// Internal structure used to store items in the k‑nearest neighbor heap.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct HeapItem<P> {
     dist: OrderedFloat<f64>,
     point: P,
@@ -117,7 +117,7 @@ impl<P> Ord for HeapItem<P> {
 }
 
 /// A node in the Kd‑tree containing a point and references to its children.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct KdNode<P: KdPoint> {
     point: P,
@@ -140,7 +140,7 @@ impl<P: KdPoint> KdNode<P> {
 ///
 /// The tree stores points in k‑dimensional space (where `k` is provided during creation)
 /// and supports insertion, k‑nearest neighbor search, range search, and deletion.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct KdTree<P: KdPoint> {
     root: Option<Box<KdNode<P>>>,
