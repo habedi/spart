@@ -170,6 +170,43 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Returns true if the exact point exists in the tree.
+    pub fn contains(&self, point: &P) -> bool {
+        let k = match self.k {
+            Some(k) => k,
+            None => return false,
+        };
+        Self::contains_rec(&self.root, point, 0, k)
+    }
+
+    fn contains_rec(node: &Option<Box<KdNode<P>>>, point: &P, depth: usize, k: usize) -> bool {
+        match node {
+            None => false,
+            Some(n) => {
+                if n.point == *point {
+                    return true;
+                }
+                let axis = depth % k;
+                let p_coord = point
+                    .coord(axis)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                let c_coord = n
+                    .point
+                    .coord(axis)
+                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                if p_coord < c_coord {
+                    Self::contains_rec(&n.left, point, depth + 1, k)
+                } else if p_coord > c_coord {
+                    Self::contains_rec(&n.right, point, depth + 1, k)
+                } else {
+                    // Equal on this axis, could be in either subtree.
+                    Self::contains_rec(&n.right, point, depth + 1, k)
+                        || Self::contains_rec(&n.left, point, depth + 1, k)
+                }
+            }
+        }
+    }
+
     /// Inserts a point into the Kd‑tree.
     ///
     /// If the tree is empty, the dimension of the tree is set to the dimension of the point.
@@ -467,27 +504,52 @@ impl<P: KdPoint> KdTree<P> {
                         current.right = new_right;
                         (Some(current), true)
                     } else if let Some(left_subtree) = current.left.take() {
-                        (Some(left_subtree), true)
+                        // Replace with min from left subtree on current axis, then delete that min
+                        let successor = Self::find_min(&left_subtree, axis, depth + 1, k).clone();
+                        let (mut new_left, _) =
+                            Self::delete_rec(Some(left_subtree), &successor, depth + 1, k);
+                        current.point = successor;
+                        // As per standard kd-tree deletion, attach the adjusted left subtree as right child
+                        current.right = new_left.take();
+                        current.left = None;
+                        (Some(current), true)
                     } else {
                         (None, true)
                     }
-                } else if point
-                    .coord(axis)
-                    .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"))
-                    < current
+                } else {
+                    let p_coord = point
+                        .coord(axis)
+                        .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+                    let c_coord = current
                         .point
                         .coord(axis)
-                        .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"))
-                {
-                    let (new_left, deleted) =
-                        Self::delete_rec(current.left.take(), point, depth + 1, k);
-                    current.left = new_left;
-                    (Some(current), deleted)
-                } else {
-                    let (new_right, deleted) =
-                        Self::delete_rec(current.right.take(), point, depth + 1, k);
-                    current.right = new_right;
-                    (Some(current), deleted)
+                        .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+
+                    if p_coord < c_coord {
+                        let (new_left, deleted) =
+                            Self::delete_rec(current.left.take(), point, depth + 1, k);
+                        current.left = new_left;
+                        (Some(current), deleted)
+                    } else if p_coord > c_coord {
+                        let (new_right, deleted) =
+                            Self::delete_rec(current.right.take(), point, depth + 1, k);
+                        current.right = new_right;
+                        (Some(current), deleted)
+                    } else {
+                        // Equal on this axis but not equal overall: the point could be in either subtree.
+                        // Search right first, then left if not found.
+                        let (new_right, deleted_right) =
+                            Self::delete_rec(current.right.take(), point, depth + 1, k);
+                        current.right = new_right;
+                        if deleted_right {
+                            (Some(current), true)
+                        } else {
+                            let (new_left, deleted_left) =
+                                Self::delete_rec(current.left.take(), point, depth + 1, k);
+                            current.left = new_left;
+                            (Some(current), deleted_left)
+                        }
+                    }
                 }
             }
         }
