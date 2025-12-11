@@ -29,7 +29,7 @@ repos:
         stages: [ pre-commit ]
 
       - id: lint
-        name: Run Linter Checks
+        name: Check Code Style
         entry: make lint
         language: system
         pass_filenames: false
@@ -37,6 +37,12 @@ repos:
 
       - id: test
         name: Run Tests
-        entry: make nexttest
+        entry: make nextest
+        language: system
+        pass_filenames: false
+
+      - id: test-py
+        name: Run PyGraphina Tests
+        entry: make test-py
         language: system
         pass_filenames: false
