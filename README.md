@@ -37,10 +37,6 @@ At the moment, the following tree data structures and features are supported:
 
 See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
-> [!IMPORTANT]
-> Spart is in early development, so bugs and breaking changes are expected.
-> Please use the [issues page](https://github.com/habedi/spart/issues) to report bugs or request features.
-
 ---
 
 ### Installation
