@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules"
@@ -40,6 +41,10 @@ documentation = "https://github.com/habedi/spart/tree/main/pyspart"
 module-name = "pyspart"
 bindings = "pyo3"
 features = ["pyo3/extension-module"]
-include = [{ path = ".", format = "sdist" }]
+include = [
+    { path = ".", format = "sdist" },
+    { path = "pyspart.pyi", format = ["sdist", "wheel"] },
+    { path = "py.typed", format = ["sdist", "wheel"] }
+]
 strip = true
 release = true

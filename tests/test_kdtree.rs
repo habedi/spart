@@ -377,8 +377,14 @@ fn test_kdtree_delete_same_coords_different_data() {
     tree.insert(p3.clone()).unwrap();
 
     assert!(tree.delete(&p2), "should delete exact payload match");
-    assert!(tree.contains(&p1), "other payload with same coords should remain");
-    assert!(tree.contains(&p3), "other payload with same coords should remain");
+    assert!(
+        tree.contains(&p1),
+        "other payload with same coords should remain"
+    );
+    assert!(
+        tree.contains(&p3),
+        "other payload with same coords should remain"
+    );
     assert!(!tree.contains(&p2), "deleted payload should be gone");
 
     let tgt = Point2D::new(10.0, 10.0, None);
@@ -400,7 +406,10 @@ fn test_kdtree_delete_nonexistent_with_equal_axis() {
     tree.insert(c.clone()).unwrap();
 
     let not_present = Point2D::new(1.0, 2.0, Some("X"));
-    assert!(!tree.delete(&not_present), "deleting non-existent point should return false");
+    assert!(
+        !tree.delete(&not_present),
+        "deleting non-existent point should return false"
+    );
     assert!(tree.contains(&a));
     assert!(tree.contains(&b));
     assert!(tree.contains(&c));
@@ -416,7 +425,10 @@ fn test_kdtree_delete_root_with_only_left() {
     tree.insert(l1.clone()).unwrap();
     tree.insert(l2.clone()).unwrap();
 
-    assert!(tree.delete(&root), "should delete root when only left subtree exists");
+    assert!(
+        tree.delete(&root),
+        "should delete root when only left subtree exists"
+    );
     assert!(!tree.contains(&root));
     assert!(tree.contains(&l1));
     assert!(tree.contains(&l2));
@@ -434,17 +446,29 @@ fn test_kdtree_delete_all_and_reinsert() {
         Point2D::new(1.0, 1.0, Some("B")),
         Point2D::new(-1.0, -1.0, Some("C")),
     ];
-    for p in pts.iter().cloned() { tree.insert(p).unwrap(); }
+    for p in pts.iter().cloned() {
+        tree.insert(p).unwrap();
+    }
 
-    for p in &pts { assert!(tree.delete(p), "failed to delete {:?}", p); }
-    for p in &pts { assert!(!tree.delete(p), "second delete should report false for {:?}", p); }
+    for p in &pts {
+        assert!(tree.delete(p), "failed to delete {:?}", p);
+    }
+    for p in &pts {
+        assert!(
+            !tree.delete(p),
+            "second delete should report false for {:?}",
+            p
+        );
+    }
 
     // After clearing, reinsert and ensure queries behave
     let new_pts = [
         Point2D::new(2.0, 2.0, Some("D")),
         Point2D::new(3.0, 3.0, Some("E")),
     ];
-    for p in new_pts.iter().cloned() { tree.insert(p).unwrap(); }
+    for p in new_pts.iter().cloned() {
+        tree.insert(p).unwrap();
+    }
 
     let tgt = Point2D::new(2.1, 2.1, None);
     let res = tree.knn_search::<EuclideanDistance>(&tgt, 2);
@@ -461,7 +485,9 @@ fn test_kdtree_delete_many_equal_on_axis() {
         Point2D::new(0.0, 3.0, Some("D")),
         Point2D::new(0.0, -1.0, Some("E")),
     ];
-    for p in pts.iter().cloned() { tree.insert(p).unwrap(); }
+    for p in pts.iter().cloned() {
+        tree.insert(p).unwrap();
+    }
 
     for p in &pts {
         assert!(tree.delete(p), "failed to delete {:?}", p);
@@ -472,4 +498,3 @@ fn test_kdtree_delete_many_equal_on_axis() {
     let res = tree.knn_search::<EuclideanDistance>(&tgt, 1);
     assert!(res.is_empty(), "tree should be empty after deleting all");
 }
-

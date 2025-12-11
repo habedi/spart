@@ -8,7 +8,6 @@
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/habedi/spart/tests.yml?label=tests&style=flat&labelColor=282c34&logo=github)](https://github.com/habedi/spart/actions/workflows/tests.yml)
 [![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
-[![Code Quality](https://img.shields.io/codefactor/grade/github/habedi/spart?label=quality&style=flat&labelColor=282c34&logo=codefactor)](https://www.codefactor.io/repository/github/habedi/spart)
 [![Crates.io](https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&labelColor=282c34&color=fc8d62&logo=rust)](https://crates.io/crates/spart)
 [![Docs.rs](https://img.shields.io/badge/docs-spart-66c2a5?style=flat&labelColor=282c34&logo=docs.rs)](https://docs.rs/spart)
 [![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
@@ -37,10 +36,6 @@ At the moment, the following tree data structures and features are supported:
 | 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  |     ✓      |       ✓       |
 
 See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
-
-> [!IMPORTANT]
-> Spart is in early development, so bugs and breaking changes are expected.
-> Please use the [issues page](https://github.com/habedi/spart/issues) to report bugs or request features.
 
 ---
 
