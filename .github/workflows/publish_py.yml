@@ -123,7 +123,7 @@ jobs:
           ls -la wheels/
           twine check wheels/*
 
-#      - name: Publish wheels to PyPI
-#        run: |
-#          twine upload wheels/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
-#        if: success()
+      - name: Publish wheels to PyPI
+        run: |
+          twine upload wheels/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+        if: success()
