@@ -34,10 +34,6 @@ bincode = "1.3.3"
 spart = { path = ".", features = ["serde"] }
 proptest = "1.5.0"
 
-# Need to pin versions for Rust 1.83 compatibility
-wit-bindgen = "=0.36.0"
-spdx = "=0.9.0"
-
 [features]
 default = []
 serde = ["dep:serde", "dep:bincode"]
