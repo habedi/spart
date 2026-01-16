@@ -168,8 +168,10 @@ impl Rectangle {
             && point.x <= self.x + self.width
             && point.y >= self.y
             && point.y <= self.y + self.height;
-        debug!("Rectangle::contains(): self: (x: {}, y: {}, w: {}, h: {}), point: (x: {}, y: {}), result: {}",
-            self.x, self.y, self.width, self.height, point.x, point.y, res);
+        debug!(
+            "Rectangle::contains(): self: (x: {}, y: {}, w: {}, h: {}), point: (x: {}, y: {}), result: {}",
+            self.x, self.y, self.width, self.height, point.x, point.y, res
+        );
         res
     }
 
@@ -192,8 +194,18 @@ impl Rectangle {
             || other.x + other.width < self.x
             || other.y > self.y + self.height
             || other.y + other.height < self.y);
-        debug!("Rectangle::intersects(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: {}",
-            self.x, self.y, self.width, self.height, other.x, other.y, other.width, other.height, res);
+        debug!(
+            "Rectangle::intersects(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: {}",
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            other.x,
+            other.y,
+            other.width,
+            other.height,
+            res
+        );
         res
     }
 
@@ -252,9 +264,21 @@ impl Rectangle {
             width,
             height,
         };
-        debug!("Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})",
-            self.x, self.y, self.width, self.height, other.x, other.y, other.width, other.height,
-            union_rect.x, union_rect.y, union_rect.width, union_rect.height);
+        debug!(
+            "Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})",
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            other.x,
+            other.y,
+            other.width,
+            other.height,
+            union_rect.x,
+            union_rect.y,
+            union_rect.width,
+            union_rect.height
+        );
         union_rect
     }
 
@@ -395,8 +419,10 @@ impl<T> Point3D<T> {
     pub fn distance_sq(&self, other: &Point3D<T>) -> f64 {
         let dist =
             (self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2);
-        debug!("Point3D::distance_sq(): self: (x: {}, y: {}, z: {}), other: (x: {}, y: {}, z: {}), result: {}",
-            self.x, self.y, self.z, other.x, other.y, other.z, dist);
+        debug!(
+            "Point3D::distance_sq(): self: (x: {}, y: {}, z: {}), other: (x: {}, y: {}, z: {}), result: {}",
+            self.x, self.y, self.z, other.x, other.y, other.z, dist
+        );
         dist
     }
 }
@@ -441,9 +467,19 @@ impl Cube {
             && point.y <= self.y + self.height
             && point.z >= self.z
             && point.z <= self.z + self.depth;
-        debug!("Cube::contains(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), point: (x: {}, y: {}, z: {}), result: {}",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            point.x, point.y, point.z, res);
+        debug!(
+            "Cube::contains(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), point: (x: {}, y: {}, z: {}), result: {}",
+            self.x,
+            self.y,
+            self.z,
+            self.width,
+            self.height,
+            self.depth,
+            point.x,
+            point.y,
+            point.z,
+            res
+        );
         res
     }
 
@@ -468,9 +504,22 @@ impl Cube {
             || other.y + other.height < self.y
             || other.z > self.z + self.depth
             || other.z + other.depth < self.z);
-        debug!("Cube::intersects(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: {}",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            other.x, other.y, other.z, other.width, other.height, other.depth, res);
+        debug!(
+            "Cube::intersects(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: {}",
+            self.x,
+            self.y,
+            self.z,
+            self.width,
+            self.height,
+            self.depth,
+            other.x,
+            other.y,
+            other.z,
+            other.width,
+            other.height,
+            other.depth,
+            res
+        );
         res
     }
 
@@ -530,10 +579,27 @@ impl Cube {
             height: (y2 - y1) + eps_y,
             depth: (z2 - z1) + eps_z,
         };
-        debug!("Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})",
-            self.x, self.y, self.z, self.width, self.height, self.depth,
-            other.x, other.y, other.z, other.width, other.height, other.depth,
-            union_cube.x, union_cube.y, union_cube.z, union_cube.width, union_cube.height, union_cube.depth);
+        debug!(
+            "Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})",
+            self.x,
+            self.y,
+            self.z,
+            self.width,
+            self.height,
+            self.depth,
+            other.x,
+            other.y,
+            other.z,
+            other.width,
+            other.height,
+            other.depth,
+            union_cube.x,
+            union_cube.y,
+            union_cube.z,
+            union_cube.width,
+            union_cube.height,
+            union_cube.depth
+        );
         union_cube
     }
 

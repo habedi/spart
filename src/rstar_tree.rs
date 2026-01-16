@@ -35,8 +35,8 @@ use crate::geometry::{
     Point2D, Point3D, Rectangle,
 };
 use crate::rtree_common::{
-    compute_group_mbr as common_compute_group_mbr, delete_entry as common_delete_entry,
-    search_node as common_search_node, KnnCandidate,
+    KnnCandidate, compute_group_mbr as common_compute_group_mbr,
+    delete_entry as common_delete_entry, search_node as common_search_node,
 };
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]

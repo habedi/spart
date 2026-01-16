@@ -10,7 +10,7 @@
 [![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
 [![Crates.io](https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&labelColor=282c34&color=fc8d62&logo=rust)](https://crates.io/crates/spart)
 [![Docs.rs](https://img.shields.io/badge/docs-spart-66c2a5?style=flat&labelColor=282c34&logo=docs.rs)](https://docs.rs/spart)
-[![MSRV](https://img.shields.io/badge/msrv-1.83.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/msrv-1.85.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart)
 
 A collection of space partitioning trees for Rust
@@ -45,7 +45,7 @@ See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned feature
 cargo add spart
 ````
 
-*Spart requires Rust 1.83.0 or later.*
+*Spart requires Rust 1.85.0 or later.*
 
 #### Python Bindings
 

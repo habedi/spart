@@ -355,7 +355,7 @@ fn test_kdtree_delete_many() {
     for p in &points {
         // Show the points
         assert!(tree.delete(p), "failed to delete {:?}", p);
-        let knn_after = tree.knn_search::<EuclideanDistance>(&p, KNN_COUNT);
+        let knn_after = tree.knn_search::<EuclideanDistance>(p, KNN_COUNT);
         for pt in &knn_after {
             debug!("2D kNN after deletion: {:?}", pt);
             assert_ne!(
