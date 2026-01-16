@@ -2,7 +2,7 @@
 mod shared;
 use shared::*;
 
-use criterion::{criterion_group, Criterion};
+use criterion::{Criterion, criterion_group};
 use spart::geometry::Rectangle;
 use spart::{kdtree, octree, quadtree, rstar_tree, rtree};
 use std::hint::black_box;

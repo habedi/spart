@@ -385,56 +385,56 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         if self
             .front_top_left
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .front_top_right
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .front_bottom_left
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .front_bottom_right
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .back_top_left
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .back_top_right
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .back_bottom_left
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .back_bottom_right
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }

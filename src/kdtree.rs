@@ -365,7 +365,7 @@ impl<P: KdPoint> KdTree<P> {
         depth: usize,
         heap: &mut BinaryHeap<HeapItem<P>>,
     ) {
-        if let Some(ref n) = node {
+        if let Some(n) = node {
             let dist_sq = M::distance_sq(target, &n.point);
             let dist = OrderedFloat(dist_sq);
             if heap.len() < k_neighbors {
@@ -435,7 +435,7 @@ impl<P: KdPoint> KdTree<P> {
         radius: f64,
         found: &mut Vec<P>,
     ) {
-        if let Some(ref n) = node {
+        if let Some(n) = node {
             let dist_sq = M::distance_sq(center, &n.point);
             if dist_sq <= radius_sq {
                 found.push(n.point.clone());

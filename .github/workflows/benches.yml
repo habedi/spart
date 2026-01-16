@@ -3,6 +3,10 @@ name: Run Benchmarks
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -13,7 +17,7 @@ jobs:
     strategy:
       matrix:
         # Define the Rust versions to test against
-        rust-version: [ "1.83.0", "stable" ]
+        rust-version: [ "1.85.0", "stable" ]
 
     steps:
       - name: Checkout Repository

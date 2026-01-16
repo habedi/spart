@@ -10,6 +10,10 @@ on:
       - 'docs/**'
       - '.github/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -24,7 +28,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: '1.83.0'
+          toolchain: '1.85.0'
           cache: true
 
       - name: Install Dependencies

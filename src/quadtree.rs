@@ -196,28 +196,28 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         if self
             .northwest
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .northeast
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .southwest
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }
         if self
             .southeast
             .as_mut()
-            .map_or(false, |c| c.insert(point.clone()))
+            .is_some_and(|c| c.insert(point.clone()))
         {
             return true;
         }

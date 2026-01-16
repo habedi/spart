@@ -11,6 +11,10 @@ on:
       - 'docs/**'
       - '.github/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -21,7 +25,7 @@ jobs:
     strategy:
       matrix:
         # Define the Rust versions to test against
-        rust-version: [ "1.83.0", "stable", "beta" ]
+        rust-version: [ "1.85.0", "stable", "beta" ]
 
     steps:
       - name: Checkout Repository

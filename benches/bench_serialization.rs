@@ -1,4 +1,4 @@
-use criterion::{criterion_group, Criterion};
+use criterion::{Criterion, criterion_group};
 use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
 use spart::kdtree::KdTree;
 use spart::octree::Octree;
