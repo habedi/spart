@@ -48,6 +48,7 @@ harness = false
 strip = "symbols"
 codegen-units = 1
 lto = true
+panic = "unwind"
 
 [profile.bench]
 inherits = "release"
