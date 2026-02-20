@@ -616,3 +616,47 @@ impl<P: KdPoint> KdTree<P> {
         min
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::{EuclideanDistance, Point2D};
+
+    #[test]
+    fn test_insert_bulk_consecutive_preserves_points() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let first = vec![
+            Point2D::new(1.0, 1.0, Some("A")),
+            Point2D::new(2.0, 2.0, Some("B")),
+        ];
+        let second = vec![
+            Point2D::new(3.0, 3.0, Some("C")),
+            Point2D::new(4.0, 4.0, Some("D")),
+        ];
+
+        tree.insert_bulk(first.clone()).unwrap();
+        tree.insert_bulk(second.clone()).unwrap();
+
+        for p in first.into_iter().chain(second) {
+            assert!(tree.contains(&p));
+        }
+
+        let target = Point2D::new(2.5, 2.5, None::<&str>);
+        let knn = tree.knn_search::<EuclideanDistance>(&target, 4);
+        assert_eq!(knn.len(), 4);
+    }
+
+    #[test]
+    fn test_insert_bulk_dimension_mismatch() {
+        let mut tree: KdTree<Point2D<()>> = KdTree::with_dimension(3);
+        let points = vec![Point2D::new(1.0, 2.0, None)];
+        let result = tree.insert_bulk(points);
+        assert!(matches!(
+            result,
+            Err(SpartError::DimensionMismatch {
+                expected: 3,
+                actual: 2
+            })
+        ));
+    }
+}

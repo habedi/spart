@@ -911,3 +911,104 @@ impl<T> BoundingVolumeFromPoint<Point3D<T>> for Cube {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rectangle_contains_edges() {
+        let rect = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        let corners = [
+            Point2D::new(0.0, 0.0, None::<()>),
+            Point2D::new(10.0, 0.0, None::<()>),
+            Point2D::new(0.0, 10.0, None::<()>),
+            Point2D::new(10.0, 10.0, None::<()>),
+        ];
+        for corner in corners {
+            assert!(rect.contains(&corner));
+        }
+    }
+
+    #[test]
+    fn test_rectangle_intersects_touching_edges() {
+        let rect = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        let touching = Rectangle {
+            x: 10.0,
+            y: 2.0,
+            width: 5.0,
+            height: 5.0,
+        };
+        let separate = Rectangle {
+            x: 10.01,
+            y: 0.0,
+            width: 5.0,
+            height: 5.0,
+        };
+        assert!(rect.intersects(&touching));
+        assert!(!rect.intersects(&separate));
+    }
+
+    #[test]
+    fn test_cube_contains_edges() {
+        let cube = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 10.0,
+            depth: 10.0,
+        };
+        let corners = [
+            Point3D::new(0.0, 0.0, 0.0, None::<()>),
+            Point3D::new(10.0, 0.0, 0.0, None::<()>),
+            Point3D::new(0.0, 10.0, 0.0, None::<()>),
+            Point3D::new(0.0, 0.0, 10.0, None::<()>),
+            Point3D::new(10.0, 10.0, 10.0, None::<()>),
+        ];
+        for corner in corners {
+            assert!(cube.contains(&corner));
+        }
+    }
+
+    #[test]
+    fn test_min_distance_inside_is_zero() {
+        let rect = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        let inside = Point2D::new(5.0, 5.0, None::<()>);
+        assert_eq!(rect.min_distance(&inside), 0.0);
+    }
+
+    #[test]
+    fn test_bounding_volume_from_point_radius() {
+        let query = Point2D::new(1.0, 2.0, None::<()>);
+        let rect = Rectangle::from_point_radius(&query, 3.0);
+        assert_eq!(rect.x, -2.0);
+        assert_eq!(rect.y, -1.0);
+        assert_eq!(rect.width, 6.0);
+        assert_eq!(rect.height, 6.0);
+
+        let query3 = Point3D::new(1.0, 2.0, 3.0, None::<()>);
+        let cube = Cube::from_point_radius(&query3, 2.0);
+        assert_eq!(cube.x, -1.0);
+        assert_eq!(cube.y, 0.0);
+        assert_eq!(cube.z, 1.0);
+        assert_eq!(cube.width, 4.0);
+        assert_eq!(cube.height, 4.0);
+        assert_eq!(cube.depth, 4.0);
+    }
+}

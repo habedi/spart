@@ -773,3 +773,59 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::EuclideanDistance;
+
+    #[test]
+    fn test_insert_rejects_outside_boundary() {
+        let boundary = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 10.0,
+            depth: 10.0,
+        };
+        let mut tree: Octree<&str> = Octree::new(&boundary, 2).unwrap();
+        let outside = Point3D::new(20.0, 20.0, 20.0, Some("O"));
+        assert!(!tree.insert(outside));
+    }
+
+    #[test]
+    fn test_insert_accepts_boundary_points() {
+        let boundary = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 10.0,
+            depth: 10.0,
+        };
+        let mut tree: Octree<&str> = Octree::new(&boundary, 1).unwrap();
+        let edge = Point3D::new(10.0, 10.0, 10.0, Some("E"));
+        assert!(tree.insert(edge));
+    }
+
+    #[test]
+    fn test_range_search_zero_radius_returns_exact_match() {
+        let boundary = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 100.0,
+            height: 100.0,
+            depth: 100.0,
+        };
+        let mut tree: Octree<&str> = Octree::new(&boundary, 2).unwrap();
+        let target = Point3D::new(25.0, 25.0, 25.0, Some("T"));
+        tree.insert(target.clone());
+        tree.insert(Point3D::new(25.0, 25.0, 26.0, Some("N")));
+
+        let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], target);
+    }
+}

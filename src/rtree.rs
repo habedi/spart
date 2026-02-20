@@ -779,3 +779,56 @@ where
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::EuclideanDistance;
+
+    #[test]
+    fn test_range_search_radius_zero_2d() {
+        let mut tree: RTree<Point2D<&str>> = RTree::new(4).unwrap();
+        let target = Point2D::new(5.0, 5.0, Some("T"));
+        tree.insert(target.clone());
+        tree.insert(Point2D::new(5.0, 6.0, Some("N")));
+
+        let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(*results[0], target);
+    }
+
+    #[test]
+    fn test_range_search_bbox_filters_results() {
+        let mut tree: RTree<Point2D<&str>> = RTree::new(4).unwrap();
+        let inside = Point2D::new(1.0, 1.0, Some("I"));
+        let outside = Point2D::new(20.0, 20.0, Some("O"));
+        tree.insert(inside.clone());
+        tree.insert(outside);
+
+        let query = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 5.0,
+            height: 5.0,
+        };
+        let results = tree.range_search_bbox(&query);
+        assert_eq!(results.len(), 1);
+        assert_eq!(*results[0], inside);
+    }
+
+    #[test]
+    fn test_delete_removes_point_3d() {
+        let mut tree: RTree<Point3D<&str>> = RTree::new(4).unwrap();
+        let a = Point3D::new(1.0, 1.0, 1.0, Some("A"));
+        let b = Point3D::new(2.0, 2.0, 2.0, Some("B"));
+        tree.insert(a.clone());
+        tree.insert(b.clone());
+
+        assert!(tree.delete(&a));
+        let removed = tree.range_search::<EuclideanDistance>(&a, 0.0);
+        let remaining = tree.range_search::<EuclideanDistance>(&b, 0.0);
+        assert!(removed.is_empty());
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(*remaining[0], b);
+    }
+}
