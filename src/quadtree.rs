@@ -465,6 +465,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         center: &Point2D<T>,
         radius: f64,
     ) -> Vec<Point2D<T>> {
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
@@ -499,6 +502,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             for child in self.children_mut() {
                 if child.delete(point) {
                     deleted = true;
+                    break;
                 }
             }
             self.try_merge();
@@ -550,5 +554,205 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
                 self.divided = false;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::EuclideanDistance;
+
+    #[test]
+    fn test_insert_rejects_outside_boundary() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let outside = Point2D::new(20.0, 20.0, Some("O"));
+        assert!(!tree.insert(outside));
+    }
+
+    #[test]
+    fn test_insert_accepts_boundary_points() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 1).unwrap();
+        let edge = Point2D::new(10.0, 10.0, Some("E"));
+        assert!(tree.insert(edge));
+    }
+
+    #[test]
+    fn test_range_search_zero_radius_returns_exact_match() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let target = Point2D::new(25.0, 25.0, Some("T"));
+        tree.insert(target.clone());
+        tree.insert(Point2D::new(26.0, 25.0, Some("N")));
+
+        let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], target);
+    }
+
+    #[test]
+    fn test_delete_existing_point() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let p1 = Point2D::new(10.0, 10.0, Some("A"));
+        let p2 = Point2D::new(20.0, 20.0, Some("B"));
+        tree.insert(p1.clone());
+        tree.insert(p2);
+
+        assert!(tree.delete(&p1));
+        let results = tree.knn_search::<EuclideanDistance>(&p1, 1);
+        assert_ne!(results[0], p1);
+        assert!(!tree.delete(&p1));
+    }
+
+    #[test]
+    fn test_empty_tree_queries() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let target = Point2D::new(5.0, 5.0, None::<&str>);
+
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
+        assert!(knn_results.is_empty());
+
+        let range_results = tree.range_search::<EuclideanDistance>(&target, 10.0);
+        assert!(range_results.is_empty());
+
+        assert!(!tree.delete(&target));
+    }
+
+    #[test]
+    fn test_knn_edge_cases() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 4).unwrap();
+        let points = vec![
+            Point2D::new(10.0, 10.0, Some("A")),
+            Point2D::new(20.0, 20.0, Some("B")),
+            Point2D::new(30.0, 30.0, Some("C")),
+        ];
+        let num_points = points.len();
+        tree.insert_bulk(&points);
+
+        let target = Point2D::new(15.0, 15.0, None::<&str>);
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, 0);
+        assert!(knn_results.is_empty());
+
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, num_points + 5);
+        assert_eq!(knn_results.len(), num_points);
+    }
+
+    #[test]
+    fn test_duplicates_delete_one() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 4).unwrap();
+        let p1 = Point2D::new(10.0, 10.0, Some("A"));
+        let p2 = p1.clone();
+        tree.insert(p1.clone());
+        tree.insert(p2.clone());
+
+        let results = tree.knn_search::<EuclideanDistance>(&p1, 2);
+        assert_eq!(results.len(), 2);
+
+        assert!(tree.delete(&p1));
+        let results_after_delete = tree.knn_search::<EuclideanDistance>(&p1, 2);
+        assert_eq!(results_after_delete.len(), 1);
+    }
+
+    #[test]
+    fn test_range_search_includes_boundary_point() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 4).unwrap();
+        let center = Point2D::new(50.0, 50.0, Some("C"));
+        let boundary_point = Point2D::new(60.0, 50.0, Some("B"));
+        tree.insert(center.clone());
+        tree.insert(boundary_point.clone());
+
+        let results = tree.range_search::<EuclideanDistance>(&center, 10.0);
+        assert!(results.contains(&boundary_point));
+        assert!(results.contains(&center));
+    }
+
+    #[test]
+    fn test_bulk_insert_empty_noop() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<i32> = Quadtree::new(&boundary, 4).unwrap();
+        let empty: Vec<Point2D<i32>> = Vec::new();
+        tree.insert_bulk(&empty);
+        let target = Point2D::new(10.0, 10.0, None::<i32>);
+        let results = tree.knn_search::<EuclideanDistance>(&target, 1);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_zero_capacity_rejected() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let result = Quadtree::<i32>::new(&boundary, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let target = Point2D::new(10.0, 10.0, Some("T"));
+        tree.insert(target.clone());
+
+        let results = tree.range_search::<EuclideanDistance>(&target, -1.0);
+        assert!(results.is_empty());
     }
 }

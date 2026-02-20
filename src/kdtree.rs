@@ -272,13 +272,13 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
-        
+
         if self.root.is_some() {
             let mut existing = Vec::new();
             Self::collect_points(&self.root, &mut existing);
             points.extend(existing);
         }
-        
+
         // Pass k explicitly to avoid unwraps inside recursion
         self.root = Self::insert_bulk_rec(&mut points[..], 0, k);
         Ok(())
@@ -359,6 +359,13 @@ impl<P: KdPoint> KdTree<P> {
         if k_neighbors == 0 {
             return Vec::new();
         }
+        let k = match self.k {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        if target.dims() != k {
+            return Vec::new();
+        }
         info!(
             "Performing k‑NN search for target {:?} with k={}",
             target, k_neighbors
@@ -436,6 +443,13 @@ impl<P: KdPoint> KdTree<P> {
     /// A vector of points within the specified radius.
     pub fn range_search<M: DistanceMetric<P>>(&self, center: &P, radius: f64) -> Vec<P> {
         info!("Finding points within radius {} of {:?}", radius, center);
+        let k = match self.k {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        if center.dims() != k {
+            return Vec::new();
+        }
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         Self::range_search_rec::<M>(&self.root, center, radius_sq, 0, radius, &mut found);
@@ -614,5 +628,298 @@ impl<P: KdPoint> KdTree<P> {
             }
         }
         min
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::{EuclideanDistance, Point2D, Point3D};
+
+    #[test]
+    fn test_insert_bulk_consecutive_preserves_points() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let first = vec![
+            Point2D::new(1.0, 1.0, Some("A")),
+            Point2D::new(2.0, 2.0, Some("B")),
+        ];
+        let second = vec![
+            Point2D::new(3.0, 3.0, Some("C")),
+            Point2D::new(4.0, 4.0, Some("D")),
+        ];
+
+        tree.insert_bulk(first.clone()).unwrap();
+        tree.insert_bulk(second.clone()).unwrap();
+
+        for p in first.into_iter().chain(second) {
+            assert!(tree.contains(&p));
+        }
+
+        let target = Point2D::new(2.5, 2.5, None::<&str>);
+        let knn = tree.knn_search::<EuclideanDistance>(&target, 4);
+        assert_eq!(knn.len(), 4);
+    }
+
+    #[test]
+    fn test_insert_bulk_dimension_mismatch() {
+        let mut tree: KdTree<Point2D<()>> = KdTree::with_dimension(3);
+        let points = vec![Point2D::new(1.0, 2.0, None)];
+        let result = tree.insert_bulk(points);
+        assert!(matches!(
+            result,
+            Err(SpartError::DimensionMismatch {
+                expected: 3,
+                actual: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn test_dimension_inference() {
+        let mut tree: KdTree<Point2D<()>> = KdTree::new();
+        let p = Point2D::new(1.0, 2.0, None);
+        tree.insert(p).unwrap();
+        let p2 = Point2D::new(3.0, 4.0, None);
+        assert!(tree.insert(p2).is_ok());
+    }
+
+    #[test]
+    fn test_empty_tree_queries() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let target = Point2D::new(1.0, 2.0, None::<&str>);
+
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, 5);
+        assert!(knn_results.is_empty());
+
+        let range_results = tree.range_search::<EuclideanDistance>(&target, 10.0);
+        assert!(range_results.is_empty());
+
+        assert!(!tree.delete(&target));
+    }
+
+    #[test]
+    fn test_knn_edge_cases() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let points = vec![
+            Point2D::new(0.0, 0.0, Some("A")),
+            Point2D::new(1.0, 1.0, Some("B")),
+            Point2D::new(2.0, 2.0, Some("C")),
+        ];
+        let num_points = points.len();
+        tree.insert_bulk(points).unwrap();
+
+        let target = Point2D::new(0.5, 0.5, None::<&str>);
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, 0);
+        assert!(knn_results.is_empty());
+
+        let knn_results = tree.knn_search::<EuclideanDistance>(&target, num_points + 5);
+        assert_eq!(knn_results.len(), num_points);
+    }
+
+    #[test]
+    fn test_range_zero_radius_exact_match() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let target = Point2D::new(10.0, 10.0, Some("A"));
+        tree.insert(target.clone()).unwrap();
+        tree.insert(Point2D::new(11.0, 11.0, Some("B"))).unwrap();
+
+        let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], target);
+    }
+
+    #[test]
+    fn test_duplicates_delete_one() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let p1 = Point2D::new(10.0, 10.0, Some("A"));
+        let p2 = Point2D::new(10.0, 10.0, Some("A"));
+        tree.insert(p1.clone()).unwrap();
+        tree.insert(p2.clone()).unwrap();
+
+        let target = Point2D::new(10.0, 10.0, None::<&str>);
+        let results = tree.knn_search::<EuclideanDistance>(&target, 2);
+        assert_eq!(results.len(), 2);
+
+        assert!(tree.delete(&p1));
+
+        let results_after_delete = tree.knn_search::<EuclideanDistance>(&target, 2);
+        assert_eq!(results_after_delete.len(), 1);
+    }
+
+    #[test]
+    fn test_delete_many() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let points = [
+            Point2D::new(1.0, 2.0, Some("A")),
+            Point2D::new(3.0, 4.0, Some("B")),
+            Point2D::new(-1.0, -2.0, Some("C")),
+            Point2D::new(1.5, 3.2, Some("D")),
+            Point2D::new(0.5, 2.0, Some("E")),
+            Point2D::new(0.25, 2.0, Some("F")),
+            Point2D::new(0.5, 1.0, Some("G")),
+        ];
+
+        for p in points.clone() {
+            tree.insert(p).unwrap();
+        }
+
+        for p in &points {
+            assert!(tree.delete(p));
+            let knn_after = tree.knn_search::<EuclideanDistance>(p, 2);
+            for pt in &knn_after {
+                assert_ne!(pt.data, p.data);
+            }
+        }
+    }
+
+    #[test]
+    fn test_delete_same_coords_different_data() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let p1 = Point2D::new(10.0, 10.0, Some("A"));
+        let p2 = Point2D::new(10.0, 10.0, Some("B"));
+        let p3 = Point2D::new(10.0, 10.0, Some("C"));
+        tree.insert(p1.clone()).unwrap();
+        tree.insert(p2.clone()).unwrap();
+        tree.insert(p3.clone()).unwrap();
+
+        assert!(tree.delete(&p2));
+        assert!(tree.contains(&p1));
+        assert!(tree.contains(&p3));
+        assert!(!tree.contains(&p2));
+
+        let tgt = Point2D::new(10.0, 10.0, None::<&str>);
+        let res = tree.knn_search::<EuclideanDistance>(&tgt, 3);
+        assert_eq!(res.len(), 2);
+        for r in res {
+            assert_ne!(r.data, Some("B"));
+        }
+    }
+
+    #[test]
+    fn test_delete_nonexistent_with_equal_axis() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let a = Point2D::new(1.0, 0.0, Some("A"));
+        let b = Point2D::new(1.0, 1.0, Some("B"));
+        let c = Point2D::new(1.0, -1.0, Some("C"));
+        tree.insert(a.clone()).unwrap();
+        tree.insert(b.clone()).unwrap();
+        tree.insert(c.clone()).unwrap();
+
+        let not_present = Point2D::new(1.0, 2.0, Some("X"));
+        assert!(!tree.delete(&not_present));
+        assert!(tree.contains(&a));
+        assert!(tree.contains(&b));
+        assert!(tree.contains(&c));
+    }
+
+    #[test]
+    fn test_delete_root_with_only_left() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let root = Point2D::new(5.0, 5.0, Some("R"));
+        let l1 = Point2D::new(2.0, 2.0, Some("L1"));
+        let l2 = Point2D::new(1.0, 1.0, Some("L2"));
+        tree.insert(root.clone()).unwrap();
+        tree.insert(l1.clone()).unwrap();
+        tree.insert(l2.clone()).unwrap();
+
+        assert!(tree.delete(&root));
+        assert!(!tree.contains(&root));
+        assert!(tree.contains(&l1));
+        assert!(tree.contains(&l2));
+
+        assert!(tree.delete(&l1));
+        assert!(tree.contains(&l2));
+    }
+
+    #[test]
+    fn test_delete_all_and_reinsert() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let pts = [
+            Point2D::new(0.0, 0.0, Some("A")),
+            Point2D::new(1.0, 1.0, Some("B")),
+            Point2D::new(-1.0, -1.0, Some("C")),
+        ];
+        for p in pts.iter().cloned() {
+            tree.insert(p).unwrap();
+        }
+
+        for p in &pts {
+            assert!(tree.delete(p));
+        }
+        for p in &pts {
+            assert!(!tree.delete(p));
+        }
+
+        let new_pts = [
+            Point2D::new(2.0, 2.0, Some("D")),
+            Point2D::new(3.0, 3.0, Some("E")),
+        ];
+        for p in new_pts.iter().cloned() {
+            tree.insert(p).unwrap();
+        }
+
+        let tgt = Point2D::new(2.1, 2.1, None::<&str>);
+        let res = tree.knn_search::<EuclideanDistance>(&tgt, 2);
+        assert_eq!(res.len(), 2);
+    }
+
+    #[test]
+    fn test_delete_many_equal_on_axis() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let pts = [
+            Point2D::new(0.0, 0.0, Some("A")),
+            Point2D::new(0.0, 1.0, Some("B")),
+            Point2D::new(0.0, 2.0, Some("C")),
+            Point2D::new(0.0, 3.0, Some("D")),
+            Point2D::new(0.0, -1.0, Some("E")),
+        ];
+        for p in pts.iter().cloned() {
+            tree.insert(p).unwrap();
+        }
+
+        for p in &pts {
+            assert!(tree.delete(p));
+            assert!(!tree.contains(p));
+        }
+
+        let tgt = Point2D::new(0.0, 0.0, None::<&str>);
+        let res = tree.knn_search::<EuclideanDistance>(&tgt, 1);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_insert_bulk_3d_smoke() {
+        let mut tree: KdTree<Point3D<&str>> = KdTree::new();
+        let points = vec![
+            Point3D::new(1.0, 2.0, 3.0, Some("A")),
+            Point3D::new(4.0, 5.0, 6.0, Some("B")),
+        ];
+        tree.insert_bulk(points).unwrap();
+        let target = Point3D::new(2.0, 3.0, 4.0, None::<&str>);
+        let results = tree.knn_search::<EuclideanDistance>(&target, 1);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_insert_bulk_empty_is_ok() {
+        let mut tree: KdTree<Point2D<i32>> = KdTree::new();
+        let result = tree.insert_bulk(Vec::new());
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_knn_dimension_mismatch_returns_empty() {
+        let tree: KdTree<Point2D<&str>> = KdTree::with_dimension(3);
+        let target = Point2D::new(1.0, 2.0, None::<&str>);
+        let results = tree.knn_search::<EuclideanDistance>(&target, 1);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_range_dimension_mismatch_returns_empty() {
+        let tree: KdTree<Point2D<&str>> = KdTree::with_dimension(3);
+        let target = Point2D::new(1.0, 2.0, None::<&str>);
+        let results = tree.range_search::<EuclideanDistance>(&target, 1.0);
+        assert!(results.is_empty());
     }
 }
