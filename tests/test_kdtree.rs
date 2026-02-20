@@ -498,3 +498,40 @@ fn test_kdtree_delete_many_equal_on_axis() {
     let res = tree.knn_search::<EuclideanDistance>(&tgt, 1);
     assert!(res.is_empty(), "tree should be empty after deleting all");
 }
+
+#[test]
+fn test_kdtree_insert_bulk_consecutive() {
+    let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+
+    let points_a = common_points_2d();
+    let len_a = points_a.len();
+
+    let points_b = vec![
+        Point2D::new(12.0, 19.0, Some("L")),
+        Point2D::new(53.0, 59.0, Some("M")),
+        Point2D::new(34.0, 49.0, Some("N")),
+        Point2D::new(72.0, 89.0, Some("O")),
+        Point2D::new(83.0, 99.0, Some("P")),
+        Point2D::new(24.0, 29.0, Some("Q")),
+        Point2D::new(22.0, 28.0, Some("R")),
+        Point2D::new(23.0, 27.0, Some("S")),
+        Point2D::new(24.0, 26.0, Some("T")),
+        Point2D::new(22.0, 29.0, Some("U")),
+        Point2D::new(23.0, 24.0, Some("V")),
+    ];
+    let len_b = points_b.len();
+
+    tree.insert_bulk(points_a).unwrap();
+    tree.insert_bulk(points_b).unwrap();
+
+    let target = target_point_2d();
+    let knn_results = tree.knn_search::<EuclideanDistance>(&target, len_a + len_b);
+
+    assert_eq!(
+        knn_results.len(),
+        len_a + len_b,
+        "Expected {} nearest neighbors, got {}",
+        len_a + len_b,
+        knn_results.len()
+    );
+}
