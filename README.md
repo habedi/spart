@@ -35,7 +35,11 @@ At the moment, the following tree data structures and features are supported:
 | 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  |     ✓      |       ✓       |
 | 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  |     ✓      |       ✓       |
 
-See the [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
+See [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
+
+> [!IMPORTANT]
+> This project is in early development, so bugs and breaking changes are expected.
+> Please use the [issues page](https://github.com/habedi/spart/issues) to report bugs or request features.
 
 ---
 
