@@ -1,5 +1,6 @@
 default_stages: [ pre-push ]
 fail_fast: false
+exclude: ^(docs/|examples/benches)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -22,27 +23,27 @@ repos:
   - repo: local
     hooks:
       - id: format
-        name: Format Code
+        name: Format Rust Code
         entry: make format
         language: system
         pass_filenames: false
         stages: [ pre-commit ]
 
       - id: lint
-        name: Check Code Style
+        name: Check Code Style (Rust)
         entry: make lint
         language: system
         pass_filenames: false
         stages: [ pre-commit ]
 
       - id: test
-        name: Run Tests
+        name: Run Rust Tests
         entry: make nextest
         language: system
         pass_filenames: false
 
       - id: test-py
-        name: Run PyGraphina Tests
+        name: Run Python Tests
         entry: make test-py
         language: system
         pass_filenames: false
