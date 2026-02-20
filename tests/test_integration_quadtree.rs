@@ -1,6 +1,6 @@
-#[path = "shared.rs"]
-mod shared;
-use shared::*;
+#[path = "common.rs"]
+mod common;
+use common::*;
 
 use spart::geometry::EuclideanDistance;
 use spart::quadtree::Quadtree;

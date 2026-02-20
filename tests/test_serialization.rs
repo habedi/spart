@@ -1,8 +1,9 @@
-mod helpers;
+#[path = "common.rs"]
+mod common;
 
 #[cfg(test)]
 mod tests {
-    use super::helpers::Anyhow;
+    use crate::common::Anyhow;
     use spart::geometry::{Cube, Point2D, Point3D, Rectangle};
     use spart::kdtree::KdTree;
     use spart::octree::Octree;
