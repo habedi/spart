@@ -272,13 +272,13 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
-        
+
         if self.root.is_some() {
             let mut existing = Vec::new();
             Self::collect_points(&self.root, &mut existing);
             points.extend(existing);
         }
-        
+
         // Pass k explicitly to avoid unwraps inside recursion
         self.root = Self::insert_bulk_rec(&mut points[..], 0, k);
         Ok(())
