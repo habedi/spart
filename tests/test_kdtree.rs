@@ -521,8 +521,8 @@ fn test_kdtree_insert_bulk_consecutive() {
     ];
     let len_b = points_b.len();
 
-    tree.insert_bulk(points_a).unwrap();
-    tree.insert_bulk(points_b).unwrap();
+    tree.insert_bulk(points_a.clone()).unwrap();
+    tree.insert_bulk(points_b.clone()).unwrap();
 
     let target = target_point_2d();
     let knn_results = tree.knn_search::<EuclideanDistance>(&target, len_a + len_b);
@@ -534,4 +534,11 @@ fn test_kdtree_insert_bulk_consecutive() {
         len_a + len_b,
         knn_results.len()
     );
+
+    for point in points_a.into_iter().chain(points_b) {
+        assert!(
+            tree.contains(&point),
+            "Expected tree to contain point '{point:?}' after consecutive `insert_bulk` call"
+        )
+    }
 }
