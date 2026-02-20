@@ -25,14 +25,14 @@
 //! assert!(!neighbors3d.is_empty());
 //! ```
 
-use crate::errors::SpartError;
-use crate::geometry::DistanceMetric;
+use std::{cmp::Ordering, collections::BinaryHeap};
+
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
 use tracing::info;
+
+use crate::{errors::SpartError, geometry::DistanceMetric};
 
 /// Trait representing a point that can be stored in the Kd‑tree implementation.
 ///
@@ -272,9 +272,24 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
+        
+        if self.root.is_some() {
+            let mut existing = Vec::new();
+            Self::collect_points(&self.root, &mut existing);
+            points.extend(existing);
+        }
+        
         // Pass k explicitly to avoid unwraps inside recursion
         self.root = Self::insert_bulk_rec(&mut points[..], 0, k);
         Ok(())
+    }
+
+    fn collect_points(node: &Option<Box<KdNode<P>>>, result: &mut Vec<P>) {
+        if let Some(n) = node {
+            result.push(n.point.clone());
+            Self::collect_points(&n.left, result);
+            Self::collect_points(&n.right, result);
+        }
     }
 
     fn insert_bulk_rec(points: &mut [P], depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
