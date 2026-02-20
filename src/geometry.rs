@@ -1011,4 +1011,66 @@ mod tests {
         assert_eq!(cube.height, 4.0);
         assert_eq!(cube.depth, 4.0);
     }
+
+    #[test]
+    fn test_cube_intersects_touching_edges() {
+        let c1 = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 10.0,
+            depth: 10.0,
+        };
+        let c2 = Cube {
+            x: 10.0,
+            y: 0.0,
+            z: 0.0,
+            width: 5.0,
+            height: 5.0,
+            depth: 5.0,
+        };
+        assert!(c1.intersects(&c2));
+    }
+
+    #[test]
+    fn test_triangle_inequality_distance() {
+        let p1 = Point2D::new(0.0, 0.0, Some(1));
+        let p2 = Point2D::new(3.0, 0.0, Some(2));
+        let p3 = Point2D::new(3.0, 4.0, Some(3));
+
+        let d12 = p1.distance_sq(&p2).sqrt();
+        let d23 = p2.distance_sq(&p3).sqrt();
+        let d13 = p1.distance_sq(&p3).sqrt();
+
+        assert!(d13 <= d12 + d23 + 1e-9);
+    }
+
+    #[test]
+    fn test_rectangle_union_negative_coords_contains_corners() {
+        let r1 = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 111.08676433386941,
+            height: 1.0,
+        };
+        let r2 = Rectangle {
+            x: -191.20362538993982,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        };
+
+        let union = r1.union(&r2);
+
+        let r1_min: Point2D<()> = Point2D::new(r1.x, r1.y, None);
+        let r1_max: Point2D<()> = Point2D::new(r1.x + r1.width, r1.y + r1.height, None);
+        assert!(union.contains(&r1_min));
+        assert!(union.contains(&r1_max));
+
+        let r2_min: Point2D<()> = Point2D::new(r2.x, r2.y, None);
+        let r2_max: Point2D<()> = Point2D::new(r2.x + r2.width, r2.y + r2.height, None);
+        assert!(union.contains(&r2_min));
+        assert!(union.contains(&r2_max));
+    }
 }
