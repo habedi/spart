@@ -195,6 +195,7 @@ fn test_kdtree_insert_bulk_2d() {
     );
 }
 
+#[test]
 fn test_kdtree_insert_bulk_3d() {
     let mut tree: KdTree<Point3D<&str>> = KdTree::new();
     let points = common_points_3d();
