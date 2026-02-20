@@ -359,6 +359,13 @@ impl<P: KdPoint> KdTree<P> {
         if k_neighbors == 0 {
             return Vec::new();
         }
+        let k = match self.k {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        if target.dims() != k {
+            return Vec::new();
+        }
         info!(
             "Performing k‑NN search for target {:?} with k={}",
             target, k_neighbors
@@ -436,6 +443,13 @@ impl<P: KdPoint> KdTree<P> {
     /// A vector of points within the specified radius.
     pub fn range_search<M: DistanceMetric<P>>(&self, center: &P, radius: f64) -> Vec<P> {
         info!("Finding points within radius {} of {:?}", radius, center);
+        let k = match self.k {
+            Some(k) => k,
+            None => return Vec::new(),
+        };
+        if center.dims() != k {
+            return Vec::new();
+        }
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         Self::range_search_rec::<M>(&self.root, center, radius_sq, 0, radius, &mut found);
@@ -891,5 +905,21 @@ mod tests {
         let mut tree: KdTree<Point2D<i32>> = KdTree::new();
         let result = tree.insert_bulk(Vec::new());
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_knn_dimension_mismatch_returns_empty() {
+        let tree: KdTree<Point2D<&str>> = KdTree::with_dimension(3);
+        let target = Point2D::new(1.0, 2.0, None::<&str>);
+        let results = tree.knn_search::<EuclideanDistance>(&target, 1);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_range_dimension_mismatch_returns_empty() {
+        let tree: KdTree<Point2D<&str>> = KdTree::with_dimension(3);
+        let target = Point2D::new(1.0, 2.0, None::<&str>);
+        let results = tree.range_search::<EuclideanDistance>(&target, 1.0);
+        assert!(results.is_empty());
     }
 }

@@ -465,6 +465,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         center: &Point2D<T>,
         radius: f64,
     ) -> Vec<Point2D<T>> {
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
@@ -499,6 +502,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
             for child in self.children_mut() {
                 if child.delete(point) {
                     deleted = true;
+                    break;
                 }
             }
             self.try_merge();
@@ -734,5 +738,21 @@ mod tests {
         };
         let result = Quadtree::<i32>::new(&boundary, 0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let boundary = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        };
+        let mut tree: Quadtree<&str> = Quadtree::new(&boundary, 2).unwrap();
+        let target = Point2D::new(10.0, 10.0, Some("T"));
+        tree.insert(target.clone());
+
+        let results = tree.range_search::<EuclideanDistance>(&target, -1.0);
+        assert!(results.is_empty());
     }
 }

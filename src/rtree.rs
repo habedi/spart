@@ -771,6 +771,9 @@ where
     /// that are not compatible with Euclidean distance may lead to incorrect results or reduced
     /// performance.
     pub fn range_search<M: DistanceMetric<T>>(&self, query: &T, radius: f64) -> Vec<&T> {
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let query_volume = T::B::from_point_radius(query, radius);
         let candidates = self.range_search_bbox(&query_volume);
         candidates
@@ -916,5 +919,15 @@ mod tests {
 
         let results_after_delete = tree.knn_search::<EuclideanDistance>(&p1, 2);
         assert_eq!(results_after_delete.len(), 1);
+    }
+
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let mut tree: RTree<Point2D<&str>> = RTree::new(4).unwrap();
+        let target = Point2D::new(5.0, 5.0, Some("T"));
+        tree.insert(target.clone());
+
+        let results = tree.range_search::<EuclideanDistance>(&target, -1.0);
+        assert!(results.is_empty());
     }
 }

@@ -674,6 +674,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         center: &Point3D<T>,
         radius: f64,
     ) -> Vec<Point3D<T>> {
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let mut found = Vec::new();
         let radius_sq = radius * radius;
         if self.min_distance_sq(center) > radius_sq {
@@ -708,6 +711,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             for child in self.children_mut() {
                 if child.delete(point) {
                     deleted = true;
+                    break;
                 }
             }
             self.try_merge();
@@ -975,5 +979,23 @@ mod tests {
         };
         let result = Octree::<i32>::new(&boundary, 0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let boundary = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 100.0,
+            height: 100.0,
+            depth: 100.0,
+        };
+        let mut tree: Octree<&str> = Octree::new(&boundary, 2).unwrap();
+        let target = Point3D::new(10.0, 10.0, 10.0, Some("T"));
+        tree.insert(target.clone());
+
+        let results = tree.range_search::<EuclideanDistance>(&target, -1.0);
+        assert!(results.is_empty());
     }
 }

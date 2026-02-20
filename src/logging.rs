@@ -18,8 +18,8 @@ fn set_debug_level() {
     if std::env::var("DEBUG_SPART").map_or(true, |v| v == "0" || v == "false" || v.is_empty()) {
         // Option 1: Do nothing (logging macros will not output)
         // Option 2: Install a no-op subscriber to explicitly disable logging:
-        tracing::subscriber::set_global_default(tracing::subscriber::NoSubscriber::default())
-            .expect("Failed to set no-op subscriber");
+        let _ =
+            tracing::subscriber::set_global_default(tracing::subscriber::NoSubscriber::default());
     } else {
         tracing_subscriber::fmt()
             .with_max_level(Level::DEBUG)
