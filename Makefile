@@ -160,7 +160,7 @@ wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
 .PHONY: test-py
 test-py: develop-py ## Run Python tests
 	@echo "Running Python tests..."
-	@bash -c "source .venv/bin/activate && pytest"
+	@$(PY_DEP_MNGR) run --extra dev pytest
 
 .PHONY: publish-py
 publish-py: wheel-manylinux ## Publish the PySpart wheel to PyPI (requires PYPI_TOKEN to be set)
