@@ -142,8 +142,8 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install twine
-        run: pip install twine
+      - name: Set Up uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -154,12 +154,30 @@ jobs:
       - name: Verify the distributions
         run: |
           ls -la dist/
-          twine check dist/*
-          # Every platform files and the sdist has to be present, or a release would silently ship only
-          # part of the set.
           count=$(ls -1 dist/*.whl | wc -l)
           test "$count" -eq 8 || { echo "expected 8 wheels, found $count"; exit 1; }
           test -n "$(ls -1 dist/*.tar.gz 2>/dev/null)" || { echo "no sdist found"; exit 1; }
+          python - <<'PY'
+          import email, glob, os, sys, zipfile
+
+          tag = os.environ.get("GITHUB_REF_NAME", "").lstrip("v")
+          wheels = sorted(glob.glob("dist/*.whl"))
+          versions = set()
+          for wheel in wheels:
+              with zipfile.ZipFile(wheel) as archive:
+                  name = next(n for n in archive.namelist() if n.endswith(".dist-info/METADATA"))
+                  meta = email.message_from_bytes(archive.read(name))
+              assert meta["Name"] == "pyspart", f"{wheel}: unexpected name {meta['Name']}"
+              versions.add(meta["Version"])
+          if len(versions) != 1:
+              sys.exit(f"wheels disagree on the version: {sorted(versions)}")
+          built = versions.pop()
+          if tag and built != tag:
+              sys.exit(f"tag {tag!r} does not match the built version {built!r}")
+          print(f"verified {len(wheels)} wheels and an sdist for pyspart {built}")
+          PY
 
       - name: Publish to PyPI
-        run: twine upload dist/* -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish --check-url https://pypi.org/simple/ dist/*

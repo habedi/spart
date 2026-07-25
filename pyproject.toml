@@ -19,7 +19,6 @@ dev = [
     "griffe (>=1.7.3,<2.0.0)",
     "types-requests (>=2.32.0.20250515,<3.0.0.0)",
     "maturin[zig] (>=1.9.0,<2.0.0)",
-    "twine (>=6.1.0,<7.0.0)",
 ]
 
 [tool.pytest.ini_options]

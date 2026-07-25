@@ -182,8 +182,12 @@ publish-py: wheel-manylinux sdist ## Publish PySpart to PyPI for THIS host only 
 	   echo "Error: no sdist for version $(PYSPART_VERSION) in $(PYSPART_DIR)/$(WHEEL_DIR)."; \
 	   exit 1; \
 	fi
+	@if [ -z "$$PYPI_TOKEN" ]; then \
+	   echo "Error: PYPI_TOKEN is not set in the environment."; \
+	   exit 1; \
+	fi
 	@echo "Uploading: $(WHEEL_FILES) $(SDIST_FILE)"
-	@twine upload -u __token__ -p $(PYPI_TOKEN) $(WHEEL_FILES) $(SDIST_FILE)
+	@UV_PUBLISH_TOKEN="$$PYPI_TOKEN" $(PY_DEP_MNGR) publish --check-url https://pypi.org/simple/ $(WHEEL_FILES) $(SDIST_FILE)
 
 ########################################################################################
 ## Additional targets
