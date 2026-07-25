@@ -383,7 +383,7 @@ fn refresh_mbr<T: RTreeObject>(entry: &mut RTreeEntry<T>) {
 /// Returns an entry pointing at a freshly created sibling when `node` had to split. The caller owns
 /// that sibling: an interior caller pushes it into its own entry list, and `RTree::insert_entry_at`
 /// turns it into a new root. Splitting on the way back up is what keeps every leaf at the same
-/// depth — without it only the root would ever split and the tree would stay two levels deep no
+/// depth. Without it only the root would ever split, and the tree would stay two levels deep no
 /// matter how many objects it held.
 fn insert_entry_at_height<T: RTreeObject>(
     node: &mut RTreeNode<T>,

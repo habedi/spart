@@ -149,8 +149,8 @@ where
         } else if let Some(new_mbr) = compute_group_mbr(child.entries()) {
             entry.set_mbr(new_mbr);
         }
-        // Only one object is removed per call, so there is no reason to look at further siblings —
-        // and scanning on would delete one copy of a duplicated object from *every* subtree.
+        // Only one object is removed per call, so there is no reason to look at further siblings.
+        // Scanning on would also delete one copy of a duplicated object from *every* subtree.
         break;
     }
 
@@ -199,8 +199,8 @@ impl<E: EntryAccess> PartialOrd for KnnCandidate<'_, E> {
 ///
 /// The invariants are what the search algorithms rely on:
 ///
-/// * a leaf node holds only object entries and an interior node only subtree entries — mixing them
-///   used to make whole subtrees unreachable;
+/// * a leaf node holds only object entries and an interior node only subtree entries, because
+///   mixing them used to make whole subtrees unreachable;
 /// * every leaf sits at the same depth;
 /// * no node holds more than `max_entries` entries, and (when `min_entries` is given) no node other
 ///   than the root holds fewer than that.

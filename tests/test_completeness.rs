@@ -1,11 +1,11 @@
 //! Completeness tests: every tree must return all the points a query covers, not merely correct
 //! ones.
 //!
-//! The rest of the suite checks soundness — that returned points really do lie inside the query, and
-//! that kNN results come back sorted. Nothing checked the other direction, so a tree could quietly
-//! drop points and still pass: R*-tree range searches once found 1 of 1000 inserted points, bulk
-//! insert lost whole batches, and coincident points crashed the quadtree. Each test below compares a
-//! query against brute force over the set of points known to be live.
+//! The rest of the suite checks soundness, meaning that returned points really do lie inside the
+//! query and that kNN results come back sorted. Nothing checked the other direction, so a tree
+//! could quietly drop points and still pass: R*-tree range searches once found 1 of 1000
+//! inserted points, bulk insert lost whole batches, and coincident points crashed the quadtree.
+//! Each test below compares a query against brute force over the set of points known to be live.
 
 use std::collections::HashMap;
 
@@ -207,7 +207,7 @@ fn rtree_knn_matches_brute_force() {
             for (rank, (g, e)) in got.iter().zip(expected.iter()).enumerate() {
                 assert!(
                     (g - e).abs() < 1e-9,
-                    "query {query_index}, k={k}, rank {rank}: got squared distance {g}, expected {e}"
+                    "query {query_index}, k={k}, rank {rank}: got d2={g}, expected d2={e}"
                 );
             }
         }
@@ -425,8 +425,8 @@ fn quadtree_keeps_every_point_through_inserts_and_deletes() {
 }
 
 /// More coincident points than `capacity` used to subdivide until floating-point rounding left a
-/// point matching the parent but no child, reaching `unreachable!()` on insert — and on bulk insert
-/// the same gap dropped every point silently.
+/// point matching the parent but no child, reaching `unreachable!()` on insert. On bulk insert the
+/// same gap dropped every point silently.
 #[test]
 fn quadtree_handles_coincident_points() {
     for capacity in [1usize, 2, 4] {
@@ -462,8 +462,8 @@ fn quadtree_handles_coincident_points() {
     }
 }
 
-/// Points spaced far below the depth cap's resolution end up in the same bucket; they must still all
-/// be found.
+/// Points spaced far below the depth cap's resolution end up in the same bucket; they must still
+/// all be found.
 #[test]
 fn quadtree_handles_near_coincident_points() {
     let mut tree: Quadtree<u32> = Quadtree::new(&WORLD, 2).unwrap();

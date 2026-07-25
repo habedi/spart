@@ -21,8 +21,8 @@ use crate::errors::SpartError;
 /// Bounding volumes here are stored as an origin plus an extent, and containment tests compare
 /// against `origin + extent`. Computing the extent as a plain `hi - lo` can round *down*, so that
 /// `lo + (hi - lo) < hi` and the volume fails to contain the very corner it was built from.
-/// Nudging the extent up by the minimum number of ULPs keeps the volume tight — and therefore
-/// keeps `union` idempotent, so `enlargement` is exactly zero for an already-contained volume.
+/// Nudging the extent up by the minimum number of ULPs keeps the volume tight. That in turn keeps
+/// `union` idempotent, so `enlargement` is exactly zero for an already-contained volume.
 #[inline]
 pub(crate) fn span(lo: f64, hi: f64) -> f64 {
     let mut len = hi - lo;

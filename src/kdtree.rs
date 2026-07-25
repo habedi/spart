@@ -120,8 +120,8 @@ impl<P> Ord for HeapItem<P> {
 ///
 /// A subtree is rebuilt when one of its children holds more than `REBUILD_RATIO_NUM /
 /// REBUILD_RATIO_DEN` of it. Keeping every subtree within that ratio bounds the height of the tree at
-/// `log(n) / log(3/2)`, which is what stops sorted input from degenerating into a linked list —
-/// inserting ascending coordinates used to build a tree of depth *n*, and every recursive walk over
+/// `log(n) / log(3/2)`, which is what stops sorted input from degenerating into a linked list.
+/// Inserting ascending coordinates used to build a tree of depth *n*, and every recursive walk over
 /// it (search, and dropping the tree itself) overflowed the stack somewhere past 50k points.
 const REBUILD_RATIO_NUM: usize = 2;
 const REBUILD_RATIO_DEN: usize = 3;
@@ -386,7 +386,7 @@ impl<P: KdPoint> KdTree<P> {
 
         let axis = depth % k;
         let median_idx = points.len() / 2;
-        // Partitioning around the median is enough — a full sort at every level would make the
+        // Partitioning around the median is enough; a full sort at every level would make the
         // build O(n log^2 n) for no benefit.
         points.select_nth_unstable_by(median_idx, |a, b| {
             let ac = a.coord(axis).unwrap_or(f64::NAN);

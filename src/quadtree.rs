@@ -37,7 +37,7 @@ use tracing::info;
 
 /// Deepest level a node will subdivide to.
 ///
-/// Without a cap, points that coincide — or very nearly do — subdivide forever: they always land in
+/// Without a cap, points that coincide, or very nearly do, subdivide forever: they always land in
 /// the same child, so no split ever separates them. Beyond this depth a node simply keeps its
 /// points, growing past `capacity` rather than recursing. A node at depth 32 covers 2^-32 of the
 /// original boundary, so only genuinely (near-)coincident points ever reach it.
@@ -107,9 +107,9 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     /// Subdivides the current quadtree node into four child quadrants.
     ///
     /// The children's far edges are derived from the parent's own edges rather than from halved
-    /// extents, so the four of them tile the parent exactly. A gap — even one of a single ULP —
-    /// would let a point be stored in a child whose boundary does not contain it, and search
-    /// pruning would then skip right over it.
+    /// extents, so the four of them tile the parent exactly. A gap of even a single ULP would let a
+    /// point be stored in a child whose boundary does not contain it, and search pruning would then
+    /// skip right over it.
     ///
     /// After subdivision, all existing points are moved down into the appropriate children.
     fn subdivide(&mut self) {
@@ -163,7 +163,7 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
     ///
     /// Routing compares against the node's midpoints instead of testing each child's boundary, so
     /// exactly one child is always selected. Testing boundaries meant that once floating-point
-    /// rounding crept in a point could match the parent and yet match no child at all — which is how
+    /// rounding crept in a point could match the parent and yet match no child at all. That is how
     /// coincident points used to reach `unreachable!()` on insert and vanish silently on bulk insert.
     fn insert_within(&mut self, point: Point2D<T>) {
         if !self.divided {
@@ -412,8 +412,8 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         if !self.divided {
             return false;
         }
-        // Insertion routes a point to exactly one quadrant, so only that quadrant can hold it —
-        // no need to search the other three.
+        // Insertion routes a point to exactly one quadrant, so only that quadrant can hold it;
+        // there is no need to search the other three.
         let index = self.child_index(point);
         let deleted = self
             .child_mut(index)
