@@ -1,6 +1,7 @@
 pub mod errors;
 pub mod geometry;
 pub mod kdtree;
+mod knn;
 mod logging;
 pub mod octree;
 pub mod quadtree;

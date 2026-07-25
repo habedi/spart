@@ -820,39 +820,6 @@ impl BoundingVolume for Cube {
     }
 }
 
-/// Represents an item in a heap, typically used for nearest neighbor or best-first search algorithms.
-///
-/// The `neg_distance` field is used to order items in a max-heap by their (negated) distance value.
-#[derive(Debug)]
-pub struct HeapItem<T: Clone> {
-    /// The negated distance, used for ordering.
-    pub neg_distance: OrderedFloat<f64>,
-    /// An optional 2D point associated with the heap item.
-    pub point_2d: Option<Point2D<T>>,
-    /// An optional 3D point associated with the heap item.
-    pub point_3d: Option<Point3D<T>>,
-}
-
-impl<T: Clone> PartialEq for HeapItem<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.neg_distance == other.neg_distance
-    }
-}
-
-impl<T: Clone> Eq for HeapItem<T> {}
-
-impl<T: Clone> PartialOrd for HeapItem<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: Clone> Ord for HeapItem<T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.neg_distance.cmp(&self.neg_distance)
-    }
-}
-
 /// Trait for types that can compute the minimum distance to a given query.
 pub trait HasMinDistance<Q> {
     /// Computes the minimum distance from the bounding volume to the given query.

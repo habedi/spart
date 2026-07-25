@@ -237,9 +237,13 @@ Unbounded, keyed on the bounding volume an object reports through `mbr`.
 
 ### Encapsulation Rule
 
-`rtree_common` and `logging` are private modules and are not reachable from outside the crate. `RTreeNode`, `RTreeEntry`, and their R*-tree
-counterparts are public because the object traits mention them, but the `root`, `max_entries`, and `min_entries` fields of the trees are private and
-must stay that way. Do not add a "just for now" accessor; add a test-only helper inside the module if a test needs internal access.
+`rtree_common` and `logging` are private modules and are not reachable from outside the crate. The `root`, `max_entries`, and `min_entries` fields of
+the trees are private and must stay that way. Do not add a "just for now" accessor; add a test-only helper inside the module if a test needs internal
+access.
+
+`RTreeNode`, `RTreeEntry`, and their R*-tree counterparts are public with public fields, but no public signature mentions them: flipping all four
+to `pub(crate)` leaves the crate, its tests, and the bindings compiling. Treat them as an unintended leak rather than a supported surface, and do
+not build on them.
 
 ## Workflow
 

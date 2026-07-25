@@ -34,6 +34,7 @@ use crate::geometry::{
     BSPBounds, BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance,
     Point2D, Point3D, Rectangle,
 };
+use crate::knn::KnnHeap;
 use crate::rtree_common::{
     KnnCandidate, compute_group_mbr as common_compute_group_mbr,
     delete_entry as common_delete_entry, node_height as common_node_height,
@@ -768,109 +769,40 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
         query: &Point2D<T>,
         k: usize,
     ) -> Vec<&Point2D<T>> {
-        if k == 0 {
-            return Vec::new();
-        }
-
-        let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point2D<T>>>> = BinaryHeap::new();
+        let mut results = KnnHeap::new(k);
+        // Best-first descent: always expand whichever pending entry is nearest to the query, so the
+        // search can stop as soon as the nearest pending entry is farther than the worst result kept.
+        let mut pending: BinaryHeap<KnnCandidate<RStarTreeEntry<Point2D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance_sq(query);
-            heap.push(KnnCandidate {
-                dist: dist_sq,
+            pending.push(KnnCandidate {
+                dist: entry.mbr().min_distance_sq(query),
                 entry,
             });
         }
 
-        type OrdDist = OrderedFloat<f64>;
-        #[inline]
-        #[allow(non_snake_case)]
-        fn OrdDist(x: f64) -> OrderedFloat<f64> {
-            OrderedFloat(x)
-        }
-
-        struct HeapItem<'a, P> {
-            key: OrdDist,
-            idx: usize,
-            obj: &'a P,
-        }
-        impl<P> PartialEq for HeapItem<'_, P> {
-            fn eq(&self, other: &Self) -> bool {
-                self.key == other.key && self.idx == other.idx
+        while let Some(KnnCandidate { dist, entry }) = pending.pop() {
+            if dist > results.worst() {
+                break;
             }
-        }
-        impl<P> Eq for HeapItem<'_, P> {}
-        impl<P> Ord for HeapItem<'_, P> {
-            fn cmp(&self, other: &Self) -> Ordering {
-                match self.key.cmp(&other.key) {
-                    Ordering::Equal => self.idx.cmp(&other.idx),
-                    ord => ord,
-                }
-            }
-        }
-        impl<P> PartialOrd for HeapItem<'_, P> {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        let mut results: BinaryHeap<HeapItem<Point2D<T>>> = BinaryHeap::new();
-        let mut counter: usize = 0;
-
-        while let Some(KnnCandidate { dist, entry }) = heap.pop() {
-            if results.len() >= k {
-                if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.key.0 {
-                        break;
-                    }
-                }
-            }
-
             match entry {
                 RStarTreeEntry::Leaf { object, .. } => {
-                    let d_sq = M::distance_sq(query, object);
-                    if results.len() < k {
-                        counter += 1;
-                        results.push(HeapItem {
-                            key: OrdDist(d_sq),
-                            idx: counter,
-                            obj: object,
-                        });
-                    } else if let Some(peek) = results.peek() {
-                        if d_sq < peek.key.0 {
-                            results.pop();
-                            counter += 1;
-                            results.push(HeapItem {
-                                key: OrdDist(d_sq),
-                                idx: counter,
-                                obj: object,
-                            });
-                        }
-                    }
+                    results.offer(M::distance_sq(query, object), object);
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance_sq(query);
-                        if results.len() < k {
-                            heap.push(KnnCandidate {
-                                dist: d_sq,
+                        let child_dist = child_entry.mbr().min_distance_sq(query);
+                        if child_dist <= results.worst() {
+                            pending.push(KnnCandidate {
+                                dist: child_dist,
                                 entry: child_entry,
                             });
-                        } else if let Some(peek) = results.peek() {
-                            if d_sq < peek.key.0 {
-                                heap.push(KnnCandidate {
-                                    dist: d_sq,
-                                    entry: child_entry,
-                                });
-                            }
                         }
                     }
                 }
             }
         }
 
-        let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap_or(Ordering::Equal));
-        sorted_results.into_iter().map(|r| r.obj).collect()
+        results.into_sorted_vec()
     }
 }
 
@@ -896,109 +828,40 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
         query: &Point3D<T>,
         k: usize,
     ) -> Vec<&Point3D<T>> {
-        if k == 0 {
-            return Vec::new();
-        }
-
-        let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point3D<T>>>> = BinaryHeap::new();
+        let mut results = KnnHeap::new(k);
+        // Best-first descent: always expand whichever pending entry is nearest to the query, so the
+        // search can stop as soon as the nearest pending entry is farther than the worst result kept.
+        let mut pending: BinaryHeap<KnnCandidate<RStarTreeEntry<Point3D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance_sq(query);
-            heap.push(KnnCandidate {
-                dist: dist_sq,
+            pending.push(KnnCandidate {
+                dist: entry.mbr().min_distance_sq(query),
                 entry,
             });
         }
 
-        type OrdDist = OrderedFloat<f64>;
-        #[inline]
-        #[allow(non_snake_case)]
-        fn OrdDist(x: f64) -> OrderedFloat<f64> {
-            OrderedFloat(x)
-        }
-
-        struct HeapItem<'a, P> {
-            key: OrdDist,
-            idx: usize,
-            obj: &'a P,
-        }
-        impl<P> PartialEq for HeapItem<'_, P> {
-            fn eq(&self, other: &Self) -> bool {
-                self.key == other.key && self.idx == other.idx
+        while let Some(KnnCandidate { dist, entry }) = pending.pop() {
+            if dist > results.worst() {
+                break;
             }
-        }
-        impl<P> Eq for HeapItem<'_, P> {}
-        impl<P> Ord for HeapItem<'_, P> {
-            fn cmp(&self, other: &Self) -> Ordering {
-                match self.key.cmp(&other.key) {
-                    Ordering::Equal => self.idx.cmp(&other.idx),
-                    ord => ord,
-                }
-            }
-        }
-        impl<P> PartialOrd for HeapItem<'_, P> {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        let mut results: BinaryHeap<HeapItem<Point3D<T>>> = BinaryHeap::new();
-        let mut counter: usize = 0;
-
-        while let Some(KnnCandidate { dist, entry }) = heap.pop() {
-            if results.len() >= k {
-                if let Some(worst_result) = results.peek() {
-                    if dist > worst_result.key.0 {
-                        break;
-                    }
-                }
-            }
-
             match entry {
                 RStarTreeEntry::Leaf { object, .. } => {
-                    let d_sq = M::distance_sq(query, object);
-                    if results.len() < k {
-                        counter += 1;
-                        results.push(HeapItem {
-                            key: OrdDist(d_sq),
-                            idx: counter,
-                            obj: object,
-                        });
-                    } else if let Some(peek) = results.peek() {
-                        if d_sq < peek.key.0 {
-                            results.pop();
-                            counter += 1;
-                            results.push(HeapItem {
-                                key: OrdDist(d_sq),
-                                idx: counter,
-                                obj: object,
-                            });
-                        }
-                    }
+                    results.offer(M::distance_sq(query, object), object);
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance_sq(query);
-                        if results.len() < k {
-                            heap.push(KnnCandidate {
-                                dist: d_sq,
+                        let child_dist = child_entry.mbr().min_distance_sq(query);
+                        if child_dist <= results.worst() {
+                            pending.push(KnnCandidate {
+                                dist: child_dist,
                                 entry: child_entry,
                             });
-                        } else if let Some(peek) = results.peek() {
-                            if d_sq < peek.key.0 {
-                                heap.push(KnnCandidate {
-                                    dist: d_sq,
-                                    entry: child_entry,
-                                });
-                            }
                         }
                     }
                 }
             }
         }
 
-        let mut sorted_results = results.into_vec();
-        sorted_results.sort_by(|a, b| a.key.partial_cmp(&b.key).unwrap_or(Ordering::Equal));
-        sorted_results.into_iter().map(|r| r.obj).collect()
+        results.into_sorted_vec()
     }
 }
 

@@ -28,11 +28,10 @@
 //! ```
 
 use crate::errors::SpartError;
-use crate::geometry::{DistanceMetric, HasMinDistance, HeapItem, Point2D, Rectangle, span};
-use ordered_float::OrderedFloat;
+use crate::geometry::{DistanceMetric, HasMinDistance, Point2D, Rectangle, span};
+use crate::knn::KnnHeap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::collections::BinaryHeap;
 use tracing::info;
 
 /// Deepest level a node will subdivide to.
@@ -283,47 +282,28 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Quadtree<T> {
         &self,
         target: &Point2D<T>,
         k: usize,
-    ) -> Vec<Point2D<T>> {
-        if k == 0 {
-            return Vec::new();
-        }
-        let mut heap: BinaryHeap<HeapItem<T>> = BinaryHeap::new();
-        self.knn_search_helper::<M>(target, k, &mut heap);
+    ) -> Vec<&Point2D<T>> {
+        let mut heap = KnnHeap::new(k);
+        self.knn_search_helper::<M>(target, &mut heap);
         heap.into_sorted_vec()
-            .into_iter()
-            .filter_map(|item| item.point_2d)
-            .collect()
     }
 
     /// Helper method for performing the recursive k-nearest neighbor search.
-    fn knn_search_helper<M: DistanceMetric<Point2D<T>>>(
-        &self,
+    fn knn_search_helper<'a, M: DistanceMetric<Point2D<T>>>(
+        &'a self,
         target: &Point2D<T>,
-        k: usize,
-        heap: &mut BinaryHeap<HeapItem<T>>,
+        heap: &mut KnnHeap<&'a Point2D<T>>,
     ) {
         for point in &self.points {
-            let dist_sq = M::distance_sq(point, target);
-            let item = HeapItem {
-                neg_distance: OrderedFloat(-dist_sq),
-                point_2d: Some(point.clone()),
-                point_3d: None,
-            };
-            heap.push(item);
-            if heap.len() > k {
-                heap.pop();
-            }
+            heap.offer(M::distance_sq(point, target), point);
         }
         for child in self.children().into_iter().flatten() {
-            if heap.len() == k {
-                if let Some(top) = heap.peek() {
-                    let current_farthest = -top.neg_distance.into_inner();
-                    if child.min_distance_sq(target) > current_farthest {
-                        continue;
-                    }
-                }
+            // `worst` is infinite until the heap is full, so this prunes only once there is a
+            // distance worth beating.
+            if child.min_distance_sq(target) > heap.worst() {
+                continue;
             }
-            child.knn_search_helper::<M>(target, k, heap);
+            child.knn_search_helper::<M>(target, heap);
         }
     }
 
