@@ -116,6 +116,20 @@ impl<P> Ord for HeapItem<P> {
     }
 }
 
+/// How lopsided a subtree may get before it is rebuilt.
+///
+/// A subtree is rebuilt when one of its children holds more than `REBUILD_RATIO_NUM /
+/// REBUILD_RATIO_DEN` of it. Keeping every subtree within that ratio bounds the height of the tree at
+/// `log(n) / log(3/2)`, which is what stops sorted input from degenerating into a linked list —
+/// inserting ascending coordinates used to build a tree of depth *n*, and every recursive walk over
+/// it (search, and dropping the tree itself) overflowed the stack somewhere past 50k points.
+const REBUILD_RATIO_NUM: usize = 2;
+const REBUILD_RATIO_DEN: usize = 3;
+
+/// Subtrees smaller than this are never rebuilt: they can only contribute a couple of levels, and
+/// rebuilding them would cost more than it saves.
+const REBUILD_MIN_SIZE: usize = 8;
+
 /// A node in the Kd‑tree containing a point and references to its children.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -123,6 +137,9 @@ struct KdNode<P: KdPoint> {
     point: P,
     left: Option<Box<KdNode<P>>>,
     right: Option<Box<KdNode<P>>>,
+    /// Number of nodes in this subtree, including this one. Maintained by every insert and delete
+    /// so the balance condition can be checked without walking the subtree.
+    size: usize,
 }
 
 impl<P: KdPoint> KdNode<P> {
@@ -132,7 +149,26 @@ impl<P: KdPoint> KdNode<P> {
             point,
             left: None,
             right: None,
+            size: 1,
         }
+    }
+
+    fn child_size(child: &Option<Box<KdNode<P>>>) -> usize {
+        child.as_ref().map_or(0, |node| node.size)
+    }
+
+    /// Recomputes `size` from the children. Call after either child changes.
+    fn update_size(&mut self) {
+        self.size = 1 + Self::child_size(&self.left) + Self::child_size(&self.right);
+    }
+
+    /// Whether this subtree is lopsided enough to be worth rebuilding.
+    fn is_unbalanced(&self) -> bool {
+        if self.size < REBUILD_MIN_SIZE {
+            return false;
+        }
+        let heaviest = Self::child_size(&self.left).max(Self::child_size(&self.right));
+        heaviest * REBUILD_RATIO_DEN > self.size * REBUILD_RATIO_NUM
     }
 }
 
@@ -237,8 +273,63 @@ impl<P: KdPoint> KdTree<P> {
             }
         };
         info!("Inserting point: {:?}", point);
-        self.root = Some(Self::insert_rec(self.root.take(), point, 0, k));
+        self.root = Some(Self::insert_rec(self.root.take(), point.clone(), 0, k));
+        Self::rebalance_along_path(&mut self.root, &point, k);
         Ok(())
+    }
+
+    /// Restores the balance condition after the search path towards `point` changed.
+    ///
+    /// Walks down that path, finds the highest subtree whose children have become too lopsided, and
+    /// rebuilds it as a perfectly balanced subtree. Rebuilding the *highest* offender is what leaves
+    /// no violation behind on the path, and since only nodes on the path changed size, the condition
+    /// then holds everywhere again.
+    fn rebalance_along_path(root: &mut Option<Box<KdNode<P>>>, point: &P, k: usize) {
+        // Locate the offender first, so the walk that rebuilds it does not need to hold a borrow.
+        let mut target_depth = None;
+        let mut current = &*root;
+        let mut depth = 0;
+        while let Some(node) = current {
+            if node.is_unbalanced() {
+                target_depth = Some(depth);
+                break;
+            }
+            current = if Self::goes_left(point, &node.point, depth % k) {
+                &node.left
+            } else {
+                &node.right
+            };
+            depth += 1;
+        }
+
+        let Some(target_depth) = target_depth else {
+            return;
+        };
+
+        let mut current = root;
+        for depth in 0..target_depth {
+            let Some(node) = current.as_mut() else {
+                return;
+            };
+            current = if Self::goes_left(point, &node.point, depth % k) {
+                &mut node.left
+            } else {
+                &mut node.right
+            };
+        }
+
+        let mut points = Vec::new();
+        Self::collect_points(current, &mut points);
+        *current = Self::insert_bulk_rec(&mut points, target_depth, k);
+    }
+
+    /// Whether `point` belongs in the left subtree of a node holding `pivot` split on `axis`.
+    ///
+    /// Mirrors the comparison used by `insert_rec`, so the two always walk the same path.
+    fn goes_left(point: &P, pivot: &P, axis: usize) -> bool {
+        let p = point.coord(axis).unwrap_or(f64::NAN);
+        let c = pivot.coord(axis).unwrap_or(f64::NAN);
+        p < c
     }
 
     /// Inserts a bulk of points into the Kd-tree.
@@ -256,14 +347,8 @@ impl<P: KdPoint> KdTree<P> {
         if points.is_empty() {
             return Ok(());
         }
-        let k = match self.k {
-            Some(k) => k,
-            None => {
-                let k = points[0].dims();
-                self.k = Some(k);
-                k
-            }
-        };
+        // Validate before touching any state, so a rejected batch leaves the tree exactly as it was.
+        let k = self.k.unwrap_or_else(|| points[0].dims());
         for p in &points {
             if p.dims() != k {
                 return Err(SpartError::DimensionMismatch {
@@ -272,6 +357,7 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
+        self.k = Some(k);
 
         if self.root.is_some() {
             let mut existing = Vec::new();
@@ -292,22 +378,21 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Builds a balanced subtree from `points` by splitting on the median of each axis in turn.
     fn insert_bulk_rec(points: &mut [P], depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
         if points.is_empty() {
             return None;
         }
 
         let axis = depth % k;
-        points.sort_by(|a, b| {
-            let ac = a
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let bc = b
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+        let median_idx = points.len() / 2;
+        // Partitioning around the median is enough — a full sort at every level would make the
+        // build O(n log^2 n) for no benefit.
+        points.select_nth_unstable_by(median_idx, |a, b| {
+            let ac = a.coord(axis).unwrap_or(f64::NAN);
+            let bc = b.coord(axis).unwrap_or(f64::NAN);
             ac.partial_cmp(&bc).unwrap_or(Ordering::Equal)
         });
-        let median_idx = points.len() / 2;
 
         let mut node = KdNode::new(points[median_idx].clone());
         let (left_slice, right_slice) = points.split_at_mut(median_idx);
@@ -315,6 +400,7 @@ impl<P: KdPoint> KdTree<P> {
 
         node.left = Self::insert_bulk_rec(left_slice, depth + 1, k);
         node.right = Self::insert_bulk_rec(right_slice, depth + 1, k);
+        node.update_size();
 
         Some(Box::new(node))
     }
@@ -326,19 +412,12 @@ impl<P: KdPoint> KdTree<P> {
         k: usize,
     ) -> Box<KdNode<P>> {
         if let Some(mut current) = node {
-            let axis = depth % k;
-            let p_coord = point
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let c_coord = current
-                .point
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            if p_coord < c_coord {
+            if Self::goes_left(&point, &current.point, depth % k) {
                 current.left = Some(Self::insert_rec(current.left.take(), point, depth + 1, k));
             } else {
                 current.right = Some(Self::insert_rec(current.right.take(), point, depth + 1, k));
             }
+            current.update_size();
             current
         } else {
             Box::new(KdNode::new(point))
@@ -506,8 +585,10 @@ impl<P: KdPoint> KdTree<P> {
         };
         let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, k);
         self.root = new_root;
-        if self.root.is_none() {
-            self.k = None;
+        // The dimension stays as it is. Clearing it when the tree empties would silently let the
+        // next insert establish a different dimension, discarding an explicit `with_dimension`.
+        if deleted {
+            Self::rebalance_along_path(&mut self.root, point, k);
         }
         deleted
     }
@@ -531,6 +612,7 @@ impl<P: KdPoint> KdTree<P> {
                             Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
                         current.point = successor;
                         current.right = new_right;
+                        current.update_size();
                         (Some(current), true)
                     } else if let Some(left_subtree) = current.left.take() {
                         // Replace with min from left subtree on current axis, then delete that min
@@ -538,9 +620,12 @@ impl<P: KdPoint> KdTree<P> {
                         let (mut new_left, _) =
                             Self::delete_rec(Some(left_subtree), &successor, depth + 1, k);
                         current.point = successor;
-                        // As per standard kd-tree deletion, attach the adjusted left subtree as right child
+                        // The promoted point is the minimum of the old left subtree along this axis,
+                        // so every point left over is >= it: the standard kd-tree move is to hang
+                        // that subtree off the right, where the invariant now holds.
                         current.right = new_left.take();
                         current.left = None;
+                        current.update_size();
                         (Some(current), true)
                     } else {
                         (None, true)
@@ -558,11 +643,13 @@ impl<P: KdPoint> KdTree<P> {
                         let (new_left, deleted) =
                             Self::delete_rec(current.left.take(), point, depth + 1, k);
                         current.left = new_left;
+                        current.update_size();
                         (Some(current), deleted)
                     } else if p_coord > c_coord {
                         let (new_right, deleted) =
                             Self::delete_rec(current.right.take(), point, depth + 1, k);
                         current.right = new_right;
+                        current.update_size();
                         (Some(current), deleted)
                     } else {
                         // Equal on this axis but not equal overall: the point could be in either subtree.
@@ -571,11 +658,13 @@ impl<P: KdPoint> KdTree<P> {
                             Self::delete_rec(current.right.take(), point, depth + 1, k);
                         current.right = new_right;
                         if deleted_right {
+                            current.update_size();
                             (Some(current), true)
                         } else {
                             let (new_left, deleted_left) =
                                 Self::delete_rec(current.left.take(), point, depth + 1, k);
                             current.left = new_left;
+                            current.update_size();
                             (Some(current), deleted_left)
                         }
                     }

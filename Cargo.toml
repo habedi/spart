@@ -12,6 +12,10 @@ documentation = "https://docs.rs/spart"
 categories = ["data-structures", "algorithms"]
 edition = "2024"
 rust-version = "1.85.0"
+# The files under benches/ are modules of the single `main` bench target, not bench targets of their
+# own. Without this, Cargo also built each of them standalone, compiling shared.rs five extra times
+# and producing four empty benchmark binaries.
+autobenches = false
 
 resolver = "2"
 

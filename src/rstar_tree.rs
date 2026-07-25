@@ -36,7 +36,8 @@ use crate::geometry::{
 };
 use crate::rtree_common::{
     KnnCandidate, compute_group_mbr as common_compute_group_mbr,
-    delete_entry as common_delete_entry, search_node as common_search_node,
+    delete_entry as common_delete_entry, node_height as common_node_height,
+    search_node as common_search_node,
 };
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
@@ -214,68 +215,92 @@ impl<T: RStarTreeObject> RStarTree<T> {
             mbr: object.mbr(),
             object,
         };
-        self.insert_entry(entry, None);
+        self.insert_entry_at(entry, 0);
     }
 
-    fn insert_entry(&mut self, entry: RStarTreeEntry<T>, reinsert_from_level: Option<usize>)
+    /// Inserts `entry` into a node at height `target_height`, applying R*-tree overflow treatment
+    /// on the way back up.
+    ///
+    /// Entries pulled out by forced reinsertion are queued instead of being pushed back down
+    /// immediately, and each carries **the height it came from**. Re-attaching an entry at any other
+    /// height either buries a subtree inside a leaf or an object inside an interior node, which
+    /// destroys the uniform depth of the tree. Heights are counted from the leaves, so a queued
+    /// height stays valid even when an earlier reinsertion grows a new root.
+    fn insert_entry_at(&mut self, entry: RStarTreeEntry<T>, target_height: usize)
     where
         T: Clone,
         T::B: BSPBounds,
     {
-        let mut to_insert = vec![(entry, 0)];
-        let mut reinsert_level = reinsert_from_level;
+        let mut state = InsertState {
+            max_entries: self.max_entries,
+            min_entries: self.min_entries,
+            reinserted_heights: Vec::new(),
+            pending: vec![(entry, target_height)],
+        };
 
-        while let Some((item, level)) = to_insert.pop() {
+        while let Some((entry, entry_height)) = state.pending.pop() {
+            let height = common_node_height(&self.root);
+            let target_height = entry_height.min(height);
             let overflow = insert_recursive(
                 &mut self.root,
-                item,
-                self.max_entries,
-                level,
-                &mut reinsert_level,
-                &mut to_insert,
+                entry,
+                target_height,
+                height,
+                true,
+                &mut state,
             );
-
-            if let Some((overflowed_node, overflow_level)) = overflow {
-                if reinsert_level == Some(overflow_level) {
-                    let old_entries = overflowed_node;
-                    let (group1, group2) = split_entries(old_entries, self.max_entries);
-                    let child1 = RStarTreeNode {
-                        entries: group1,
-                        is_leaf: self.root.is_leaf,
-                    };
-                    let child2 = RStarTreeNode {
-                        entries: group2,
-                        is_leaf: self.root.is_leaf,
-                    };
-                    let mbr1 = common_compute_group_mbr(&child1.entries)
-                        .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-                    let mbr2 = common_compute_group_mbr(&child2.entries)
-                        .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-                    self.root.is_leaf = false;
-                    self.root.entries.clear();
-                    self.root.entries.push(RStarTreeEntry::Node {
-                        mbr: mbr1,
-                        child: Box::new(child1),
-                    });
-                    self.root.entries.push(RStarTreeEntry::Node {
-                        mbr: mbr2,
-                        child: Box::new(child2),
-                    });
-                } else {
-                    if reinsert_level.is_none() {
-                        reinsert_level = Some(overflow_level);
-                    }
-                    let mut node = RStarTreeNode {
-                        entries: overflowed_node,
-                        is_leaf: self.root.is_leaf,
-                    };
-                    let reinserted_entries = forced_reinsert(&mut node, self.max_entries);
-                    self.root.entries = node.entries;
-                    for entry in reinserted_entries {
-                        to_insert.push((entry, 0));
-                    }
-                }
+            if let Some(sibling) = overflow {
+                self.grow_root(sibling);
             }
+        }
+    }
+
+    /// Adds one level on top of the tree after the root has been split in two.
+    fn grow_root(&mut self, sibling: RStarTreeEntry<T>) {
+        info!("Root overflowed; growing the tree by one level");
+        let old_root = std::mem::replace(
+            &mut self.root,
+            RStarTreeNode {
+                entries: Vec::with_capacity(2),
+                is_leaf: false,
+            },
+        );
+        match common_compute_group_mbr(&old_root.entries) {
+            Some(mbr) => {
+                self.root.entries.push(RStarTreeEntry::Node {
+                    mbr,
+                    child: Box::new(old_root),
+                });
+                self.root.entries.push(sibling);
+            }
+            None => {
+                // The old root was left empty by the split, so the new sibling is the whole tree.
+                self.root = match sibling {
+                    RStarTreeEntry::Node { child, .. } => *child,
+                    leaf => RStarTreeNode {
+                        entries: vec![leaf],
+                        is_leaf: true,
+                    },
+                };
+            }
+        }
+    }
+
+    /// Drops levels off the top of the tree while the root has a single child, and turns an emptied
+    /// internal root back into an empty leaf so later inserts have somewhere to go.
+    fn condense_root(&mut self) {
+        while !self.root.is_leaf && self.root.entries.len() == 1 {
+            match self.root.entries.pop() {
+                Some(RStarTreeEntry::Node { child, .. }) => self.root = *child,
+                Some(other) => {
+                    self.root.entries.push(other);
+                    break;
+                }
+                None => break,
+            }
+        }
+        if !self.root.is_leaf && self.root.entries.is_empty() {
+            self.root.is_leaf = true;
         }
     }
 
@@ -297,6 +322,11 @@ impl<T: RStarTreeObject> RStarTree<T> {
 
     /// Inserts a bulk of objects into the R*-tree.
     ///
+    /// When the tree is still empty the objects are sorted along the first axis and packed
+    /// bottom-up into a uniformly deep tree, which is far cheaper than the incremental R*-tree
+    /// insert. Into a tree that already holds objects they are inserted individually, because
+    /// appending pre-built nodes to a populated tree cannot preserve a uniform depth.
+    ///
     /// # Arguments
     ///
     /// * `objects` - The objects to insert.
@@ -309,219 +339,242 @@ impl<T: RStarTreeObject> RStarTree<T> {
             return;
         }
 
-        let mut entries: Vec<RStarTreeEntry<T>> = objects
-            .into_iter()
-            .map(|obj| RStarTreeEntry::Leaf {
-                mbr: obj.mbr(),
-                object: obj,
-            })
-            .collect();
-
-        while entries.len() > self.max_entries {
-            let mut new_level_entries = Vec::new();
-            let chunks = entries.chunks(self.max_entries);
-
-            for chunk in chunks {
-                let child_node = RStarTreeNode {
-                    entries: chunk.to_vec(),
-                    is_leaf: self.root.is_leaf,
-                };
-                if let Some(mbr) = common_compute_group_mbr(&child_node.entries) {
-                    new_level_entries.push(RStarTreeEntry::Node {
-                        mbr,
-                        child: Box::new(child_node),
-                    });
-                }
+        if self.root.entries.is_empty() {
+            info!(
+                "Bulk loading {} objects into an empty RStarTree",
+                objects.len()
+            );
+            let mut entries: Vec<RStarTreeEntry<T>> = objects
+                .into_iter()
+                .map(|object| RStarTreeEntry::Leaf {
+                    mbr: object.mbr(),
+                    object,
+                })
+                .collect();
+            // Packing follows the entry order, so a spatial sort keeps the packed MBRs tight.
+            sort_by_center(&mut entries, 0);
+            self.root = pack_entries(entries, self.max_entries);
+        } else {
+            for object in objects {
+                self.insert(object);
             }
-            entries = new_level_entries;
-            self.root.is_leaf = false;
         }
-
-        self.root.entries.extend(entries);
     }
 
+    /// Number of levels in the tree; a tree whose root is a leaf has height 1.
     #[doc(hidden)]
     pub fn height(&self) -> usize {
-        let mut height = 1;
-        let mut current_node = &self.root;
-        while !current_node.is_leaf {
-            height += 1;
-            current_node =
-                if let Some(RStarTreeEntry::Node { child, .. }) = current_node.entries.first() {
-                    child
-                } else {
-                    break;
-                };
-        }
-        height
+        common_node_height(&self.root) + 1
     }
 }
 
-fn choose_subtree<T: RStarTreeObject>(node: &RStarTreeNode<T>, entry: &RStarTreeEntry<T>) -> usize {
-    let children_are_leaves = if let Some(RStarTreeEntry::Node { child, .. }) = node.entries.first()
-    {
-        child.is_leaf
-    } else {
-        false
-    };
-
-    if children_are_leaves {
-        node.entries
-            .iter()
-            .enumerate()
-            .min_by(|&(_, a), &(_, b)| {
-                let mbr_a = a.mbr();
-                let mbr_b = b.mbr();
-
-                let overlap_a = node
-                    .entries
-                    .iter()
-                    .filter(|e| !std::ptr::eq(*e, a))
-                    .map(|e| e.mbr().union(entry.mbr()).overlap(e.mbr()))
-                    .sum::<f64>();
-
-                let overlap_b = node
-                    .entries
-                    .iter()
-                    .filter(|e| !std::ptr::eq(*e, b))
-                    .map(|e| e.mbr().union(entry.mbr()).overlap(e.mbr()))
-                    .sum::<f64>();
-
-                let overlap_cmp = overlap_a.partial_cmp(&overlap_b).unwrap_or(Ordering::Equal);
-                if overlap_cmp != Ordering::Equal {
-                    return overlap_cmp;
-                }
-
-                let enlargement_a = mbr_a.enlargement(entry.mbr());
-                let enlargement_b = mbr_b.enlargement(entry.mbr());
-                let enlargement_cmp = enlargement_a
-                    .partial_cmp(&enlargement_b)
-                    .unwrap_or(Ordering::Equal);
-                if enlargement_cmp != Ordering::Equal {
-                    return enlargement_cmp;
-                }
-
-                mbr_a
-                    .area()
-                    .partial_cmp(&mbr_b.area())
-                    .unwrap_or(Ordering::Equal)
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(0)
-    } else {
-        node.entries
-            .iter()
-            .enumerate()
-            .min_by(|(_, a), (_, b)| {
-                let mbr_a = a.mbr();
-                let mbr_b = b.mbr();
-
-                let enlargement_a = mbr_a.enlargement(entry.mbr());
-                let enlargement_b = mbr_b.enlargement(entry.mbr());
-
-                let enlargement_cmp = enlargement_a
-                    .partial_cmp(&enlargement_b)
-                    .unwrap_or(Ordering::Equal);
-                if enlargement_cmp != Ordering::Equal {
-                    return enlargement_cmp;
-                }
-                mbr_a
-                    .area()
-                    .partial_cmp(&mbr_b.area())
-                    .unwrap_or(Ordering::Equal)
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(0)
-    }
-}
-
-fn insert_recursive<T: RStarTreeObject + Clone>(
-    node: &mut RStarTreeNode<T>,
-    entry: RStarTreeEntry<T>,
+/// Mutable state threaded through a single R*-tree insertion.
+struct InsertState<T: RStarTreeObject> {
     max_entries: usize,
-    level: usize,
-    reinsert_level: &mut Option<usize>,
-    to_insert_queue: &mut Vec<(RStarTreeEntry<T>, usize)>,
-) -> Option<(Vec<RStarTreeEntry<T>>, usize)>
+    min_entries: usize,
+    /// Heights at which forced reinsertion has already been used during this insertion. The
+    /// R*-tree paper allows it at most once per height per inserted object; every later overflow at
+    /// that height splits instead, which is what makes the insertion terminate.
+    reinserted_heights: Vec<usize>,
+    /// Entries removed by forced reinsertion, each with the height it must go back to.
+    pending: Vec<(RStarTreeEntry<T>, usize)>,
+}
+
+/// Packs entries bottom-up into a uniformly deep tree.
+///
+/// Each level records whether its nodes are leaves, so leaf entries only ever land in leaf nodes.
+fn pack_entries<T: RStarTreeObject>(
+    entries: Vec<RStarTreeEntry<T>>,
+    max_entries: usize,
+) -> RStarTreeNode<T> {
+    let mut level = entries;
+    let mut level_is_leaf = true;
+
+    while level.len() > max_entries {
+        let mut parents = Vec::with_capacity(level.len().div_ceil(max_entries));
+        let mut remaining = level;
+        while !remaining.is_empty() {
+            let take = remaining.len().min(max_entries);
+            let child = RStarTreeNode {
+                entries: remaining.drain(..take).collect(),
+                is_leaf: level_is_leaf,
+            };
+            if let Some(mbr) = common_compute_group_mbr(&child.entries) {
+                parents.push(RStarTreeEntry::Node {
+                    mbr,
+                    child: Box::new(child),
+                });
+            }
+        }
+        level = parents;
+        level_is_leaf = false;
+    }
+
+    RStarTreeNode {
+        entries: level,
+        is_leaf: level_is_leaf,
+    }
+}
+
+/// Recomputes an entry's MBR from the child it points at.
+fn refresh_mbr<T: RStarTreeObject>(entry: &mut RStarTreeEntry<T>) {
+    if let RStarTreeEntry::Node { mbr, child } = entry {
+        if let Some(new_mbr) = common_compute_group_mbr(&child.entries) {
+            *mbr = new_mbr;
+        }
+    }
+}
+
+/// Sorts entries by the centre of their MBR along `dim`.
+fn sort_by_center<T: RStarTreeObject>(entries: &mut [RStarTreeEntry<T>], dim: usize)
 where
     T::B: BSPBounds,
 {
-    if node.is_leaf {
-        node.entries.push(entry);
-    } else {
-        let best_index = choose_subtree(node, &entry);
-        let child = if let RStarTreeEntry::Node { child, .. } = &mut node.entries[best_index] {
-            child
-        } else {
-            unreachable!()
-        };
-
-        if let Some((overflow, overflow_level)) = insert_recursive(
-            child,
-            entry,
-            max_entries,
-            level + 1,
-            reinsert_level,
-            to_insert_queue,
-        ) {
-            if reinsert_level.is_some() && *reinsert_level == Some(overflow_level) {
-                let (g1, g2) = split_entries(overflow, max_entries);
-                let child1 = RStarTreeNode {
-                    entries: g1,
-                    is_leaf: child.is_leaf,
-                };
-                let child2 = RStarTreeNode {
-                    entries: g2,
-                    is_leaf: child.is_leaf,
-                };
-                let mbr1 = common_compute_group_mbr(&child1.entries)
-                    .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-                let mbr2 = common_compute_group_mbr(&child2.entries)
-                    .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-                node.entries[best_index] = RStarTreeEntry::Node {
-                    mbr: mbr1,
-                    child: Box::new(child1),
-                };
-                node.entries.push(RStarTreeEntry::Node {
-                    mbr: mbr2,
-                    child: Box::new(child2),
-                });
-            } else {
-                if reinsert_level.is_none() {
-                    *reinsert_level = Some(overflow_level);
-                }
-                let mut overflowed_node = RStarTreeNode {
-                    entries: overflow,
-                    is_leaf: child.is_leaf,
-                };
-                let reinserted = forced_reinsert(&mut overflowed_node, max_entries);
-                for item in reinserted {
-                    to_insert_queue.push((item, 0));
-                }
-                if let RStarTreeEntry::Node { child, .. } = &mut node.entries[best_index] {
-                    child.entries = overflowed_node.entries;
-                }
-            }
-        }
-        if let Some(new_mbr) = common_compute_group_mbr(
-            if let RStarTreeEntry::Node { child, .. } = &node.entries[best_index] {
-                &child.entries
-            } else {
-                unreachable!()
-            },
-        ) {
-            if let RStarTreeEntry::Node { mbr, .. } = &mut node.entries[best_index] {
-                *mbr = new_mbr;
-            }
-        }
-    }
-
-    if node.entries.len() > max_entries {
-        return Some((std::mem::take(&mut node.entries), level));
-    }
-    None
+    entries.sort_by(|a, b| {
+        let ca = a.mbr().center(dim).unwrap_or(0.0);
+        let cb = b.mbr().center(dim).unwrap_or(0.0);
+        ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
+    });
 }
 
+/// R*-tree ChooseSubtree.
+///
+/// Just above leaf level the child whose overlap with its siblings grows least wins; higher up the
+/// child needing the least enlargement wins. Ties are broken towards the smaller MBR.
+///
+/// Keys are computed once per candidate instead of inside a comparator, both because the overlap
+/// term is quadratic in the entry count and because a comparator that recomputes them is not a
+/// consistent ordering.
+fn choose_subtree<T: RStarTreeObject>(node: &RStarTreeNode<T>, mbr: &T::B) -> usize {
+    let children_are_leaves = matches!(
+        node.entries.first(),
+        Some(RStarTreeEntry::Node { child, .. }) if child.is_leaf
+    );
+
+    let mut best_index = 0;
+    let mut best_key = (
+        OrderedFloat(f64::INFINITY),
+        OrderedFloat(f64::INFINITY),
+        OrderedFloat(f64::INFINITY),
+    );
+
+    for (i, entry) in node.entries.iter().enumerate() {
+        let candidate = entry.mbr();
+        let overlap = if children_are_leaves {
+            let enlarged = candidate.union(mbr);
+            node.entries
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, sibling)| enlarged.overlap(sibling.mbr()))
+                .sum::<f64>()
+        } else {
+            0.0
+        };
+        let key = (
+            OrderedFloat(overlap),
+            OrderedFloat(candidate.enlargement(mbr)),
+            OrderedFloat(candidate.area()),
+        );
+        if key < best_key {
+            best_key = key;
+            best_index = i;
+        }
+    }
+
+    best_index
+}
+
+/// Inserts `entry` into the node at height `target_height` in the subtree rooted at `node`, whose
+/// own height is `node_height`.
+///
+/// Returns an entry pointing at a freshly created sibling when `node` had to split; interior callers
+/// push it into their own entry list and the root caller turns it into a new level.
+fn insert_recursive<T: RStarTreeObject + Clone>(
+    node: &mut RStarTreeNode<T>,
+    entry: RStarTreeEntry<T>,
+    target_height: usize,
+    node_height: usize,
+    is_root: bool,
+    state: &mut InsertState<T>,
+) -> Option<RStarTreeEntry<T>>
+where
+    T::B: BSPBounds,
+{
+    if node_height == target_height {
+        node.entries.push(entry);
+    } else {
+        let best_index = choose_subtree(node, entry.mbr());
+        // Above leaf level a node only ever holds `Node` entries. If a tree ever turns up that
+        // breaks the invariant, keep the entry reachable here rather than dropping it.
+        let can_descend = matches!(
+            node.entries.get(best_index),
+            Some(RStarTreeEntry::Node { .. })
+        );
+        let overflow = if can_descend {
+            let RStarTreeEntry::Node { child, .. } = &mut node.entries[best_index] else {
+                unreachable!("checked by `can_descend`")
+            };
+            insert_recursive(child, entry, target_height, node_height - 1, false, state)
+        } else {
+            node.entries.push(entry);
+            None
+        };
+        if can_descend {
+            refresh_mbr(&mut node.entries[best_index]);
+        }
+        if let Some(sibling) = overflow {
+            node.entries.push(sibling);
+        }
+    }
+
+    if node.entries.len() <= state.max_entries {
+        return None;
+    }
+
+    // Overflow treatment: the first overflow at a given height below the root pulls out the entries
+    // furthest from the node's centre and queues them for reinsertion; a later overflow at the same
+    // height, or any overflow at the root, splits instead.
+    if !is_root && !state.reinserted_heights.contains(&node_height) {
+        state.reinserted_heights.push(node_height);
+        for entry in forced_reinsert(node, state.max_entries) {
+            state.pending.push((entry, node_height));
+        }
+        return None;
+    }
+
+    split_node(node, state.min_entries)
+}
+
+/// Splits an overfull node in place, returning an entry that points at the new sibling.
+fn split_node<T: RStarTreeObject + Clone>(
+    node: &mut RStarTreeNode<T>,
+    min_entries: usize,
+) -> Option<RStarTreeEntry<T>>
+where
+    T::B: BSPBounds,
+{
+    let entries = std::mem::take(&mut node.entries);
+    let (group1, group2) = split_entries(entries, min_entries);
+    node.entries = group1;
+    let sibling = RStarTreeNode {
+        entries: group2,
+        is_leaf: node.is_leaf,
+    };
+    // `None` only when the second group came out empty, in which case there is nothing to move and
+    // `node` already holds every entry.
+    let mbr = common_compute_group_mbr(&sibling.entries)?;
+    Some(RStarTreeEntry::Node {
+        mbr,
+        child: Box::new(sibling),
+    })
+}
+
+/// R*-tree ReInsert: removes the entries furthest from the node's centre, furthest first, so the
+/// caller can put them back somewhere better.
+///
+/// Never removes so many that the node is left empty, and always removes at least one so that the
+/// node it was called on is no longer overfull.
 fn forced_reinsert<T: RStarTreeObject + Clone>(
     node: &mut RStarTreeNode<T>,
     max_entries: usize,
@@ -529,131 +582,102 @@ fn forced_reinsert<T: RStarTreeObject + Clone>(
 where
     T::B: BSPBounds,
 {
-    let node_mbr = if let Some(mbr) = common_compute_group_mbr(&node.entries) {
-        mbr
-    } else {
+    let Some(node_mbr) = common_compute_group_mbr(&node.entries) else {
         return Vec::new();
     };
-    let reinsert_count = (max_entries as f64 * 0.3).ceil() as usize;
+    let node_center: Vec<f64> = (0..T::B::DIM)
+        .map(|d| node_mbr.center(d).unwrap_or(0.0))
+        .collect();
 
-    node.entries.sort_by(|a, b| {
-        let center_a: Vec<f64> = (0..T::B::DIM)
-            .map(|d| {
-                a.mbr()
-                    .center(d)
-                    .unwrap_or_else(|_| unreachable!("dim valid"))
-            })
-            .collect();
-        let center_b: Vec<f64> = (0..T::B::DIM)
-            .map(|d| {
-                b.mbr()
-                    .center(d)
-                    .unwrap_or_else(|_| unreachable!("dim valid"))
-            })
-            .collect();
-        let node_center: Vec<f64> = (0..T::B::DIM)
-            .map(|d| {
-                node_mbr
-                    .center(d)
-                    .unwrap_or_else(|_| unreachable!("dim valid"))
-            })
-            .collect();
+    let mut ranked: Vec<(OrderedFloat<f64>, RStarTreeEntry<T>)> = node
+        .entries
+        .drain(..)
+        .map(|entry| {
+            let distance = (0..T::B::DIM)
+                .map(|d| {
+                    let center = entry.mbr().center(d).unwrap_or(0.0);
+                    (center - node_center[d]).powi(2)
+                })
+                .sum::<f64>();
+            (OrderedFloat(distance), entry)
+        })
+        .collect();
+    // Furthest from the centre first.
+    ranked.sort_by(|a, b| b.0.cmp(&a.0));
 
-        let dist_a = center_a
-            .iter()
-            .zip(node_center.iter())
-            .map(|(ca, cb)| (ca - cb).powi(2))
-            .sum::<f64>();
-        let dist_b = center_b
-            .iter()
-            .zip(node_center.iter())
-            .map(|(ca, cb)| (ca - cb).powi(2))
-            .sum::<f64>();
-
-        dist_b.partial_cmp(&dist_a).unwrap_or(Ordering::Equal)
-    });
-
-    node.entries.drain(0..reinsert_count).collect()
+    let count = ((max_entries as f64 * 0.3).ceil() as usize)
+        .clamp(1, ranked.len().saturating_sub(1).max(1));
+    let mut removed = Vec::with_capacity(count);
+    for (i, (_, entry)) in ranked.into_iter().enumerate() {
+        if i < count {
+            removed.push(entry);
+        } else {
+            node.entries.push(entry);
+        }
+    }
+    removed
 }
 
+/// R*-tree split: pick the axis whose sorted distributions have the smallest total margin, then
+/// along that axis the distribution with the least overlap (least total area on a tie).
+///
+/// Both groups are guaranteed at least `min_entries` entries, so the usual call with
+/// `max_entries + 1` entries cannot leave either group larger than `max_entries`.
 fn split_entries<T: RStarTreeObject + Clone>(
     mut entries: Vec<RStarTreeEntry<T>>,
-    max_entries: usize,
+    min_entries: usize,
 ) -> (Vec<RStarTreeEntry<T>>, Vec<RStarTreeEntry<T>>)
 where
     T::B: BSPBounds,
 {
-    let min_entries = (max_entries as f64 * 0.4).ceil() as usize;
+    if entries.len() < 2 {
+        return (entries, Vec::new());
+    }
+    // Both groups have to be able to reach the floor, so it can never exceed half the entries.
+    let min_entries = min_entries.clamp(1, entries.len() / 2);
+    let last_split = entries.len() - min_entries;
+
     let mut best_axis = 0;
-    let mut best_split_index = 0;
-    let mut min_margin = f64::INFINITY;
-
+    let mut smallest_margin = f64::INFINITY;
     for dim in 0..T::B::DIM {
-        entries.sort_by(|a, b| {
-            let ca = a
-                .mbr()
-                .center(dim)
-                .unwrap_or_else(|_| unreachable!("dim valid"));
-            let cb = b
-                .mbr()
-                .center(dim)
-                .unwrap_or_else(|_| unreachable!("dim valid"));
-            ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
-        });
-
-        for k in min_entries..=entries.len() - min_entries {
-            let group1 = &entries[..k];
-            let group2 = &entries[k..];
-            let mbr1 = common_compute_group_mbr(group1)
-                .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-            let mbr2 = common_compute_group_mbr(group2)
-                .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-            let margin = mbr1.margin() + mbr2.margin();
-            if margin < min_margin {
-                min_margin = margin;
-                best_axis = dim;
-                best_split_index = k;
+        sort_by_center(&mut entries, dim);
+        let mut margin = 0.0;
+        for k in min_entries..=last_split {
+            if let (Some(mbr1), Some(mbr2)) = (
+                common_compute_group_mbr(&entries[..k]),
+                common_compute_group_mbr(&entries[k..]),
+            ) {
+                margin += mbr1.margin() + mbr2.margin();
             }
         }
-    }
-
-    entries.sort_by(|a, b| {
-        let ca = a
-            .mbr()
-            .center(best_axis)
-            .unwrap_or_else(|_| unreachable!("dim valid"));
-        let cb = b
-            .mbr()
-            .center(best_axis)
-            .unwrap_or_else(|_| unreachable!("dim valid"));
-        ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
-    });
-
-    let mut best_overlap = f64::INFINITY;
-    let mut best_area = f64::INFINITY;
-
-    for k in min_entries..=entries.len() - min_entries {
-        let group1 = &entries[..k];
-        let group2 = &entries[k..];
-        let mbr1 = common_compute_group_mbr(group1)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-        let mbr2 = common_compute_group_mbr(group2)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-        let overlap = mbr1.overlap(&mbr2);
-        let area = mbr1.area() + mbr2.area();
-
-        if overlap < best_overlap {
-            best_overlap = overlap;
-            best_area = area;
-            best_split_index = k;
-        } else if (overlap - best_overlap).abs() < EPSILON && area < best_area {
-            best_area = area;
-            best_split_index = k;
+        if margin < smallest_margin {
+            smallest_margin = margin;
+            best_axis = dim;
         }
     }
 
-    let (group1, group2) = entries.split_at(best_split_index);
-    (group1.to_vec(), group2.to_vec())
+    sort_by_center(&mut entries, best_axis);
+    let mut best_split = min_entries;
+    let mut best_key = (OrderedFloat(f64::INFINITY), OrderedFloat(f64::INFINITY));
+    for k in min_entries..=last_split {
+        let (Some(mbr1), Some(mbr2)) = (
+            common_compute_group_mbr(&entries[..k]),
+            common_compute_group_mbr(&entries[k..]),
+        ) else {
+            continue;
+        };
+        let key = (
+            OrderedFloat(mbr1.overlap(&mbr2)),
+            OrderedFloat(mbr1.area() + mbr2.area()),
+        );
+        if key < best_key {
+            best_key = key;
+            best_split = k;
+        }
+    }
+
+    let group2 = entries.split_off(best_split);
+    (entries, group2)
 }
 
 impl<T: RStarTreeObject> RStarTree<T>
@@ -674,24 +698,23 @@ where
         info!("Attempting to delete object: {:?}", object);
         let object_mbr = object.mbr();
         let mut reinsert_list = Vec::new();
+        let height = common_node_height(&self.root);
         let deleted = common_delete_entry(
             &mut self.root,
             object,
             &object_mbr,
             self.min_entries,
+            height,
             &mut reinsert_list,
         );
 
         if deleted {
-            for entry in reinsert_list {
-                self.insert_entry(entry, None);
+            // Each entry goes back in at the height it was detached from. Heights are counted from
+            // the leaves, so they stay correct even if an earlier reinsertion grew a new root.
+            for (entry, entry_height) in reinsert_list {
+                self.insert_entry_at(entry, entry_height);
             }
-
-            if !self.root.is_leaf && self.root.entries.len() == 1 {
-                if let Some(RStarTreeEntry::Node { child, .. }) = self.root.entries.pop() {
-                    self.root = *child;
-                }
-            }
+            self.condense_root();
         }
         deleted
     }
@@ -751,7 +774,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
 
         let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point2D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            let dist_sq = entry.mbr().min_distance_sq(query);
             heap.push(KnnCandidate {
                 dist: dist_sq,
                 entry,
@@ -826,7 +849,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point2D<T>> {
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        let d_sq = child_entry.mbr().min_distance_sq(query);
                         if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
@@ -879,7 +902,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
 
         let mut heap: BinaryHeap<KnnCandidate<RStarTreeEntry<Point3D<T>>>> = BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            let dist_sq = entry.mbr().min_distance_sq(query);
             heap.push(KnnCandidate {
                 dist: dist_sq,
                 entry,
@@ -954,7 +977,7 @@ impl<T: std::fmt::Debug + Clone> RStarTree<Point3D<T>> {
                 }
                 RStarTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        let d_sq = child_entry.mbr().min_distance_sq(query);
                         if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
@@ -1019,6 +1042,92 @@ where
 mod tests {
     use super::*;
     use crate::geometry::{EuclideanDistance, Rectangle};
+    use crate::rtree_common::assert_structure;
+
+    const MAX_ENTRIES: usize = 4;
+
+    fn spiral(n: u32) -> Vec<Point2D<u32>> {
+        (0..n)
+            .map(|i| {
+                let a = i as f64 * 0.7;
+                Point2D::new(a.sin() * 100.0, a.cos() * 100.0, Some(i))
+            })
+            .collect()
+    }
+
+    fn check(tree: &RStarTree<Point2D<u32>>, context: &str) -> usize {
+        assert_structure(
+            &tree.root,
+            tree.max_entries,
+            Some(tree.min_entries),
+            context,
+        )
+    }
+
+    /// The structural invariants must survive every single insert and delete.
+    ///
+    /// Forced reinsertion used to put the entries it pulled out back at level 0, which buried whole
+    /// subtrees inside leaf nodes: by the eleventh insert a range search over this tree could only
+    /// see 6 of the 11 objects, and by a thousand objects it could see one.
+    #[test]
+    fn test_structure_survives_inserts_and_deletes() {
+        let mut tree: RStarTree<Point2D<u32>> = RStarTree::new(MAX_ENTRIES).unwrap();
+        let points = spiral(400);
+
+        for (i, point) in points.iter().enumerate() {
+            tree.insert(point.clone());
+            let reachable = check(&tree, &format!("after {} inserts", i + 1));
+            assert_eq!(
+                reachable,
+                i + 1,
+                "objects went missing after {} inserts",
+                i + 1
+            );
+        }
+
+        assert!(
+            tree.height() >= 4,
+            "400 objects with max_entries={MAX_ENTRIES} cannot fit in {} levels",
+            tree.height()
+        );
+
+        for (i, point) in points.iter().enumerate() {
+            assert!(tree.delete(point), "delete of point {i} failed");
+            let reachable = check(&tree, &format!("after {} deletes", i + 1));
+            assert_eq!(reachable, points.len() - i - 1);
+        }
+        assert!(tree.root.entries.is_empty());
+        assert!(tree.root.is_leaf, "an emptied tree should be a leaf again");
+    }
+
+    #[test]
+    fn test_structure_survives_bulk_load() {
+        let points = spiral(300);
+
+        let mut packed: RStarTree<Point2D<u32>> = RStarTree::new(MAX_ENTRIES).unwrap();
+        packed.insert_bulk(points.clone());
+        // Packing fills nodes greedily, so the last node of a level may sit below min_entries.
+        let reachable = assert_structure(&packed.root, MAX_ENTRIES, None, "after bulk load");
+        assert_eq!(reachable, points.len());
+        assert!(packed.height() >= 4);
+
+        let mut mixed: RStarTree<Point2D<u32>> = RStarTree::new(MAX_ENTRIES).unwrap();
+        for point in points.iter().take(7) {
+            mixed.insert(point.clone());
+        }
+        mixed.insert_bulk(points[7..40].to_vec());
+        assert_eq!(
+            assert_structure(&mixed.root, MAX_ENTRIES, None, "bulk onto populated tree"),
+            40
+        );
+        for point in points.iter().skip(40).take(20) {
+            mixed.insert(point.clone());
+        }
+        assert_eq!(
+            assert_structure(&mixed.root, MAX_ENTRIES, None, "inserts after bulk"),
+            60
+        );
+    }
 
     #[test]
     fn test_range_search_radius_zero_2d() {
@@ -1120,8 +1229,8 @@ mod tests {
         });
         assert_eq!(all_points.len(), 7);
 
-        for i in 3..10 {
-            assert!(tree.delete(&points[i]));
+        for point in points.iter().take(10).skip(3) {
+            assert!(tree.delete(point));
         }
 
         let all_points_after_all_deleted = tree.range_search_bbox(&Rectangle {

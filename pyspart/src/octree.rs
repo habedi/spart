@@ -39,9 +39,13 @@ impl PyOctree {
     ///
     /// Args:
     ///     points (list[Point3D]): A list of points to insert.
-    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) {
+    /// Points outside the tree's boundary are skipped.
+    ///
+    /// Returns:
+    ///     int: The number of points that were inserted.
+    fn insert_bulk(&mut self, points: Vec<PyPoint3D>) -> usize {
         let rust_points: Vec<Point3D<PyData>> = points.into_iter().map(|p| p.into()).collect();
-        self.tree.insert_bulk(&rust_points);
+        self.tree.insert_bulk(&rust_points)
     }
 
     /// Deletes a point from the octree.

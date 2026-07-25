@@ -143,8 +143,12 @@ class Quadtree:
         """
         ...
 
-    def insert_bulk(self, points: List[Point2D]) -> None:
-        """Insert many points efficiently."""
+    def insert_bulk(self, points: List[Point2D]) -> int:
+        """Insert many points efficiently, skipping any outside the boundary.
+
+        Returns:
+            The number of points that were inserted.
+        """
         ...
 
     def delete(self, point: Point2D) -> bool:
@@ -197,8 +201,12 @@ class Octree:
         """
         ...
 
-    def insert_bulk(self, points: List[Point3D]) -> None:
-        """Insert many points efficiently."""
+    def insert_bulk(self, points: List[Point3D]) -> int:
+        """Insert many points efficiently, skipping any outside the boundary.
+
+        Returns:
+            The number of points that were inserted.
+        """
         ...
 
     def delete(self, point: Point3D) -> bool:

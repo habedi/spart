@@ -37,11 +37,16 @@ impl PyQuadtree {
 
     /// Inserts multiple points into the quadtree efficiently.
     ///
+    /// Points outside the tree's boundary are skipped.
+    ///
     /// Args:
     ///     points (list[Point2D]): A list of points to insert.
-    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) {
+    ///
+    /// Returns:
+    ///     int: The number of points that were inserted.
+    fn insert_bulk(&mut self, points: Vec<PyPoint2D>) -> usize {
         let rust_points: Vec<Point2D<PyData>> = points.into_iter().map(|p| p.into()).collect();
-        self.tree.insert_bulk(&rust_points);
+        self.tree.insert_bulk(&rust_points)
     }
 
     /// Deletes a point from the quadtree.

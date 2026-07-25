@@ -27,12 +27,20 @@
 //! ```
 
 use crate::errors::SpartError;
-use crate::geometry::{Cube, DistanceMetric, HeapItem, Point3D};
+use crate::geometry::{Cube, DistanceMetric, HasMinDistance, HeapItem, Point3D, span};
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::collections::BinaryHeap;
 use tracing::info;
+
+/// Deepest level a node will subdivide to.
+///
+/// Without a cap, points that coincide — or very nearly do — subdivide forever: they always land in
+/// the same child, so no split ever separates them. Beyond this depth a node simply keeps its
+/// points, growing past `capacity` rather than recursing. A node at depth 32 covers 2^-32 of the
+/// original boundary, so only genuinely (near-)coincident points ever reach it.
+const MAX_DEPTH: usize = 32;
 
 /// An octree for indexing of 3D points.
 ///
@@ -50,6 +58,8 @@ pub struct Octree<T: Clone + PartialEq> {
     points: Vec<Point3D<T>>,
     capacity: usize,
     divided: bool,
+    /// Distance from the root, used to stop subdividing at [`MAX_DEPTH`].
+    depth: usize,
     front_top_left: Option<Box<Octree<T>>>,
     front_top_right: Option<Box<Octree<T>>>,
     front_bottom_left: Option<Box<Octree<T>>>,
@@ -79,11 +89,17 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             "Creating new Octree with boundary: {:?} and capacity: {}",
             boundary, capacity
         );
-        Ok(Octree {
-            boundary: boundary.clone(),
+        Ok(Self::with_depth(boundary.clone(), capacity, 0))
+    }
+
+    /// Creates an empty node covering `boundary` at the given depth below the root.
+    fn with_depth(boundary: Cube, capacity: usize, depth: usize) -> Self {
+        Octree {
+            boundary,
             points: Vec::new(),
             capacity,
             divided: false,
+            depth,
             front_top_left: None,
             front_top_right: None,
             front_bottom_left: None,
@@ -92,224 +108,93 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
             back_top_right: None,
             back_bottom_left: None,
             back_bottom_right: None,
-        })
+        }
     }
 
     /// Subdivides the current octree node into eight child octants.
     ///
-    /// After subdivision, all existing points are reinserted into the appropriate children.
+    /// The children's far faces are derived from the parent's own faces rather than from halved
+    /// extents, so the eight of them tile the parent exactly. A gap — even one of a single ULP —
+    /// would let a point be stored in a child whose boundary does not contain it, and search pruning
+    /// would then skip right over it.
+    ///
+    /// After subdivision, all existing points are moved down into the appropriate children.
     fn subdivide(&mut self) {
         info!("Subdividing Octree at boundary: {:?}", self.boundary);
-        let x = self.boundary.x;
-        let y = self.boundary.y;
-        let z = self.boundary.z;
-        let w = self.boundary.width / 2.0;
-        let h = self.boundary.height / 2.0;
-        let d = self.boundary.depth / 2.0;
+        let Cube {
+            x,
+            y,
+            z,
+            width,
+            height,
+            depth,
+        } = self.boundary;
+        let mid_x = x + width / 2.0;
+        let mid_y = y + height / 2.0;
+        let mid_z = z + depth / 2.0;
+        let left = span(x, mid_x);
+        let right = span(mid_x, x + width);
+        let top = span(y, mid_y);
+        let bottom = span(mid_y, y + height);
+        let front = span(z, mid_z);
+        let back = span(mid_z, z + depth);
 
-        self.front_top_left = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x,
-                    y,
-                    z,
-                    width: w,
-                    height: h,
-                    depth: d,
+        let octant = |ox: f64, oy: f64, oz: f64, ow: f64, oh: f64, od: f64| {
+            Some(Box::new(Self::with_depth(
+                Cube {
+                    x: ox,
+                    y: oy,
+                    z: oz,
+                    width: ow,
+                    height: oh,
+                    depth: od,
                 },
                 self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.front_top_right = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x: x + w,
-                    y,
-                    z,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.front_bottom_left = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x,
-                    y: y + h,
-                    z,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.front_bottom_right = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x: x + w,
-                    y: y + h,
-                    z,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.back_top_left = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x,
-                    y,
-                    z: z + d,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.back_top_right = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x: x + w,
-                    y,
-                    z: z + d,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.back_bottom_left = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x,
-                    y: y + h,
-                    z: z + d,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
-        self.back_bottom_right = Some(Box::new({
-            let child = Octree::new(
-                &Cube {
-                    x: x + w,
-                    y: y + h,
-                    z: z + d,
-                    width: w,
-                    height: h,
-                    depth: d,
-                },
-                self.capacity,
-            );
-            match child {
-                Ok(c) => c,
-                Err(_) => unreachable!("capacity validated at construction"),
-            }
-        }));
+                self.depth + 1,
+            )))
+        };
+        self.front_top_left = octant(x, y, z, left, top, front);
+        self.front_top_right = octant(mid_x, y, z, right, top, front);
+        self.front_bottom_left = octant(x, mid_y, z, left, bottom, front);
+        self.front_bottom_right = octant(mid_x, mid_y, z, right, bottom, front);
+        self.back_top_left = octant(x, y, mid_z, left, top, back);
+        self.back_top_right = octant(mid_x, y, mid_z, right, top, back);
+        self.back_bottom_left = octant(x, mid_y, mid_z, left, bottom, back);
+        self.back_bottom_right = octant(mid_x, mid_y, mid_z, right, bottom, back);
         self.divided = true;
 
-        // Reinsert existing points into the appropriate children.
-        let points = std::mem::take(&mut self.points);
-        for point in points {
-            self.insert(point);
+        // Move existing points down into the children.
+        for point in std::mem::take(&mut self.points) {
+            self.insert_within(point);
         }
     }
 
-    /// Returns mutable references to all eight child octants, if they exist.
-    fn children_mut(&mut self) -> Vec<&mut Octree<T>> {
-        let mut children = Vec::with_capacity(8);
-        if let Some(ref mut child) = self.front_top_left {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.front_top_right {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.front_bottom_left {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.front_bottom_right {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.back_top_left {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.back_top_right {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.back_bottom_left {
-            children.push(child.as_mut());
-        }
-        if let Some(ref mut child) = self.back_bottom_right {
-            children.push(child.as_mut());
-        }
-        children
+    /// The eight child octants in [`Octree::child_index`] order, or `None` where absent.
+    fn children(&self) -> [Option<&Octree<T>>; 8] {
+        [
+            self.front_top_left.as_deref(),
+            self.front_top_right.as_deref(),
+            self.front_bottom_left.as_deref(),
+            self.front_bottom_right.as_deref(),
+            self.back_top_left.as_deref(),
+            self.back_top_right.as_deref(),
+            self.back_bottom_left.as_deref(),
+            self.back_bottom_right.as_deref(),
+        ]
     }
 
-    /// Returns references to all eight child octants, if they exist.
-    fn children(&self) -> Vec<&Octree<T>> {
-        let mut children = Vec::with_capacity(8);
-        if let Some(ref child) = self.front_top_left {
-            children.push(child.as_ref());
+    /// The child at `index` in [`Octree::child_index`] order.
+    fn child_mut(&mut self, index: usize) -> Option<&mut Octree<T>> {
+        match index {
+            0 => self.front_top_left.as_deref_mut(),
+            1 => self.front_top_right.as_deref_mut(),
+            2 => self.front_bottom_left.as_deref_mut(),
+            3 => self.front_bottom_right.as_deref_mut(),
+            4 => self.back_top_left.as_deref_mut(),
+            5 => self.back_top_right.as_deref_mut(),
+            6 => self.back_bottom_left.as_deref_mut(),
+            _ => self.back_bottom_right.as_deref_mut(),
         }
-        if let Some(ref child) = self.front_top_right {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.front_bottom_left {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.front_bottom_right {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.back_top_left {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.back_top_right {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.back_bottom_left {
-            children.push(child.as_ref());
-        }
-        if let Some(ref child) = self.back_bottom_right {
-            children.push(child.as_ref());
-        }
-        children
     }
 
     /// Computes the squared minimum distance from the given target point to the boundary of this node.
@@ -320,47 +205,52 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     ///
     /// * `target` - The target 3D point.
     fn min_distance_sq(&self, target: &Point3D<T>) -> f64 {
-        let tx = target.x;
-        let ty = target.y;
-        let tz = target.z;
-        let cx = self.boundary.x;
-        let cy = self.boundary.y;
-        let cz = self.boundary.z;
-        let cw = self.boundary.width;
-        let ch = self.boundary.height;
-        let cd = self.boundary.depth;
+        HasMinDistance::min_distance_sq(&self.boundary, target)
+    }
 
-        let dx = if tx < cx {
-            cx - tx
-        } else if tx > cx + cw {
-            tx - (cx + cw)
-        } else {
-            0.0
-        };
+    /// Index of the octant a point belongs to: bit 0 selects right over left, bit 1 bottom over
+    /// top, bit 2 back over front. Matches the order of [`Octree::children`].
+    fn child_index(&self, point: &Point3D<T>) -> usize {
+        let right = point.x >= self.boundary.x + self.boundary.width / 2.0;
+        let bottom = point.y >= self.boundary.y + self.boundary.height / 2.0;
+        let back = point.z >= self.boundary.z + self.boundary.depth / 2.0;
+        usize::from(right) | (usize::from(bottom) << 1) | (usize::from(back) << 2)
+    }
 
-        let dy = if ty < cy {
-            cy - ty
-        } else if ty > cy + ch {
-            ty - (cy + ch)
-        } else {
-            0.0
-        };
+    /// Inserts a point already known to lie inside this node's boundary.
+    ///
+    /// Routing compares against the node's midplanes instead of testing each child's boundary, so
+    /// exactly one child is always selected. Testing boundaries meant that once floating-point
+    /// rounding crept in a point could match the parent and yet match no child at all — which is how
+    /// coincident points used to reach `unreachable!()` on insert and vanish silently on bulk insert.
+    fn insert_within(&mut self, point: Point3D<T>) {
+        if !self.divided {
+            // At the depth cap the node becomes a bucket: (near-)coincident points can never be
+            // separated by another split, so subdividing further would recurse without end.
+            if self.points.len() < self.capacity || self.depth >= MAX_DEPTH {
+                self.points.push(point);
+                return;
+            }
+            self.subdivide();
+        }
 
-        let dz = if tz < cz {
-            cz - tz
-        } else if tz > cz + cd {
-            tz - (cz + cd)
-        } else {
-            0.0
-        };
-
-        dx * dx + dy * dy + dz * dz
+        let index = self.child_index(&point);
+        if self.child_mut(index).is_none() {
+            // A subdivided node always has all eight children. If one is somehow missing, keep the
+            // point here rather than dropping it.
+            self.points.push(point);
+            return;
+        }
+        if let Some(child) = self.child_mut(index) {
+            child.insert_within(point);
+        }
     }
 
     /// Inserts a 3D point into the octree.
     ///
     /// If the point is not within the boundary, it is ignored.
-    /// If the current node is full, the node subdivides and attempts to insert the point into a child.
+    /// If the current node is full, the node subdivides and inserts the point into the child whose
+    /// octant contains it.
     ///
     /// # Arguments
     ///
@@ -368,223 +258,36 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
     ///
     /// # Returns
     ///
-    /// `true` if the point was successfully inserted, `false` otherwise.
+    /// `true` if the point was successfully inserted, `false` if it lies outside the boundary.
     pub fn insert(&mut self, point: Point3D<T>) -> bool {
         if !self.boundary.contains(&point) {
             return false;
         }
-
-        if !self.divided {
-            if self.points.len() < self.capacity {
-                self.points.push(point);
-                return true;
-            }
-            self.subdivide();
-        }
-
-        if self
-            .front_top_left
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .front_top_right
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .front_bottom_left
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .front_bottom_right
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .back_top_left
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .back_top_right
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .back_bottom_left
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-        if self
-            .back_bottom_right
-            .as_mut()
-            .is_some_and(|c| c.insert(point.clone()))
-        {
-            return true;
-        }
-
-        unreachable!("A point within the parent boundary should always fit in a child boundary.");
+        self.insert_within(point);
+        true
     }
 
-    /// Inserts a bulk of points into the octree.
+    /// Inserts many points into the octree at once.
+    ///
+    /// Points outside the boundary are skipped rather than reported individually, so the return
+    /// value says how many of them were actually stored.
     ///
     /// # Arguments
     ///
     /// * `points` - The points to insert.
-    pub fn insert_bulk(&mut self, points: &[Point3D<T>]) {
-        if points.is_empty() {
-            return;
-        }
-
-        let points_within_boundary: Vec<Point3D<T>> = points
-            .iter()
-            .filter(|p| self.boundary.contains(p))
-            .cloned()
-            .collect();
-
-        if points_within_boundary.is_empty() {
-            return;
-        }
-
-        if !self.divided && self.points.len() + points_within_boundary.len() <= self.capacity {
-            self.points.extend(points_within_boundary);
-            return;
-        }
-
-        if !self.divided {
-            self.subdivide();
-        }
-
-        let mut points_to_insert = points_within_boundary;
-        if self.divided {
-            let mut children_points: [Vec<Point3D<T>>; 8] = [
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-            ];
-
-            for point in points_to_insert.drain(..) {
-                if self
-                    .front_top_left
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[0].push(point);
-                } else if self
-                    .front_top_right
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[1].push(point);
-                } else if self
-                    .front_bottom_left
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[2].push(point);
-                } else if self
-                    .front_bottom_right
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[3].push(point);
-                } else if self
-                    .back_top_left
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[4].push(point);
-                } else if self
-                    .back_top_right
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[5].push(point);
-                } else if self
-                    .back_bottom_left
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[6].push(point);
-                } else if self
-                    .back_bottom_right
-                    .as_ref()
-                    .map(|c| c.boundary.contains(&point))
-                    .unwrap_or(false)
-                {
-                    children_points[7].push(point);
-                }
-            }
-
-            if !children_points[0].is_empty() {
-                if let Some(c) = self.front_top_left.as_mut() {
-                    c.insert_bulk(&children_points[0]);
-                }
-            }
-            if !children_points[1].is_empty() {
-                if let Some(c) = self.front_top_right.as_mut() {
-                    c.insert_bulk(&children_points[1]);
-                }
-            }
-            if !children_points[2].is_empty() {
-                if let Some(c) = self.front_bottom_left.as_mut() {
-                    c.insert_bulk(&children_points[2]);
-                }
-            }
-            if !children_points[3].is_empty() {
-                if let Some(c) = self.front_bottom_right.as_mut() {
-                    c.insert_bulk(&children_points[3]);
-                }
-            }
-            if !children_points[4].is_empty() {
-                if let Some(c) = self.back_top_left.as_mut() {
-                    c.insert_bulk(&children_points[4]);
-                }
-            }
-            if !children_points[5].is_empty() {
-                if let Some(c) = self.back_top_right.as_mut() {
-                    c.insert_bulk(&children_points[5]);
-                }
-            }
-            if !children_points[6].is_empty() {
-                if let Some(c) = self.back_bottom_left.as_mut() {
-                    c.insert_bulk(&children_points[6]);
-                }
-            }
-            if !children_points[7].is_empty() {
-                if let Some(c) = self.back_bottom_right.as_mut() {
-                    c.insert_bulk(&children_points[7]);
-                }
+    ///
+    /// # Returns
+    ///
+    /// The number of points that were inserted.
+    pub fn insert_bulk(&mut self, points: &[Point3D<T>]) -> usize {
+        let mut inserted = 0;
+        for point in points {
+            if self.boundary.contains(point) {
+                self.insert_within(point.clone());
+                inserted += 1;
             }
         }
+        inserted
     }
 
     /// Performs a k-nearest neighbor search for the target point.
@@ -638,18 +341,16 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                 heap.pop();
             }
         }
-        if self.divided {
-            for child in self.children() {
-                if heap.len() == k {
-                    if let Some(top) = heap.peek() {
-                        let current_farthest = -top.neg_distance.into_inner();
-                        if child.min_distance_sq(target) > current_farthest {
-                            continue;
-                        }
+        for child in self.children().into_iter().flatten() {
+            if heap.len() == k {
+                if let Some(top) = heap.peek() {
+                    let current_farthest = -top.neg_distance.into_inner();
+                    if child.min_distance_sq(target) > current_farthest {
+                        continue;
                     }
                 }
-                child.knn_search_helper::<M>(target, k, heap);
             }
+            child.knn_search_helper::<M>(target, k, heap);
         }
     }
 
@@ -687,10 +388,8 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
                 found.push(point.clone());
             }
         }
-        if self.divided {
-            for child in self.children() {
-                found.extend(child.range_search::<M>(center, radius));
-            }
+        for child in self.children().into_iter().flatten() {
+            found.extend(child.range_search::<M>(center, radius));
         }
         found
     }
@@ -706,75 +405,94 @@ impl<T: Clone + PartialEq + std::fmt::Debug> Octree<T> {
         if !self.boundary.contains(point) {
             return false;
         }
-        let mut deleted = false;
-        if self.divided {
-            for child in self.children_mut() {
-                if child.delete(point) {
-                    deleted = true;
-                    break;
-                }
-            }
-            self.try_merge();
-            return deleted;
-        }
         if let Some(pos) = self.points.iter().position(|p| p == point) {
             self.points.remove(pos);
             info!("Deleting point {:?} from Octree", point);
-            true
-        } else {
-            false
+            return true;
+        }
+        if !self.divided {
+            return false;
+        }
+        // Insertion routes a point to exactly one octant, so only that octant can hold it — no need
+        // to search the other seven.
+        let index = self.child_index(point);
+        let deleted = self
+            .child_mut(index)
+            .is_some_and(|child| child.delete(point));
+        if deleted {
+            self.try_merge();
+        }
+        deleted
+    }
+
+    /// Performs a range search over a query cube, returning every point inside it.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The cube to search.
+    pub fn range_search_bbox(&self, query: &Cube) -> Vec<Point3D<T>> {
+        let mut found = Vec::new();
+        self.collect_in_bbox(query, &mut found);
+        found
+    }
+
+    /// Helper collecting the points inside `query` into `found`.
+    fn collect_in_bbox(&self, query: &Cube, found: &mut Vec<Point3D<T>>) {
+        if !self.boundary.intersects(query) {
+            return;
+        }
+        for point in &self.points {
+            if query.contains(point) {
+                found.push(point.clone());
+            }
+        }
+        for child in self.children().into_iter().flatten() {
+            child.collect_in_bbox(query, found);
         }
     }
 
     /// Attempts to merge child nodes back into the parent node if possible.
     ///
-    /// If all children are not divided and their total number of points is within capacity,
-    /// the children are merged into the parent node.
+    /// Only this node is considered. `delete` calls this at every level on its way back up, so the
+    /// path that actually changed is already merged bottom-up; recursing over the whole subtree here
+    /// made every delete cost time proportional to the size of the tree.
     fn try_merge(&mut self) {
         if !self.divided {
             return;
         }
-        for child in self.children_mut() {
-            child.try_merge();
-        }
         let children = self.children();
-        if children.iter().all(|child| !child.divided) {
-            let total_points: usize = children.iter().map(|child| child.points.len()).sum();
-            if total_points <= self.capacity {
-                let mut merged_points = Vec::with_capacity(total_points);
-                if let Some(child) = self.front_top_left.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.front_top_right.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.front_bottom_left.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.front_bottom_right.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.back_top_left.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.back_top_right.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.back_bottom_left.take() {
-                    merged_points.extend(child.points);
-                }
-                if let Some(child) = self.back_bottom_right.take() {
-                    merged_points.extend(child.points);
-                }
-                info!(
-                    "Merging children into parent node at boundary {:?} with {} points",
-                    self.boundary,
-                    merged_points.len()
-                );
-                self.points = merged_points;
-                self.divided = false;
-            }
+        if !children.iter().flatten().all(|child| !child.divided) {
+            return;
         }
+        let total_points: usize = children.iter().flatten().map(|c| c.points.len()).sum();
+        if total_points + self.points.len() > self.capacity {
+            return;
+        }
+
+        let mut merged_points = std::mem::take(&mut self.points);
+        merged_points.reserve(total_points);
+        for child in [
+            self.front_top_left.take(),
+            self.front_top_right.take(),
+            self.front_bottom_left.take(),
+            self.front_bottom_right.take(),
+            self.back_top_left.take(),
+            self.back_top_right.take(),
+            self.back_bottom_left.take(),
+            self.back_bottom_right.take(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            merged_points.extend(child.points);
+        }
+        info!(
+            "Merging children into parent node at boundary {:?} with {} points",
+            self.boundary,
+            merged_points.len()
+        );
+        self.points = merged_points;
+        self.divided = false;
     }
 }
 

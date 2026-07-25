@@ -36,7 +36,8 @@ use crate::geometry::{
 };
 use crate::rtree_common::{
     KnnCandidate, compute_group_mbr as common_compute_group_mbr,
-    delete_entry as common_delete_entry, search_node as common_search_node,
+    delete_entry as common_delete_entry, node_height as common_node_height,
+    search_node as common_search_node,
 };
 use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
@@ -210,39 +211,57 @@ impl<T: RTreeObject> RTree<T> {
             mbr: object.mbr(),
             object,
         };
-        insert_entry_node(&mut self.root, entry);
-        if self.root.entries.len() > self.max_entries {
-            info!("Root has exceeded max_entries; splitting root");
-            self.split_root();
+        self.insert_entry_at(entry, 0);
+    }
+
+    /// Inserts `entry` into a node at height `target_height`, growing a new root if the old one
+    /// splits. Object entries belong at height 0; entries recovered from a condensed subtree
+    /// belong at the height they came from.
+    fn insert_entry_at(&mut self, entry: RTreeEntry<T>, target_height: usize) {
+        let height = common_node_height(&self.root);
+        let target_height = target_height.min(height);
+        let overflow = insert_entry_at_height(
+            &mut self.root,
+            entry,
+            target_height,
+            height,
+            self.max_entries,
+            self.min_entries,
+        );
+        if let Some(sibling) = overflow {
+            self.grow_root(sibling);
         }
     }
 
-    /// Splits the root node into two child nodes when it exceeds the maximum number of entries.
-    fn split_root(&mut self) {
-        info!("Splitting root node");
-        let old_entries = std::mem::take(&mut self.root.entries);
-        let (group1, group2) = split_entries(old_entries, self.max_entries);
-        let child1 = RTreeNode {
-            entries: group1,
-            is_leaf: self.root.is_leaf,
-        };
-        let child2 = RTreeNode {
-            entries: group2,
-            is_leaf: self.root.is_leaf,
-        };
-        let mbr1 = common_compute_group_mbr(&child1.entries)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-        let mbr2 = common_compute_group_mbr(&child2.entries)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-        self.root.is_leaf = false;
-        self.root.entries.push(RTreeEntry::Node {
-            mbr: mbr1,
-            child: Box::new(child1),
-        });
-        self.root.entries.push(RTreeEntry::Node {
-            mbr: mbr2,
-            child: Box::new(child2),
-        });
+    /// Adds one level on top of the tree after the root has been split in two.
+    fn grow_root(&mut self, sibling: RTreeEntry<T>) {
+        info!("Root overflowed; growing the tree by one level");
+        let old_root = std::mem::replace(
+            &mut self.root,
+            RTreeNode {
+                entries: Vec::with_capacity(2),
+                is_leaf: false,
+            },
+        );
+        match common_compute_group_mbr(&old_root.entries) {
+            Some(mbr) => {
+                self.root.entries.push(RTreeEntry::Node {
+                    mbr,
+                    child: Box::new(old_root),
+                });
+                self.root.entries.push(sibling);
+            }
+            None => {
+                // The old root was left empty by the split, so the new sibling is the whole tree.
+                self.root = match sibling {
+                    RTreeEntry::Node { child, .. } => *child,
+                    leaf => RTreeNode {
+                        entries: vec![leaf],
+                        is_leaf: true,
+                    },
+                };
+            }
+        }
     }
 
     /// Performs a range search with a given query bounding volume.
@@ -263,6 +282,12 @@ impl<T: RTreeObject> RTree<T> {
 
     /// Inserts a bulk of objects into the R-tree.
     ///
+    /// When the tree is still empty the objects are packed bottom-up into a uniformly deep tree,
+    /// which is considerably cheaper than inserting them one by one. Objects are packed in the order
+    /// given, so pre-sorting them by locality gives a tighter index. Into a tree that already holds
+    /// objects they are inserted individually, because appending pre-built nodes to a populated
+    /// tree cannot preserve a uniform depth.
+    ///
     /// # Arguments
     ///
     /// * `objects` - The objects to insert.
@@ -271,100 +296,253 @@ impl<T: RTreeObject> RTree<T> {
             return;
         }
 
-        let mut entries: Vec<RTreeEntry<T>> = objects
-            .into_iter()
-            .map(|obj| RTreeEntry::Leaf {
-                mbr: obj.mbr(),
-                object: obj,
-            })
-            .collect();
-
-        while entries.len() > self.max_entries {
-            let mut new_level_entries = Vec::new();
-            let chunks = entries.chunks(self.max_entries);
-
-            for chunk in chunks {
-                let child_node = RTreeNode {
-                    entries: chunk.to_vec(),
-                    is_leaf: self.root.is_leaf,
-                };
-                if let Some(mbr) = common_compute_group_mbr(&child_node.entries) {
-                    new_level_entries.push(RTreeEntry::Node {
-                        mbr,
-                        child: Box::new(child_node),
-                    });
-                }
+        if self.root.entries.is_empty() {
+            info!("Bulk loading {} objects into an empty RTree", objects.len());
+            let entries = objects
+                .into_iter()
+                .map(|object| RTreeEntry::Leaf {
+                    mbr: object.mbr(),
+                    object,
+                })
+                .collect();
+            self.root = pack_entries(entries, self.max_entries);
+        } else {
+            for object in objects {
+                self.insert(object);
             }
-            entries = new_level_entries;
-            self.root.is_leaf = false;
         }
-
-        self.root.entries.extend(entries);
     }
 }
 
-fn insert_entry_node<T: RTreeObject>(node: &mut RTreeNode<T>, entry: RTreeEntry<T>) {
-    if node.is_leaf {
-        debug!("Inserting entry into leaf node");
+/// Packs entries bottom-up into a uniformly deep tree.
+///
+/// Every node on a level is filled to `max_entries` before the next is started (the last node of a
+/// level takes the remainder), and each level records whether its nodes are leaves, so leaf entries
+/// only ever land in leaf nodes.
+fn pack_entries<T: RTreeObject>(entries: Vec<RTreeEntry<T>>, max_entries: usize) -> RTreeNode<T> {
+    let mut level = entries;
+    let mut level_is_leaf = true;
+
+    while level.len() > max_entries {
+        let mut parents = Vec::with_capacity(level.len().div_ceil(max_entries));
+        let mut remaining = level;
+        while !remaining.is_empty() {
+            let take = remaining.len().min(max_entries);
+            let child = RTreeNode {
+                entries: remaining.drain(..take).collect(),
+                is_leaf: level_is_leaf,
+            };
+            if let Some(mbr) = common_compute_group_mbr(&child.entries) {
+                parents.push(RTreeEntry::Node {
+                    mbr,
+                    child: Box::new(child),
+                });
+            }
+        }
+        level = parents;
+        level_is_leaf = false;
+    }
+
+    RTreeNode {
+        entries: level,
+        is_leaf: level_is_leaf,
+    }
+}
+
+/// Picks the child of `node` whose MBR needs the least enlargement to cover `mbr`, breaking ties
+/// towards the smaller MBR.
+fn choose_subtree<T: RTreeObject>(node: &RTreeNode<T>, mbr: &T::B) -> usize {
+    let mut best_index = 0;
+    let mut best_enlargement = f64::INFINITY;
+    let mut best_area = f64::INFINITY;
+    for (i, entry) in node.entries.iter().enumerate() {
+        let candidate = entry.mbr();
+        let enlargement = candidate.enlargement(mbr);
+        let area = candidate.area();
+        if enlargement < best_enlargement || (enlargement == best_enlargement && area < best_area) {
+            best_index = i;
+            best_enlargement = enlargement;
+            best_area = area;
+        }
+    }
+    best_index
+}
+
+/// Recomputes an entry's MBR from the child it points at.
+fn refresh_mbr<T: RTreeObject>(entry: &mut RTreeEntry<T>) {
+    if let RTreeEntry::Node { mbr, child } = entry {
+        if let Some(new_mbr) = common_compute_group_mbr(&child.entries) {
+            *mbr = new_mbr;
+        }
+    }
+}
+
+/// Inserts `entry` into the node at height `target_height` in the subtree rooted at `node`, whose
+/// own height is `node_height`.
+///
+/// Returns an entry pointing at a freshly created sibling when `node` had to split. The caller owns
+/// that sibling: an interior caller pushes it into its own entry list, and `RTree::insert_entry_at`
+/// turns it into a new root. Splitting on the way back up is what keeps every leaf at the same
+/// depth — without it only the root would ever split and the tree would stay two levels deep no
+/// matter how many objects it held.
+fn insert_entry_at_height<T: RTreeObject>(
+    node: &mut RTreeNode<T>,
+    entry: RTreeEntry<T>,
+    target_height: usize,
+    node_height: usize,
+    max_entries: usize,
+    min_entries: usize,
+) -> Option<RTreeEntry<T>> {
+    if node_height == target_height {
+        debug!("Inserting entry into node at height {}", node_height);
         node.entries.push(entry);
     } else {
-        let mut best_index: Option<usize> = None;
-        let mut best_enlargement = f64::INFINITY;
-        for (i, child_entry) in node.entries.iter().enumerate() {
-            if let RTreeEntry::Node { mbr, .. } = child_entry {
-                let enlargement = mbr.enlargement(entry.mbr());
-                if enlargement < best_enlargement {
-                    best_enlargement = enlargement;
-                    best_index = Some(i);
-                } else if (enlargement - best_enlargement).abs() < f64::EPSILON {
-                    if let Some(current_best) = best_index {
-                        if mbr.area() < node.entries[current_best].mbr().area() {
-                            best_index = Some(i);
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(best_index) = best_index {
-            if let RTreeEntry::Node { mbr, child } = &mut node.entries[best_index] {
-                *mbr = mbr.union(entry.mbr());
-                insert_entry_node(child, entry);
-                if let Some(new_mbr) = common_compute_group_mbr(&child.entries) {
-                    *mbr = new_mbr;
-                }
-            }
+        let best_index = choose_subtree(node, entry.mbr());
+        // Above leaf level a node only ever holds `Node` entries. If a tree ever turns up that
+        // breaks the invariant, keep the entry reachable here rather than dropping it.
+        let can_descend = matches!(node.entries.get(best_index), Some(RTreeEntry::Node { .. }));
+        let overflow = if can_descend {
+            let RTreeEntry::Node { child, .. } = &mut node.entries[best_index] else {
+                unreachable!("checked by `can_descend`")
+            };
+            insert_entry_at_height(
+                child,
+                entry,
+                target_height,
+                node_height - 1,
+                max_entries,
+                min_entries,
+            )
         } else {
             node.entries.push(entry);
+            None
+        };
+        if can_descend {
+            refresh_mbr(&mut node.entries[best_index]);
+        }
+        if let Some(sibling) = overflow {
+            node.entries.push(sibling);
         }
     }
+
+    if node.entries.len() <= max_entries {
+        return None;
+    }
+    split_node(node, min_entries)
 }
 
+/// Splits an overfull node in place, returning an entry that points at the new sibling.
+fn split_node<T: RTreeObject>(
+    node: &mut RTreeNode<T>,
+    min_entries: usize,
+) -> Option<RTreeEntry<T>> {
+    let entries = std::mem::take(&mut node.entries);
+    let (group1, group2) = split_entries(entries, min_entries);
+    node.entries = group1;
+    let sibling = RTreeNode {
+        entries: group2,
+        is_leaf: node.is_leaf,
+    };
+    // `None` only when the second group came out empty, in which case there is nothing to move and
+    // `node` already holds every entry.
+    let mbr = common_compute_group_mbr(&sibling.entries)?;
+    Some(RTreeEntry::Node {
+        mbr,
+        child: Box::new(sibling),
+    })
+}
+
+/// Splits `entries` into two groups, each holding at least `min_entries` of them.
+///
+/// This is Guttman's quadratic split: the pair of entries wasting the most space when covered
+/// together seeds the two groups, then the rest are assigned in order of how strongly they prefer
+/// one group to the other. Because the `min_entries` floor is enforced for both groups, the usual
+/// call with `max_entries + 1` entries cannot leave either group larger than `max_entries`.
 fn split_entries<T: RTreeObject>(
-    entries: Vec<RTreeEntry<T>>,
-    _max_entries: usize,
+    mut entries: Vec<RTreeEntry<T>>,
+    min_entries: usize,
 ) -> (Vec<RTreeEntry<T>>, Vec<RTreeEntry<T>>) {
-    let mut entries = entries;
     if entries.len() < 2 {
         return (entries, Vec::new());
     }
-    let seed1 = entries.remove(0);
-    let seed2 = entries.remove(0);
-    let mut group1 = vec![seed1];
-    let mut group2 = vec![seed2];
-    for entry in entries {
-        let mbr1 = common_compute_group_mbr(&group1)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
-        let mbr2 = common_compute_group_mbr(&group2)
-            .unwrap_or_else(|| unreachable!("non-empty group must have MBR"));
+    // Asking for more than half of the entries could never be satisfied by both groups.
+    let min_entries = min_entries.clamp(1, entries.len() / 2);
+
+    let (first_seed, second_seed) = pick_seeds(&entries);
+    // Remove the later index first so the earlier one stays valid.
+    let second = entries.remove(second_seed);
+    let first = entries.remove(first_seed);
+    let mut mbr1 = first.mbr().clone();
+    let mut mbr2 = second.mbr().clone();
+    let mut group1 = vec![first];
+    let mut group2 = vec![second];
+
+    while !entries.is_empty() {
+        // Once a group can only just still reach `min_entries`, everything left belongs to it.
+        if group1.len() + entries.len() == min_entries {
+            group1.append(&mut entries);
+            break;
+        }
+        if group2.len() + entries.len() == min_entries {
+            group2.append(&mut entries);
+            break;
+        }
+
+        let entry = entries.remove(pick_next(&entries, &mbr1, &mbr2));
         let enlargement1 = mbr1.enlargement(entry.mbr());
         let enlargement2 = mbr2.enlargement(entry.mbr());
-        if enlargement1 < enlargement2 {
+        let to_first = match enlargement1.partial_cmp(&enlargement2) {
+            Some(Ordering::Less) => true,
+            Some(Ordering::Greater) => false,
+            // Equal enlargement: prefer the smaller, then the emptier group.
+            _ => match mbr1.area().partial_cmp(&mbr2.area()) {
+                Some(Ordering::Less) => true,
+                Some(Ordering::Greater) => false,
+                _ => group1.len() <= group2.len(),
+            },
+        };
+        if to_first {
+            mbr1 = mbr1.union(entry.mbr());
             group1.push(entry);
         } else {
+            mbr2 = mbr2.union(entry.mbr());
             group2.push(entry);
         }
     }
+
     (group1, group2)
+}
+
+/// Returns the indices of the two entries that waste the most space when covered by one volume.
+fn pick_seeds<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> (usize, usize) {
+    let mut seeds = (0, 1);
+    let mut worst_waste = f64::NEG_INFINITY;
+    for i in 0..entries.len() {
+        for j in (i + 1)..entries.len() {
+            let a = entries[i].mbr();
+            let b = entries[j].mbr();
+            let waste = a.union(b).area() - a.area() - b.area();
+            if waste > worst_waste {
+                worst_waste = waste;
+                seeds = (i, j);
+            }
+        }
+    }
+    seeds
+}
+
+/// Returns the index of the entry with the strongest preference between the two groups.
+fn pick_next<T: RTreeObject>(entries: &[RTreeEntry<T>], mbr1: &T::B, mbr2: &T::B) -> usize {
+    let mut best_index = 0;
+    let mut best_preference = f64::NEG_INFINITY;
+    for (i, entry) in entries.iter().enumerate() {
+        let preference = (mbr1.enlargement(entry.mbr()) - mbr2.enlargement(entry.mbr())).abs();
+        if preference > best_preference {
+            best_preference = preference;
+            best_index = i;
+        }
+    }
+    best_index
 }
 
 impl<T: RTreeObject> RTree<T>
@@ -384,32 +562,42 @@ where
         info!("Attempting to delete object: {:?}", object);
         let object_mbr = object.mbr();
         let mut reinsert_list = Vec::new();
+        let height = common_node_height(&self.root);
         let deleted = common_delete_entry(
             &mut self.root,
             object,
             &object_mbr,
             self.min_entries,
+            height,
             &mut reinsert_list,
         );
 
         if deleted {
-            for entry in reinsert_list {
-                self.insert_entry(entry);
+            // Each entry goes back in at the height it was detached from. Heights are counted from
+            // the leaves, so they stay correct even if an earlier reinsertion grew a new root.
+            for (entry, entry_height) in reinsert_list {
+                self.insert_entry_at(entry, entry_height);
             }
-
-            if !self.root.is_leaf && self.root.entries.len() == 1 {
-                if let Some(RTreeEntry::Node { child, .. }) = self.root.entries.pop() {
-                    self.root = *child;
-                }
-            }
+            self.condense_root();
         }
         deleted
     }
 
-    fn insert_entry(&mut self, entry: RTreeEntry<T>) {
-        insert_entry_node(&mut self.root, entry);
-        if self.root.entries.len() > self.max_entries {
-            self.split_root();
+    /// Drops levels off the top of the tree while the root has a single child, and turns an emptied
+    /// internal root back into an empty leaf so later inserts have somewhere to go.
+    fn condense_root(&mut self) {
+        while !self.root.is_leaf && self.root.entries.len() == 1 {
+            match self.root.entries.pop() {
+                Some(RTreeEntry::Node { child, .. }) => self.root = *child,
+                Some(other) => {
+                    self.root.entries.push(other);
+                    break;
+                }
+                None => break,
+            }
+        }
+        if !self.root.is_leaf && self.root.entries.is_empty() {
+            self.root.is_leaf = true;
         }
     }
 }
@@ -442,50 +630,31 @@ impl<T: std::fmt::Debug + Clone> RTreeObject for Point3D<T> {
 
 impl Rectangle {
     /// Computes the minimum distance from this rectangle to a given 2D point.
+    ///
+    /// Kept as an inherent method for convenience; the logic lives in
+    /// [`HasMinDistance`].
     pub fn min_distance<T>(&self, point: &Point2D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy).sqrt()
+        HasMinDistance::min_distance(self, point)
+    }
+
+    /// Computes the squared minimum distance from this rectangle to a given 2D point.
+    pub fn min_distance_sq<T>(&self, point: &Point2D<T>) -> f64 {
+        HasMinDistance::min_distance_sq(self, point)
     }
 }
 
 impl Cube {
     /// Computes the minimum distance from this cube to a given 3D point.
+    ///
+    /// Kept as an inherent method for convenience; the logic lives in
+    /// [`HasMinDistance`].
     pub fn min_distance<T>(&self, point: &Point3D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        let dz = if point.z < self.z {
-            self.z - point.z
-        } else if point.z > self.z + self.depth {
-            point.z - (self.z + self.depth)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy + dz * dz).sqrt()
+        HasMinDistance::min_distance(self, point)
+    }
+
+    /// Computes the squared minimum distance from this cube to a given 3D point.
+    pub fn min_distance_sq<T>(&self, point: &Point3D<T>) -> f64 {
+        HasMinDistance::min_distance_sq(self, point)
     }
 }
 
@@ -518,7 +687,7 @@ impl<T: std::fmt::Debug + Clone> RTree<Point2D<T>> {
         let mut heap: BinaryHeap<crate::rtree_common::KnnCandidate<RTreeEntry<Point2D<T>>>> =
             BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            let dist_sq = entry.mbr().min_distance_sq(query);
             heap.push(KnnCandidate {
                 dist: dist_sq,
                 entry,
@@ -593,7 +762,7 @@ impl<T: std::fmt::Debug + Clone> RTree<Point2D<T>> {
                 }
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        let d_sq = child_entry.mbr().min_distance_sq(query);
                         if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
@@ -647,7 +816,7 @@ impl<T: std::fmt::Debug + Clone> RTree<Point3D<T>> {
         let mut heap: BinaryHeap<crate::rtree_common::KnnCandidate<RTreeEntry<Point3D<T>>>> =
             BinaryHeap::new();
         for entry in &self.root.entries {
-            let dist_sq = entry.mbr().min_distance(query).powi(2);
+            let dist_sq = entry.mbr().min_distance_sq(query);
             heap.push(KnnCandidate {
                 dist: dist_sq,
                 entry,
@@ -722,7 +891,7 @@ impl<T: std::fmt::Debug + Clone> RTree<Point3D<T>> {
                 }
                 RTreeEntry::Node { child, .. } => {
                     for child_entry in &child.entries {
-                        let d_sq = child_entry.mbr().min_distance(query).powi(2);
+                        let d_sq = child_entry.mbr().min_distance_sq(query);
                         if results.len() < k {
                             heap.push(KnnCandidate {
                                 dist: d_sq,
@@ -787,6 +956,93 @@ where
 mod tests {
     use super::*;
     use crate::geometry::EuclideanDistance;
+    use crate::rtree_common::assert_structure;
+
+    const MAX_ENTRIES: usize = 4;
+
+    fn spiral(n: u32) -> Vec<Point2D<u32>> {
+        (0..n)
+            .map(|i| {
+                let a = i as f64 * 0.7;
+                Point2D::new(a.sin() * 100.0, a.cos() * 100.0, Some(i))
+            })
+            .collect()
+    }
+
+    fn check(tree: &RTree<Point2D<u32>>, context: &str) -> usize {
+        assert_structure(
+            &tree.root,
+            tree.max_entries,
+            Some(tree.min_entries),
+            context,
+        )
+    }
+
+    /// The structural invariants must survive every single insert and delete. Before non-root nodes
+    /// learned to split, this tree stayed two levels deep forever and both of its leaves grew
+    /// without bound, turning every query into a scan of half the data.
+    #[test]
+    fn test_structure_survives_inserts_and_deletes() {
+        let mut tree: RTree<Point2D<u32>> = RTree::new(MAX_ENTRIES).unwrap();
+        let points = spiral(400);
+
+        for (i, point) in points.iter().enumerate() {
+            tree.insert(point.clone());
+            let reachable = check(&tree, &format!("after {} inserts", i + 1));
+            assert_eq!(
+                reachable,
+                i + 1,
+                "objects went missing after {} inserts",
+                i + 1
+            );
+        }
+
+        let height = crate::rtree_common::node_height(&tree.root);
+        assert!(
+            height >= 3,
+            "400 objects with max_entries={MAX_ENTRIES} cannot fit in a tree of height {height}"
+        );
+
+        for (i, point) in points.iter().enumerate() {
+            assert!(tree.delete(point), "delete of point {i} failed");
+            let reachable = check(&tree, &format!("after {} deletes", i + 1));
+            assert_eq!(reachable, points.len() - i - 1);
+        }
+        assert!(tree.root.entries.is_empty());
+        assert!(tree.root.is_leaf, "an emptied tree should be a leaf again");
+    }
+
+    /// Bulk loading must produce a uniformly deep tree, and a later bulk load into a populated tree
+    /// must not staple mismatched entries onto the root.
+    #[test]
+    fn test_structure_survives_bulk_load() {
+        let points = spiral(300);
+
+        let mut packed: RTree<Point2D<u32>> = RTree::new(MAX_ENTRIES).unwrap();
+        packed.insert_bulk(points.clone());
+        // Packing fills nodes greedily, so the last node of a level may sit below min_entries.
+        let reachable = assert_structure(&packed.root, MAX_ENTRIES, None, "after bulk load");
+        assert_eq!(reachable, points.len());
+        assert!(crate::rtree_common::node_height(&packed.root) >= 3);
+
+        // Bulk into a tree that already holds objects, and single inserts after a bulk load.
+        let mut mixed: RTree<Point2D<u32>> = RTree::new(MAX_ENTRIES).unwrap();
+        for point in points.iter().take(7) {
+            mixed.insert(point.clone());
+        }
+        mixed.insert_bulk(points[7..40].to_vec());
+        assert_eq!(
+            assert_structure(&mixed.root, MAX_ENTRIES, None, "bulk onto populated tree"),
+            40
+        );
+        for point in points.iter().skip(40).take(20) {
+            mixed.insert(point.clone());
+        }
+        assert_eq!(
+            assert_structure(&mixed.root, MAX_ENTRIES, None, "inserts after bulk"),
+            60
+        );
+    }
 
     #[test]
     fn test_range_search_radius_zero_2d() {
@@ -858,8 +1114,8 @@ mod tests {
         });
         assert_eq!(all_points.len(), 7);
 
-        for i in 3..10 {
-            assert!(tree.delete(&points[i]));
+        for point in points.iter().take(10).skip(3) {
+            assert!(tree.delete(point));
         }
 
         let all_points_after_all_deleted = tree.range_search_bbox(&crate::geometry::Rectangle {
