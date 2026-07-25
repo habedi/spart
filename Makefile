@@ -9,7 +9,9 @@ RUST_LOG        := info
 WHEEL_DIR       := dist
 PYSPART_DIR     := pyspart
 PY_DEP_MNGR     := uv
-WHEEL_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-*.whl 2>/dev/null | head -n 1)
+PYSPART_VERSION := $(shell grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+WHEEL_FILES     := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-$(PYSPART_VERSION)-*.whl 2>/dev/null)
+SDIST_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-$(PYSPART_VERSION).tar.gz 2>/dev/null)
 
 # Pinned versions for Rust development tools
 TARPAULIN_VERSION=0.32.0
@@ -152,6 +154,11 @@ wheel: ## Build the wheel file for PySpart
 	@echo "Building the PySpart wheel..."
 	@(cd $(PYSPART_DIR) && maturin build --release --out $(WHEEL_DIR) --auditwheel check)
 
+.PHONY: sdist
+sdist: ## Build the source distribution for PySpart
+	@echo "Building the PySpart source distribution..."
+	@(cd $(PYSPART_DIR) && maturin sdist --out $(WHEEL_DIR))
+
 .PHONY: wheel-manylinux
 wheel-manylinux: ## Build the manylinux wheel file for PySpart (using Zig)
 	@echo "Building the `manylinux` PySpart wheel..."
@@ -163,14 +170,20 @@ test-py: develop-py ## Run Python tests
 	@$(PY_DEP_MNGR) run --extra dev pytest
 
 .PHONY: publish-py
-publish-py: wheel-manylinux ## Publish the PySpart wheel to PyPI (requires PYPI_TOKEN to be set)
-	@echo "Publishing PySpart to PyPI..."
-	@if [ -z "$(WHEEL_FILE)" ]; then \
-	   echo "Error: No wheel file found. Please run 'make wheel' first."; \
+publish-py: wheel-manylinux sdist ## Publish PySpart to PyPI for THIS host only (prefer the CI workflow)
+	@echo "Publishing PySpart $(PYSPART_VERSION) to PyPI..."
+	@echo "Note: this builds for the host platform only. The publish_py.yml workflow builds all eight"
+	@echo "      platform wheels plus the sdist, and is the intended release path."
+	@if [ -z "$(WHEEL_FILES)" ]; then \
+	   echo "Error: no wheel for version $(PYSPART_VERSION) in $(PYSPART_DIR)/$(WHEEL_DIR)."; \
 	   exit 1; \
 	fi
-	@echo "Found wheel file: $(WHEEL_FILE)"
-	@twine upload -u __token__ -p $(PYPI_TOKEN) $(WHEEL_FILE)
+	@if [ -z "$(SDIST_FILE)" ]; then \
+	   echo "Error: no sdist for version $(PYSPART_VERSION) in $(PYSPART_DIR)/$(WHEEL_DIR)."; \
+	   exit 1; \
+	fi
+	@echo "Uploading: $(WHEEL_FILES) $(SDIST_FILE)"
+	@twine upload -u __token__ -p $(PYPI_TOKEN) $(WHEEL_FILES) $(SDIST_FILE)
 
 ########################################################################################
 ## Additional targets

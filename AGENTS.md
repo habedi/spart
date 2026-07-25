@@ -97,7 +97,9 @@ Do not invent modules that do not yet exist, but do place new modules according 
   enforces this.
 - `benches/shared.rs`: bench data generators.
 - `examples/`: one runnable example per tree, wired up as named `[[example]]` targets in `Cargo.toml`.
-- `pyspart/`: PyO3 bindings, a separate crate with its own `Cargo.toml` that depends on the parent by path.
+- `pyspart/`: PyO3 bindings. A workspace member that depends on the parent by path, but not one of
+  `default-members`, so a bare `cargo build`, `cargo test`, or `cargo clippy` never compiles pyo3 and
+  never needs a Python toolchain. Build it explicitly with `-p pyspart` or through `make develop-py`.
     - `pyspart/src/lib.rs`: module registration.
     - `pyspart/src/point2d.rs` and `point3d.rs`: the `Point2D` and `Point3D` classes. `pyspart/src/geometry.rs`: the `PyRectangle` and `PyCube`
       newtypes. `pyspart/src/types.rs`: the `PyData` payload type.
@@ -106,7 +108,9 @@ Do not invent modules that do not yet exist, but do place new modules according 
     - `pyspart/pyspart.pyi`: type stubs. Keep them in step with the Rust signatures.
     - `pyspart/tests/`: pytest suites.
     - `pyspart/examples/`: runnable Python examples.
-- `Cargo.toml`: crate manifest. All version pins live here.
+- `Cargo.toml`: workspace root and the `spart` manifest. All dependency version pins live here, as
+  does `[workspace.package] version`, which both crates inherit.
+- `CHANGELOG.md`: one entry per release, listing fixes and every breaking change.
 - `Makefile`: developer workflow entry points.
 
 ## Testing Layout Rules

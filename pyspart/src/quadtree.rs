@@ -6,7 +6,7 @@ use std::fs::File;
 use spart::geometry::{EuclideanDistance, Point2D};
 use spart::quadtree::Quadtree;
 
-use crate::geometry::{PyRectangle};
+use crate::geometry::PyRectangle;
 use crate::point2d::PyPoint2D;
 use crate::types::PyData;
 

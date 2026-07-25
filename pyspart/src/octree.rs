@@ -6,7 +6,7 @@ use std::fs::File;
 use spart::geometry::{EuclideanDistance, Point3D};
 use spart::octree::Octree;
 
-use crate::geometry::{PyCube};
+use crate::geometry::PyCube;
 use crate::point3d::PyPoint3D;
 use crate::types::PyData;
 
