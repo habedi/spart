@@ -23,6 +23,9 @@ Priorities, in order:
 - Keep all mutable state inside the tree values themselves; do not introduce module-level `static mut`, `lazy_static`, or `OnceLock` globals for
   runtime state. The only process-global state is the optional tracing subscriber behind the `setup_tracing` feature.
 - A tree operation that cannot store a point must report it. Never drop a point silently; return `false`, return a count, or return an `Err`.
+- Define a concept once. Nearest-neighbor accumulation lives in `knn::KnnHeap`, minimum distance in `HasMinDistance`, and the indexable-object
+  contract in `BoundedObject`. If you find yourself writing a second copy for another dimension or another tree variant, reach for a generic or the
+  `impl_rtree_spatial_index!` macro instead.
 - Do not reach for `unwrap` or `expect` in library code. `make lint` denies both. Prefer an early return, a defensive fallback that keeps data
   reachable, or a documented `unreachable!` guarded by a check on the line above.
 - Respect the MSRV in `rust-toolchain.toml` and `Cargo.toml` (1.85.0). Do not use standard-library APIs stabilized later; `geometry::span` manipulates
@@ -63,11 +66,12 @@ Quick examples:
 
 Do not invent modules that do not yet exist, but do place new modules according to this map.
 
-- `src/lib.rs`: module declarations only. `errors`, `geometry`, `kdtree`, `octree`, `quadtree`, `rstar_tree`, and `rtree` are public; `logging` and
-  `rtree_common` are private.
+- `src/lib.rs`: module declarations only. `errors`, `geometry`, `index`, `kdtree`, `octree`, `quadtree`, `rstar_tree`, and `rtree` are public;
+  `knn`, `logging`, and `rtree_common` are private.
+- `src/index.rs`: the `SpatialIndex` trait, which is the uniform interface every tree implements.
 - `src/geometry.rs`: shared primitives and the traits over them. `Point2D`, `Point3D`, `Rectangle`, and `Cube`, plus `DistanceMetric`,
-  `EuclideanDistance`, `BSPBounds`, `BoundingVolume`, `HasMinDistance`, `BoundingVolumeFromPoint`, and `HeapItem`. Also the `pub(crate)` `span` helper
-  and the module-private `axis_distance`.
+  `EuclideanDistance`, `BSPBounds`, `BoundingVolume`, `HasMinDistance`, `BoundingVolumeFromPoint`, `VolumeBound`, and `BoundedObject`, plus the
+  `BoundedObject` impls for the two point types. Also the `pub(crate)` `span` helper and the module-private `axis_distance`.
 - `src/errors.rs`: `SpartError`, the single error type. Every fallible constructor and insert returns it.
 - `src/logging.rs`: optional tracing subscriber installed before `main` by a `ctor`, behind the `setup_tracing` feature and driven by the
   `DEBUG_SPART` environment variable.
@@ -75,16 +79,18 @@ Do not invent modules that do not yet exist, but do place new modules according 
 - `src/octree.rs`: `Octree`, the 3D counterpart over a `Cube` boundary. Mirrors `quadtree.rs` structurally; a fix in one almost always belongs in the
   other.
 - `src/kdtree.rs`: `KdTree` and the `KdPoint` trait. Balance is maintained by partial rebuilding, so nodes carry subtree sizes.
-- `src/rtree.rs`: `RTree`, `RTreeNode`, `RTreeEntry`, and the `RTreeObject` trait. Guttman quadratic split.
-- `src/rstar_tree.rs`: `RStarTree` and its node, entry, and object types. R*-tree choose-subtree, forced reinsertion, and margin-based split.
+- `src/knn.rs`: `KnnHeap`, the bounded nearest-neighbor heap every tree accumulates results into.
+- `src/rtree.rs`: `RTree`, Guttman quadratic split, and the crate-private `RTreeNode` and `RTreeEntry`.
+- `src/rstar_tree.rs`: `RStarTree`, R*-tree choose-subtree, forced reinsertion, and margin-based split, plus its crate-private node and entry types.
 - `src/rtree_common.rs`: the `EntryAccess` and `NodeAccess` abstractions plus the logic shared by both R-tree variants (`node_height`,
-  `compute_group_mbr`, `search_node`, `delete_entry`, and `KnnCandidate`). Private to the crate. Also holds the test-only `assert_structure` invariant
-  checker.
+  `compute_group_mbr`, `search_node`, `delete_entry`, and `KnnCandidate`), the `impl_rtree_spatial_index!` macro that writes their `SpatialIndex`
+  impls, and the test-only `assert_structure` invariant checker. Private to the crate.
 - `tests/common.rs`: shared fixtures for the integration tests, included with `#[path]` by each of them.
 - `tests/test_integration_*.rs`: one per tree, exercising insert, search, and delete through the public API.
 - `tests/test_proptest_*.rs`: `proptest` properties per tree, plus `test_proptest_geometry.rs` for the primitives.
 - `tests/test_completeness.rs`: brute-force comparisons. Every query must return exactly the covered points, checked against the set of points known
   to be live.
+- `tests/test_spatial_index.rs`: one generic harness run against every tree through `SpatialIndex`, holding all five to the same contract.
 - `tests/test_serialization.rs`: serde round-trips for every tree, gated on the `serde` feature.
 - `benches/main.rs`: the single Criterion bench target. Declares `mod shared` once and pulls in the `bench_*` modules.
 - `benches/bench_*.rs`: modules of that target, one per operation. They are not bench targets of their own; `autobenches = false` in `Cargo.toml`
@@ -201,8 +207,14 @@ call the other.
 
 ## Component APIs
 
-Each tree carries a payload type parameter and exposes the same shape of operations. Keep new methods consistent with these names across all five
-trees.
+Every tree implements [`SpatialIndex`], which is the uniform interface: `len`, `is_empty`, `clear`, `contains`, `insert`, `insert_bulk`, `delete`,
+`knn_search`, `range_search`, and `range_search_bbox`. Queries borrow from the tree rather than cloning. Write generic code and tests against that
+trait.
+
+Each tree also keeps inherent methods of the same names where it can be more precise: `Quadtree::insert` returns a plain `bool` because nothing else
+can go wrong, and `RTree::insert` returns nothing because it cannot fail at all. Rust resolves `tree.insert(item)` to the inherent method, so call
+`SpatialIndex::insert(&mut tree, item)` when you want the uniform contract. Keep the two in agreement: an inherent method must never mean something
+different from the trait method it shadows.
 
 ### `Quadtree<T>` and `Octree<T>`
 
@@ -212,7 +224,7 @@ Bounded trees: a node subdivides once it exceeds `capacity`, and a point outside
 - `insert(point) -> bool`: `false` when the point lies outside the boundary.
 - `insert_bulk(points) -> usize`: the number of points stored; the rest lay outside the boundary.
 - `knn_search::<M>(target, k)`, `range_search::<M>(center, radius)`, and `range_search_bbox(query)`.
-- `delete(point) -> bool`.
+- `delete(point) -> bool`, `contains(point) -> bool`, `len()`, `is_empty()`, and `clear()`.
 
 ### `KdTree<P: KdPoint>`
 
@@ -221,10 +233,10 @@ Unbounded and dimension-agnostic; the dimension comes from the points.
 - `new()`, `with_dimension(k)`, and `contains(point)`.
 - `insert(point) -> Result<(), SpartError>` and `insert_bulk(points) -> Result<(), SpartError>`, both returning `DimensionMismatch` on a wrong-sized
   point. Validate a whole batch before touching any state, so a rejected batch leaves the tree as it was.
-- `knn_search::<M>(target, k)` and `range_search::<M>(center, radius)`, both returning owned points.
+- `knn_search::<M>(target, k)`, `range_search::<M>(center, radius)`, and `range_search_bbox(query)`, the last one defined per point dimension.
 - `delete(point) -> bool`.
 
-### `RTree<T: RTreeObject>` and `RStarTree<T: RStarTreeObject>`
+### `RTree<T: BoundedObject>` and `RStarTree<T: BoundedObject>`
 
 Unbounded, keyed on the bounding volume an object reports through `mbr`.
 
@@ -232,8 +244,12 @@ Unbounded, keyed on the bounding volume an object reports through `mbr`.
 - `insert(object)` and `insert_bulk(objects)`.
 - `range_search_bbox(query)` and `range_search::<M>(query, radius)`, both returning references.
 - `knn_search::<M>(query, k)`, implemented per point dimension.
-- `delete(object) -> bool`, requiring `T: PartialEq`.
+- `delete(object) -> bool`, requiring `T: PartialEq`, plus `len()`, `is_empty()`, and `clear()`.
 - `RStarTree::height()` reports the number of levels; a tree whose root is a leaf has height 1.
+- No inherent `contains`: it needs the object's own bounding volume to find it, so it exists only on
+  `SpatialIndex`. This is why `pyspart/src/rtree.rs` and `rstar_tree.rs` import that trait. Adding an
+  inherent `contains` later would silently redirect those call sites, so if you add one it has to
+  mean exactly what the trait method means.
 
 ### Encapsulation Rule
 
@@ -241,9 +257,9 @@ Unbounded, keyed on the bounding volume an object reports through `mbr`.
 the trees are private and must stay that way. Do not add a "just for now" accessor; add a test-only helper inside the module if a test needs internal
 access.
 
-`RTreeNode`, `RTreeEntry`, and their R*-tree counterparts are public with public fields, but no public signature mentions them: flipping all four
-to `pub(crate)` leaves the crate, its tests, and the bindings compiling. Treat them as an unintended leak rather than a supported surface, and do
-not build on them.
+`RTreeNode`, `RTreeEntry`, and their R*-tree counterparts are `pub(crate)`. Nothing outside the crate needs them, and keeping them private is what
+lets the R-tree internals change without a breaking release. Do not make them public to reach them from a test; the invariant checker already lives
+inside the crate.
 
 ## Workflow
 
@@ -291,9 +307,7 @@ Additional validation when relevant:
 
 - Public API docs are generated by `rustdoc` from the module docs and item docs in `src/`. Each of the five tree modules carries a runnable example in
   its module-level docs, and `geometry` carries one per primitive operation; keep a new tree or operation consistent with that.
-- Almost every public item carries a doc comment. Document any item you add.
-- `missing_docs` is not enabled, and a handful of items predate the convention: the `RTreeEntry` and `RStarTreeEntry` variants and their fields, and
-  the crate root itself. Prefer filling one of these in over adding another.
+- `#![deny(missing_docs)]` is set in `src/lib.rs`, so every public item needs a doc comment and the build fails without one.
 - A doctest is a test. A change to a signature shown in a module example has to update that example.
 - Python-facing changes update the `pyspart/pyspart.pyi` stubs and the docstrings on the `#[pymethods]` in the same patch.
 - User workflow changes should update `README.md`.

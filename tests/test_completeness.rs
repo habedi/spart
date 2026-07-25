@@ -42,12 +42,20 @@ impl Rng {
 }
 
 /// Compares two collections of points as multisets, so duplicates have to match too.
-fn assert_same_points_2d<T: Clone + Eq + std::hash::Hash + std::fmt::Debug>(
-    got: &[Point2D<T>],
-    expected: &[Point2D<T>],
-    context: &str,
-) {
-    let tally = |points: &[Point2D<T>]| {
+///
+/// Generic over the iterable so it takes both an owned `Vec<Point2D<_>>` and the `Vec<&Point2D<_>>`
+/// the trees hand back from a query.
+fn assert_same_points_2d<'a, T, G, E>(got: G, expected: E, context: &str)
+where
+    T: Clone + Eq + std::hash::Hash + std::fmt::Debug + 'a,
+    G: IntoIterator<Item = &'a Point2D<T>>,
+    E: IntoIterator<Item = &'a Point2D<T>>,
+{
+    fn tally<'a, T, I>(points: I) -> HashMap<(u64, u64, Option<T>), usize>
+    where
+        T: Clone + Eq + std::hash::Hash + 'a,
+        I: IntoIterator<Item = &'a Point2D<T>>,
+    {
         let mut counts: HashMap<(u64, u64, Option<T>), usize> = HashMap::new();
         for p in points {
             *counts
@@ -55,7 +63,7 @@ fn assert_same_points_2d<T: Clone + Eq + std::hash::Hash + std::fmt::Debug>(
                 .or_default() += 1;
         }
         counts
-    };
+    }
     let (got_counts, expected_counts) = (tally(got), tally(expected));
     assert_eq!(
         got_counts.len(),
@@ -122,12 +130,8 @@ fn rtree_keeps_every_point_through_inserts_and_deletes() {
             );
         }
 
-        let found: Vec<_> = tree
-            .range_search_bbox(&EVERYTHING)
-            .into_iter()
-            .cloned()
-            .collect();
-        assert_same_points_2d(&found, &live, &format!("rtree after step {step}"));
+        let found = tree.range_search_bbox(&EVERYTHING);
+        assert_same_points_2d(found, &live, &format!("rtree after step {step}"));
     }
 }
 
@@ -151,11 +155,7 @@ fn rtree_bbox_queries_match_brute_force() {
             width: rng.coord(300),
             height: rng.coord(300),
         };
-        let found: Vec<_> = tree
-            .range_search_bbox(&query)
-            .into_iter()
-            .cloned()
-            .collect();
+        let found = tree.range_search_bbox(&query);
         let expected: Vec<_> = live
             .iter()
             .filter(|p| query.contains(*p))
@@ -165,7 +165,7 @@ fn rtree_bbox_queries_match_brute_force() {
         // so compare only points strictly inside plus the count of the sound superset.
         for point in &expected {
             assert!(
-                found.iter().any(|f| f == point),
+                found.iter().any(|f| *f == point),
                 "query {query_index} ({query:?}) missed point ({}, {})",
                 point.x,
                 point.y
@@ -173,7 +173,7 @@ fn rtree_bbox_queries_match_brute_force() {
         }
         for point in &found {
             assert!(
-                query.contains(point),
+                query.contains(*point),
                 "query {query_index} returned a point outside the query"
             );
         }
@@ -250,13 +250,9 @@ fn rtree_bulk_insert_interleaves_with_insert() {
         tree.insert(point.clone());
         live.push(point);
     }
-    let found: Vec<_> = tree
-        .range_search_bbox(&EVERYTHING)
-        .into_iter()
-        .cloned()
-        .collect();
+    let found = tree.range_search_bbox(&EVERYTHING);
     assert_same_points_2d(
-        &found,
+        found,
         &live,
         "rtree after interleaved bulk and single inserts",
     );
@@ -292,12 +288,8 @@ fn rstar_keeps_every_point_through_inserts_and_deletes() {
             );
         }
 
-        let found: Vec<_> = tree
-            .range_search_bbox(&EVERYTHING)
-            .into_iter()
-            .cloned()
-            .collect();
-        assert_same_points_2d(&found, &live, &format!("rstar after step {step}"));
+        let found = tree.range_search_bbox(&EVERYTHING);
+        assert_same_points_2d(found, &live, &format!("rstar after step {step}"));
     }
 }
 
@@ -381,13 +373,9 @@ fn rstar_bulk_insert_interleaves_with_insert() {
 
     tree.insert_bulk(make(63..120));
     live.extend(make(63..120));
-    let found: Vec<_> = tree
-        .range_search_bbox(&EVERYTHING)
-        .into_iter()
-        .cloned()
-        .collect();
+    let found = tree.range_search_bbox(&EVERYTHING);
     assert_same_points_2d(
-        &found,
+        found,
         &live,
         "rstar after interleaved bulk and single inserts",
     );
@@ -417,7 +405,7 @@ fn quadtree_keeps_every_point_through_inserts_and_deletes() {
             );
         }
         assert_same_points_2d(
-            &tree.range_search_bbox(&WORLD),
+            tree.range_search_bbox(&WORLD),
             &live,
             &format!("quadtree after step {step}"),
         );
@@ -505,7 +493,7 @@ fn quadtree_bbox_queries_match_brute_force() {
             .cloned()
             .collect();
         assert_same_points_2d(
-            &tree.range_search_bbox(&query),
+            tree.range_search_bbox(&query),
             &expected,
             "quadtree bbox query",
         );
@@ -682,7 +670,7 @@ fn kdtree_keeps_every_point_through_inserts_and_deletes() {
             );
         }
         let found = tree.range_search::<EuclideanDistance>(&Point2D::new(0.0, 0.0, None), 1e9);
-        assert_same_points_2d(&found, &live, &format!("kdtree after step {step}"));
+        assert_same_points_2d(found, &live, &format!("kdtree after step {step}"));
     }
 }
 
@@ -783,7 +771,7 @@ fn kdtree_range_queries_match_brute_force() {
             .filter(|p| p.distance_sq(&center) <= radius * radius)
             .cloned()
             .collect();
-        assert_same_points_2d(&found, &expected, "kdtree radius query");
+        assert_same_points_2d(found, &expected, "kdtree radius query");
     }
 }
 
@@ -839,7 +827,7 @@ fn kdtree_bulk_insert_interleaves_with_insert() {
     }
     let found = tree.range_search::<EuclideanDistance>(&Point2D::new(0.0, 0.0, None), 1e9);
     assert_same_points_2d(
-        &found,
+        found,
         &live,
         "kdtree after interleaved bulk and single inserts",
     );

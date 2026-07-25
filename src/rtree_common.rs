@@ -298,6 +298,142 @@ where
     objects
 }
 
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one R-tree variant at one point
+/// dimension.
+///
+/// The four impls needed (two variants, two dimensions) are pure delegation and differ only in the
+/// names, so they are generated rather than copied. `contains` is the one method with a body: an
+/// object is reachable only through its own bounding volume, so the lookup queries with that.
+macro_rules! impl_rtree_spatial_index {
+    ($tree:ident, $point:ident, $volume:ident) => {
+        impl<T: std::fmt::Debug + Clone + PartialEq> $crate::index::SpatialIndex
+            for $tree<$crate::geometry::$point<T>>
+        {
+            type Item = $crate::geometry::$point<T>;
+            type Volume = $crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                $tree::len(self)
+            }
+
+            fn clear(&mut self) {
+                $tree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                use $crate::geometry::BoundedObject;
+                $tree::range_search_bbox(self, &item.mbr())
+                    .into_iter()
+                    .any(|stored| stored == item)
+            }
+
+            /// Always `Ok(true)`; an R-tree has no boundary to fall outside of.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, $crate::errors::SpartError> {
+                $tree::insert(self, item);
+                Ok(true)
+            }
+
+            fn insert_bulk(
+                &mut self,
+                items: Vec<Self::Item>,
+            ) -> Result<usize, $crate::errors::SpartError> {
+                let count = items.len();
+                $tree::insert_bulk(self, items);
+                Ok(count)
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                $tree::delete(self, item)
+            }
+
+            fn knn_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                <$tree<$crate::geometry::$point<T>>>::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                $tree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                $tree::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_rtree_spatial_index;
+
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one bounded tree.
+///
+/// The quadtree and octree impls are pure delegation and differ only in the names, so they are
+/// generated rather than copied.
+macro_rules! impl_bounded_spatial_index {
+    ($tree:ident, $point:ident, $volume:ident) => {
+        impl<T: Clone + PartialEq + std::fmt::Debug> $crate::index::SpatialIndex for $tree<T> {
+            type Item = $crate::geometry::$point<T>;
+            type Volume = $crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                $tree::len(self)
+            }
+
+            fn clear(&mut self) {
+                $tree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                $tree::contains(self, item)
+            }
+
+            /// `Ok(false)` for a point outside the tree's boundary; never an error.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, $crate::errors::SpartError> {
+                Ok($tree::insert(self, item))
+            }
+
+            fn insert_bulk(
+                &mut self,
+                items: Vec<Self::Item>,
+            ) -> Result<usize, $crate::errors::SpartError> {
+                Ok($tree::insert_bulk(self, &items))
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                $tree::delete(self, item)
+            }
+
+            fn knn_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                $tree::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                $tree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                $tree::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_bounded_spatial_index;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -123,8 +123,14 @@ A tree provides at least the following methods:
 - `delete`: removes a point from the tree.
 - `knn_search`: finds the k nearest neighbors to a query point.
     - The inputs are the query point and the number of neighbors to find.
-- `range_search`: finds all points within a given range of a query point.
-    - The inputs are the query point and the range within which to search.
+- `range_search`: finds all points within a given radius of a query point.
+    - The inputs are the query point and the radius within which to search.
+- `range_search_bbox`: finds all points inside a query rectangle or cube.
+- `contains`: reports whether an equal point is stored.
+- `len`, `is_empty`, and `clear`: the size of the tree, and emptying it.
+
+All trees implement the `SpatialIndex` trait, which states these operations once so that code
+can be written against any of them. Searches return references into the tree, so clone only what you keep.
 
 > [!NOTE]
 > Currently, the following properties hold for all trees:
@@ -136,6 +142,7 @@ A tree provides at least the following methods:
 > - A `knn_search` with `k=0` will return an empty list.
 > - A `knn_search` with `k` greater than the number of points in the tree will return all points.
 > - A `range_search` with a radius of `0` will return only points with the exact same coordinates.
+> - A `range_search` with a negative radius will return an empty list.
 >
 > The distance metric used for nearest neighbor and range searches is the Euclidean distance by default.
 > However, you can use a custom distance metric by implementing the `DistanceMetric` trait.

@@ -2,15 +2,15 @@
 //!
 //! This module implements an R‑tree for indexing 2D and 3D points.
 //! The implementation supports insertion, deletion, range search, and k‑nearest
-//! neighbor (kNN) search. Points stored in the R‑tree must implement the `RTreeObject` trait,
+//! neighbor (kNN) search. Points stored in the R‑tree must implement the `BoundedObject` trait,
 //! which requires an implementation of a method to get a minimum bounding rectangle (for 2D)
 //! or cube (for 3D) around the point.
 //!
 //! # Examples
 //!
 //! ```
-//! use spart::geometry::{Point2D, Rectangle, Point3D, Cube};
-//! use spart::rtree::{RTree, RTreeObject};
+//! use spart::geometry::{BoundedObject, Cube, Point2D, Point3D, Rectangle};
+//! use spart::rtree::RTree;
 //!
 //! // Create an R‑tree for 2D points.
 //! let mut tree2d: RTree<Point2D<()>> = RTree::new(4).unwrap();
@@ -31,8 +31,8 @@
 
 use crate::errors::SpartError;
 use crate::geometry::{
-    BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance, Point2D,
-    Point3D, Rectangle,
+    BoundedObject, BoundingVolume, BoundingVolumeFromPoint, Cube, DistanceMetric, HasMinDistance,
+    Point2D, Point3D, Rectangle,
 };
 use crate::knn::KnnHeap;
 use crate::rtree_common::{
@@ -46,42 +46,23 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use tracing::{debug, info};
 
-// Epsilon value for zero-sizes bounding boxes/cubes.
-const EPSILON: f64 = 1e-10;
-
-/// Trait for points stored in an R‑tree.
-///
-/// Each object must provide its minimum bounding rectangle (or cube) via the `mbr()` method.
-#[cfg(feature = "serde")]
-pub trait RTreeObject: std::fmt::Debug + Clone {
-    /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
-    type B: BoundingVolume
-        + std::fmt::Debug
-        + Clone
-        + serde::Serialize
-        + for<'de> serde::Deserialize<'de>;
-    /// Returns the minimum bounding volume of the object.
-    fn mbr(&self) -> Self::B;
-}
-#[cfg(not(feature = "serde"))]
-pub trait RTreeObject: std::fmt::Debug + Clone {
-    /// The type of the bounding volume (e.g. `Rectangle` for 2D objects or `Cube` for 3D objects).
-    type B: BoundingVolume + std::fmt::Debug + Clone;
-    /// Returns the minimum bounding volume of the object.
-    fn mbr(&self) -> Self::B;
-}
-
 /// An entry in the R‑tree, which can be either a leaf or a node.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum RTreeEntry<T: RTreeObject> {
-    Leaf { mbr: T::B, object: T },
-    Node { mbr: T::B, child: Box<RTreeNode<T>> },
+pub(crate) enum RTreeEntry<T: BoundedObject> {
+    Leaf {
+        mbr: T::Volume,
+        object: T,
+    },
+    Node {
+        mbr: T::Volume,
+        child: Box<RTreeNode<T>>,
+    },
 }
 
-impl<T: RTreeObject> RTreeEntry<T> {
+impl<T: BoundedObject> RTreeEntry<T> {
     /// Returns a reference to the minimum bounding volume for this entry.
-    pub fn mbr(&self) -> &T::B {
+    pub(crate) fn mbr(&self) -> &T::Volume {
         match self {
             RTreeEntry::Leaf { mbr, .. } => mbr,
             RTreeEntry::Node { mbr, .. } => mbr,
@@ -92,11 +73,11 @@ impl<T: RTreeObject> RTreeEntry<T> {
 /// A node in the R‑tree.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct RTreeNode<T: RTreeObject> {
+pub(crate) struct RTreeNode<T: BoundedObject> {
     /// The entries stored in this node.
-    pub entries: Vec<RTreeEntry<T>>,
+    pub(crate) entries: Vec<RTreeEntry<T>>,
     /// Indicates whether this node is a leaf.
-    pub is_leaf: bool,
+    pub(crate) is_leaf: bool,
 }
 
 /// R‑tree data structure for indexing 2D or 3D points.
@@ -105,15 +86,17 @@ pub struct RTreeNode<T: RTreeObject> {
 /// number, it will split. The tree supports insertion, deletion, and range searches.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct RTree<T: RTreeObject> {
+pub struct RTree<T: BoundedObject> {
     root: RTreeNode<T>,
     max_entries: usize,
     min_entries: usize,
+    /// Objects held in the tree. Tracked here so `len` is a constant-time read rather than a walk.
+    len: usize,
 }
 
 // Common trait implementations to unify algorithms across R-tree family.
-impl<T: RTreeObject> crate::rtree_common::EntryAccess for RTreeEntry<T> {
-    type BV = T::B;
+impl<T: BoundedObject> crate::rtree_common::EntryAccess for RTreeEntry<T> {
+    type BV = T::Volume;
     type Node = RTreeNode<T>;
     type Obj = T;
 
@@ -159,7 +142,7 @@ impl<T: RTreeObject> crate::rtree_common::EntryAccess for RTreeEntry<T> {
     }
 }
 
-impl<T: RTreeObject> crate::rtree_common::NodeAccess for RTreeNode<T> {
+impl<T: BoundedObject> crate::rtree_common::NodeAccess for RTreeNode<T> {
     type Entry = RTreeEntry<T>;
 
     fn is_leaf(&self) -> bool {
@@ -173,7 +156,7 @@ impl<T: RTreeObject> crate::rtree_common::NodeAccess for RTreeNode<T> {
     }
 }
 
-impl<T: RTreeObject> RTree<T> {
+impl<T: BoundedObject> RTree<T> {
     /// Creates a new R‑tree with the specified maximum number of entries per node.
     ///
     /// # Arguments
@@ -197,6 +180,7 @@ impl<T: RTreeObject> RTree<T> {
             },
             max_entries,
             min_entries: (max_entries as f64 * 0.4).ceil() as usize,
+            len: 0,
         })
     }
 
@@ -212,6 +196,7 @@ impl<T: RTreeObject> RTree<T> {
             object,
         };
         self.insert_entry_at(entry, 0);
+        self.len += 1;
     }
 
     /// Inserts `entry` into a node at height `target_height`, growing a new root if the old one
@@ -264,6 +249,25 @@ impl<T: RTreeObject> RTree<T> {
         }
     }
 
+    /// Number of objects held in the tree.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether the tree holds no objects.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Removes every object, keeping the configured entry bounds.
+    pub fn clear(&mut self) {
+        self.root = RTreeNode {
+            entries: Vec::new(),
+            is_leaf: true,
+        };
+        self.len = 0;
+    }
+
     /// Performs a range search with a given query bounding volume.
     ///
     /// # Arguments
@@ -273,7 +277,7 @@ impl<T: RTreeObject> RTree<T> {
     /// # Returns
     ///
     /// A vector of references to the objects whose minimum bounding volumes intersect the query.
-    pub fn range_search_bbox(&self, query: &T::B) -> Vec<&T> {
+    pub fn range_search_bbox(&self, query: &T::Volume) -> Vec<&T> {
         info!("Performing range search with query: {:?}", query);
         let mut result = Vec::new();
         common_search_node(&self.root, query, &mut result);
@@ -298,13 +302,14 @@ impl<T: RTreeObject> RTree<T> {
 
         if self.root.entries.is_empty() {
             info!("Bulk loading {} objects into an empty RTree", objects.len());
-            let entries = objects
+            let entries: Vec<RTreeEntry<T>> = objects
                 .into_iter()
                 .map(|object| RTreeEntry::Leaf {
                     mbr: object.mbr(),
                     object,
                 })
                 .collect();
+            self.len += entries.len();
             self.root = pack_entries(entries, self.max_entries);
         } else {
             for object in objects {
@@ -319,7 +324,7 @@ impl<T: RTreeObject> RTree<T> {
 /// Every node on a level is filled to `max_entries` before the next is started (the last node of a
 /// level takes the remainder), and each level records whether its nodes are leaves, so leaf entries
 /// only ever land in leaf nodes.
-fn pack_entries<T: RTreeObject>(entries: Vec<RTreeEntry<T>>, max_entries: usize) -> RTreeNode<T> {
+fn pack_entries<T: BoundedObject>(entries: Vec<RTreeEntry<T>>, max_entries: usize) -> RTreeNode<T> {
     let mut level = entries;
     let mut level_is_leaf = true;
 
@@ -351,7 +356,7 @@ fn pack_entries<T: RTreeObject>(entries: Vec<RTreeEntry<T>>, max_entries: usize)
 
 /// Picks the child of `node` whose MBR needs the least enlargement to cover `mbr`, breaking ties
 /// towards the smaller MBR.
-fn choose_subtree<T: RTreeObject>(node: &RTreeNode<T>, mbr: &T::B) -> usize {
+fn choose_subtree<T: BoundedObject>(node: &RTreeNode<T>, mbr: &T::Volume) -> usize {
     let mut best_index = 0;
     let mut best_enlargement = f64::INFINITY;
     let mut best_area = f64::INFINITY;
@@ -369,7 +374,7 @@ fn choose_subtree<T: RTreeObject>(node: &RTreeNode<T>, mbr: &T::B) -> usize {
 }
 
 /// Recomputes an entry's MBR from the child it points at.
-fn refresh_mbr<T: RTreeObject>(entry: &mut RTreeEntry<T>) {
+fn refresh_mbr<T: BoundedObject>(entry: &mut RTreeEntry<T>) {
     if let RTreeEntry::Node { mbr, child } = entry {
         if let Some(new_mbr) = common_compute_group_mbr(&child.entries) {
             *mbr = new_mbr;
@@ -385,7 +390,7 @@ fn refresh_mbr<T: RTreeObject>(entry: &mut RTreeEntry<T>) {
 /// turns it into a new root. Splitting on the way back up is what keeps every leaf at the same
 /// depth. Without it only the root would ever split, and the tree would stay two levels deep no
 /// matter how many objects it held.
-fn insert_entry_at_height<T: RTreeObject>(
+fn insert_entry_at_height<T: BoundedObject>(
     node: &mut RTreeNode<T>,
     entry: RTreeEntry<T>,
     target_height: usize,
@@ -432,7 +437,7 @@ fn insert_entry_at_height<T: RTreeObject>(
 }
 
 /// Splits an overfull node in place, returning an entry that points at the new sibling.
-fn split_node<T: RTreeObject>(
+fn split_node<T: BoundedObject>(
     node: &mut RTreeNode<T>,
     min_entries: usize,
 ) -> Option<RTreeEntry<T>> {
@@ -458,7 +463,7 @@ fn split_node<T: RTreeObject>(
 /// together seeds the two groups, then the rest are assigned in order of how strongly they prefer
 /// one group to the other. Because the `min_entries` floor is enforced for both groups, the usual
 /// call with `max_entries + 1` entries cannot leave either group larger than `max_entries`.
-fn split_entries<T: RTreeObject>(
+fn split_entries<T: BoundedObject>(
     mut entries: Vec<RTreeEntry<T>>,
     min_entries: usize,
 ) -> (Vec<RTreeEntry<T>>, Vec<RTreeEntry<T>>) {
@@ -514,7 +519,7 @@ fn split_entries<T: RTreeObject>(
 }
 
 /// Returns the indices of the two entries that waste the most space when covered by one volume.
-fn pick_seeds<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> (usize, usize) {
+fn pick_seeds<T: BoundedObject>(entries: &[RTreeEntry<T>]) -> (usize, usize) {
     let mut seeds = (0, 1);
     let mut worst_waste = f64::NEG_INFINITY;
     for i in 0..entries.len() {
@@ -532,7 +537,11 @@ fn pick_seeds<T: RTreeObject>(entries: &[RTreeEntry<T>]) -> (usize, usize) {
 }
 
 /// Returns the index of the entry with the strongest preference between the two groups.
-fn pick_next<T: RTreeObject>(entries: &[RTreeEntry<T>], mbr1: &T::B, mbr2: &T::B) -> usize {
+fn pick_next<T: BoundedObject>(
+    entries: &[RTreeEntry<T>],
+    mbr1: &T::Volume,
+    mbr2: &T::Volume,
+) -> usize {
     let mut best_index = 0;
     let mut best_preference = f64::NEG_INFINITY;
     for (i, entry) in entries.iter().enumerate() {
@@ -545,7 +554,7 @@ fn pick_next<T: RTreeObject>(entries: &[RTreeEntry<T>], mbr1: &T::B, mbr2: &T::B
     best_index
 }
 
-impl<T: RTreeObject> RTree<T>
+impl<T: BoundedObject> RTree<T>
 where
     T: PartialEq,
 {
@@ -575,6 +584,9 @@ where
         if deleted {
             // Each entry goes back in at the height it was detached from. Heights are counted from
             // the leaves, so they stay correct even if an earlier reinsertion grew a new root.
+            // Saturating: the count is part of the deserialized state, so a hand-written or
+            // truncated payload must not underflow it.
+            self.len = self.len.saturating_sub(1);
             for (entry, entry_height) in reinsert_list {
                 self.insert_entry_at(entry, entry_height);
             }
@@ -598,32 +610,6 @@ where
         }
         if !self.root.is_leaf && self.root.entries.is_empty() {
             self.root.is_leaf = true;
-        }
-    }
-}
-
-impl<T: std::fmt::Debug + Clone> RTreeObject for Point2D<T> {
-    type B = Rectangle;
-    fn mbr(&self) -> Self::B {
-        Rectangle {
-            x: self.x,
-            y: self.y,
-            width: EPSILON,
-            height: EPSILON,
-        }
-    }
-}
-
-impl<T: std::fmt::Debug + Clone> RTreeObject for Point3D<T> {
-    type B = Cube;
-    fn mbr(&self) -> Self::B {
-        Cube {
-            x: self.x,
-            y: self.y,
-            z: self.z,
-            width: EPSILON,
-            height: EPSILON,
-            depth: EPSILON,
         }
     }
 }
@@ -680,6 +666,11 @@ impl<T: std::fmt::Debug + Clone> RTree<Point2D<T>> {
         query: &Point2D<T>,
         k: usize,
     ) -> Vec<&Point2D<T>> {
+        // A search for no neighbors has no work to do. `KnnHeap::worst` also fails every prune
+        // test when k is zero, but the traversal still has to be entered to reach it.
+        if k == 0 {
+            return Vec::new();
+        }
         let mut results = KnnHeap::new(k);
         // Best-first descent: always expand whichever pending entry is nearest to the query, so the
         // search can stop as soon as the nearest pending entry is farther than the worst result kept.
@@ -739,6 +730,11 @@ impl<T: std::fmt::Debug + Clone> RTree<Point3D<T>> {
         query: &Point3D<T>,
         k: usize,
     ) -> Vec<&Point3D<T>> {
+        // A search for no neighbors has no work to do. `KnnHeap::worst` also fails every prune
+        // test when k is zero, but the traversal still has to be entered to reach it.
+        if k == 0 {
+            return Vec::new();
+        }
         let mut results = KnnHeap::new(k);
         // Best-first descent: always expand whichever pending entry is nearest to the query, so the
         // search can stop as soon as the nearest pending entry is farther than the worst result kept.
@@ -778,8 +774,8 @@ impl<T: std::fmt::Debug + Clone> RTree<Point3D<T>> {
 
 impl<T> RTree<T>
 where
-    T: RTreeObject + PartialEq + std::fmt::Debug,
-    T::B: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
+    T: BoundedObject + PartialEq + std::fmt::Debug,
+    T::Volume: BoundingVolumeFromPoint<T> + HasMinDistance<T> + Clone,
 {
     /// Performs a range search on the R‑tree using a query object and radius.
     ///
@@ -803,7 +799,7 @@ where
         if radius < 0.0 {
             return Vec::new();
         }
-        let query_volume = T::B::from_point_radius(query, radius);
+        let query_volume = T::Volume::from_point_radius(query, radius);
         let candidates = self.range_search_bbox(&query_volume);
         candidates
             .into_iter()
@@ -811,6 +807,9 @@ where
             .collect()
     }
 }
+
+crate::rtree_common::impl_rtree_spatial_index!(RTree, Point2D, Rectangle);
+crate::rtree_common::impl_rtree_spatial_index!(RTree, Point3D, Cube);
 
 #[cfg(test)]
 mod tests {

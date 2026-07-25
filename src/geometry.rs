@@ -820,6 +820,85 @@ impl BoundingVolume for Cube {
     }
 }
 
+/// Extent given to the bounding volume of a single point.
+///
+/// Exactly zero, so that a box query over points means containment rather than "within an epsilon
+/// of". An inflated extent used to make `RTree::range_search_bbox` report points just outside the
+/// query, which the point-exact trees never did. The split heuristics are unaffected: they compare
+/// the volumes of *groups* of points, which have real extent, and never the volume of one point.
+const POINT_EXTENT: f64 = 0.0;
+
+/// What a bounding volume has to satisfy to be usable by the R-tree family.
+///
+/// This exists only so that [`BoundedObject`] can be declared once instead of twice under a `cfg`,
+/// with the serde requirements folded in when that feature is on. It is blanket-implemented, so you
+/// never write an impl for it yourself.
+#[cfg(feature = "serde")]
+pub trait VolumeBound:
+    BoundingVolume + std::fmt::Debug + Clone + serde::Serialize + for<'de> serde::Deserialize<'de>
+{
+}
+
+#[cfg(feature = "serde")]
+impl<V> VolumeBound for V where
+    V: BoundingVolume
+        + std::fmt::Debug
+        + Clone
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>
+{
+}
+
+/// What a bounding volume has to satisfy to be usable by the R-tree family.
+///
+/// This exists only so that [`BoundedObject`] can be declared once instead of twice under a `cfg`.
+/// It is blanket-implemented, so you never write an impl for it yourself.
+#[cfg(not(feature = "serde"))]
+pub trait VolumeBound: BoundingVolume + std::fmt::Debug + Clone {}
+
+#[cfg(not(feature = "serde"))]
+impl<V> VolumeBound for V where V: BoundingVolume + std::fmt::Debug + Clone {}
+
+/// An object that can be indexed by its bounding volume.
+///
+/// Implemented for [`Point2D`] and [`Point3D`], and by anything else you want to put in an
+/// [`RTree`](crate::rtree::RTree) or [`RStarTree`](crate::rstar_tree::RStarTree).
+pub trait BoundedObject: std::fmt::Debug + Clone {
+    /// The bounding volume this object reports, such as [`Rectangle`] for 2D or [`Cube`] for 3D.
+    type Volume: VolumeBound;
+
+    /// Returns the minimum bounding volume of the object.
+    fn mbr(&self) -> Self::Volume;
+}
+
+impl<T: std::fmt::Debug + Clone> BoundedObject for Point2D<T> {
+    type Volume = Rectangle;
+
+    fn mbr(&self) -> Self::Volume {
+        Rectangle {
+            x: self.x,
+            y: self.y,
+            width: POINT_EXTENT,
+            height: POINT_EXTENT,
+        }
+    }
+}
+
+impl<T: std::fmt::Debug + Clone> BoundedObject for Point3D<T> {
+    type Volume = Cube;
+
+    fn mbr(&self) -> Self::Volume {
+        Cube {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            width: POINT_EXTENT,
+            height: POINT_EXTENT,
+            depth: POINT_EXTENT,
+        }
+    }
+}
+
 /// Trait for types that can compute the minimum distance to a given query.
 pub trait HasMinDistance<Q> {
     /// Computes the minimum distance from the bounding volume to the given query.

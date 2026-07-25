@@ -4,8 +4,10 @@ use pyo3::types::PyType;
 use std::fs::File;
 
 use spart::geometry::{EuclideanDistance, Point2D, Point3D};
+use spart::index::SpatialIndex;
 use spart::rtree::RTree;
 
+use crate::geometry::{PyCube, PyRectangle};
 use crate::point2d::PyPoint2D;
 use crate::point3d::PyPoint3D;
 use crate::types::PyData;
@@ -50,6 +52,71 @@ impl PyRTree2D {
         let p: Point2D<PyData> = point.into();
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Number of points held in the tree.
+    fn __len__(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Number of points held in the tree.
+    ///
+    /// Returns:
+    ///     int: The number of points.
+    fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Whether the tree holds no points.
+    ///
+    /// Returns:
+    ///     bool: True when the tree is empty.
+    fn is_empty(&self) -> bool {
+        self.tree.is_empty()
+    }
+
+    /// Removes every point from the tree.
+    fn clear(&mut self) {
+        self.tree.clear();
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point2D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn __contains__(&self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point2D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn contains(&self, point: PyPoint2D) -> bool {
+        let p: Point2D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Finds all points inside a query box.
+    ///
+    /// Args:
+    ///     query (RectangleDict): The box to search, as a dict of x, y, width, height.
+    ///
+    /// Returns:
+    ///     list[Point2D]: All points inside the box.
+    fn range_search_bbox(&self, query: PyRectangle) -> Vec<PyPoint2D> {
+        self.tree
+            .range_search_bbox(&query.0)
             .into_iter()
             .map(|p| p.into())
             .collect()
@@ -120,6 +187,71 @@ impl PyRTree3D {
         let p: Point3D<PyData> = point.into();
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
+            .into_iter()
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Number of points held in the tree.
+    fn __len__(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Number of points held in the tree.
+    ///
+    /// Returns:
+    ///     int: The number of points.
+    fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Whether the tree holds no points.
+    ///
+    /// Returns:
+    ///     bool: True when the tree is empty.
+    fn is_empty(&self) -> bool {
+        self.tree.is_empty()
+    }
+
+    /// Removes every point from the tree.
+    fn clear(&mut self) {
+        self.tree.clear();
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn __contains__(&self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn contains(&self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Finds all points inside a query box.
+    ///
+    /// Args:
+    ///     query (CubeDict): The box to search, as a dict of x, y, z, width, height, depth.
+    ///
+    /// Returns:
+    ///     list[Point3D]: All points inside the box.
+    fn range_search_bbox(&self, query: PyCube) -> Vec<PyPoint3D> {
+        self.tree
+            .range_search_bbox(&query.0)
             .into_iter()
             .map(|p| p.into())
             .collect()

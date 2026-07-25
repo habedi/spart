@@ -178,6 +178,54 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Number of points held in the tree.
+    pub fn len(&self) -> usize {
+        self.root.as_ref().map_or(0, |node| node.size)
+    }
+
+    /// Whether the tree holds no points.
+    pub fn is_empty(&self) -> bool {
+        self.root.is_none()
+    }
+
+    /// Removes every point, keeping the dimension the tree was built with.
+    pub fn clear(&mut self) {
+        self.root = None;
+    }
+
+    /// Collects the points inside the axis-aligned box given as per-axis `lo` and `hi` bounds.
+    ///
+    /// Generic over the number of axes so the 2D and 3D box queries share one traversal.
+    fn bbox_search_rec<'a>(
+        node: &'a Option<Box<KdNode<P>>>,
+        lo: &[f64],
+        hi: &[f64],
+        depth: usize,
+        found: &mut Vec<&'a P>,
+    ) {
+        let Some(n) = node else {
+            return;
+        };
+        let axes = lo.len();
+        let inside = (0..axes).all(|axis| {
+            let c = n.point.coord(axis).unwrap_or(f64::NAN);
+            lo[axis] <= c && c <= hi[axis]
+        });
+        if inside {
+            found.push(&n.point);
+        }
+
+        let axis = depth % axes;
+        let node_coord = n.point.coord(axis).unwrap_or(f64::NAN);
+        // Left holds coordinates below the node's, right holds those at or above it.
+        if lo[axis] <= node_coord {
+            Self::bbox_search_rec(&n.left, lo, hi, depth + 1, found);
+        }
+        if node_coord <= hi[axis] {
+            Self::bbox_search_rec(&n.right, lo, hi, depth + 1, found);
+        }
+    }
+
     /// Returns true if the exact point exists in the tree.
     pub fn contains(&self, point: &P) -> bool {
         let k = match self.k {
@@ -411,6 +459,11 @@ impl<P: KdPoint> KdTree<P> {
         target: &P,
         k_neighbors: usize,
     ) -> Vec<&'a P> {
+        // A search for no neighbors has no work to do. `KnnHeap::worst` also fails every prune test
+        // when k is zero, but the traversal still descends the near side to reach it.
+        if k_neighbors == 0 {
+            return Vec::new();
+        }
         let k = match self.k {
             Some(k) => k,
             None => return Vec::new(),
@@ -470,6 +523,11 @@ impl<P: KdPoint> KdTree<P> {
     /// A vector of points within the specified radius.
     pub fn range_search<'a, M: DistanceMetric<P>>(&'a self, center: &P, radius: f64) -> Vec<&'a P> {
         info!("Finding points within radius {} of {:?}", radius, center);
+        // Squaring the radius would turn a negative one into a positive threshold, so reject it
+        // here as the other trees do.
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let k = match self.k {
             Some(k) => k,
             None => return Vec::new(),
@@ -668,6 +726,111 @@ impl<P: KdPoint> KdTree<P> {
     }
 }
 
+impl<T: std::fmt::Debug + Clone + PartialEq> KdTree<crate::geometry::Point2D<T>> {
+    /// Performs a range search over a query rectangle, returning every point inside it.
+    pub fn range_search_bbox(
+        &self,
+        query: &crate::geometry::Rectangle,
+    ) -> Vec<&crate::geometry::Point2D<T>> {
+        let lo = [query.x, query.y];
+        let hi = [query.x + query.width, query.y + query.height];
+        // Every other query checks the tree's dimension before traversing; the box query rotates its
+        // axis off `lo.len()`, so make sure the two agree.
+        if self.k.is_some_and(|k| k != lo.len()) {
+            return Vec::new();
+        }
+        let mut found = Vec::new();
+        Self::bbox_search_rec(&self.root, &lo, &hi, 0, &mut found);
+        found
+    }
+}
+
+impl<T: std::fmt::Debug + Clone + PartialEq> KdTree<crate::geometry::Point3D<T>> {
+    /// Performs a range search over a query cube, returning every point inside it.
+    pub fn range_search_bbox(
+        &self,
+        query: &crate::geometry::Cube,
+    ) -> Vec<&crate::geometry::Point3D<T>> {
+        let lo = [query.x, query.y, query.z];
+        let hi = [
+            query.x + query.width,
+            query.y + query.height,
+            query.z + query.depth,
+        ];
+        // Every other query checks the tree's dimension before traversing; the box query rotates its
+        // axis off `lo.len()`, so make sure the two agree.
+        if self.k.is_some_and(|k| k != lo.len()) {
+            return Vec::new();
+        }
+        let mut found = Vec::new();
+        Self::bbox_search_rec(&self.root, &lo, &hi, 0, &mut found);
+        found
+    }
+}
+
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one Kd-tree point dimension.
+///
+/// Both impls are pure delegation and differ only in the point and volume names.
+macro_rules! impl_kdtree_spatial_index {
+    ($point:ident, $volume:ident) => {
+        impl<T: std::fmt::Debug + Clone + PartialEq> crate::index::SpatialIndex
+            for KdTree<crate::geometry::$point<T>>
+        {
+            type Item = crate::geometry::$point<T>;
+            type Volume = crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                KdTree::len(self)
+            }
+
+            fn clear(&mut self) {
+                KdTree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                KdTree::contains(self, item)
+            }
+
+            /// Always `Ok(true)` on success; the Kd-tree has no boundary to fall outside of.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, SpartError> {
+                KdTree::insert(self, item).map(|()| true)
+            }
+
+            fn insert_bulk(&mut self, items: Vec<Self::Item>) -> Result<usize, SpartError> {
+                let count = items.len();
+                KdTree::insert_bulk(self, items).map(|()| count)
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                KdTree::delete(self, item)
+            }
+
+            fn knn_search<M: DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                KdTree::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                KdTree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                <KdTree<crate::geometry::$point<T>>>::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+impl_kdtree_spatial_index!(Point2D, Rectangle);
+impl_kdtree_spatial_index!(Point3D, Cube);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -753,6 +916,21 @@ mod tests {
         assert_eq!(knn_results.len(), num_points);
     }
 
+    /// Every other tree rejects a negative radius; squaring it here used to make it behave like a
+    /// positive one, so a negative radius silently returned neighbors.
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let target = Point2D::new(5.0, 5.0, Some("T"));
+        tree.insert(target.clone()).unwrap();
+        tree.insert(Point2D::new(5.2, 5.0, Some("N"))).unwrap();
+
+        assert!(
+            tree.range_search::<EuclideanDistance>(&target, -1.0)
+                .is_empty()
+        );
+    }
+
     #[test]
     fn test_range_zero_radius_exact_match() {
         let mut tree: KdTree<Point2D<&str>> = KdTree::new();
@@ -762,7 +940,7 @@ mod tests {
 
         let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0], target);
+        assert_eq!(*results[0], target);
     }
 
     #[test]

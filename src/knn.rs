@@ -49,9 +49,8 @@ impl<T> PartialOrd for Candidate<T> {
 /// Keeps the `k` nearest items offered to it.
 ///
 /// The items are held in a max-heap ordered by distance, so the one evicted to make room is always
-/// the farthest. [`KnnHeap::worst`] reports the distance a candidate has to beat and is
-/// `f64::INFINITY` until `k` items have been collected, which lets search code prune against a
-/// single value without separately handling a partly filled heap.
+/// the farthest. [`KnnHeap::worst`] reports the distance a candidate has to beat, which lets search
+/// code prune against a single value without separately handling a partly filled or zero-sized heap.
 pub(crate) struct KnnHeap<T> {
     k: usize,
     seq: u64,
@@ -68,8 +67,15 @@ impl<T> KnnHeap<T> {
         }
     }
 
-    /// The distance a candidate must beat to be kept, or `f64::INFINITY` while the heap has room.
+    /// The distance a candidate must beat to be kept.
+    ///
+    /// `f64::INFINITY` while the heap still has room, so callers prune nothing until they have `k`
+    /// items. `f64::NEG_INFINITY` when `k` is zero, so callers prune everything: nothing can be
+    /// nearer than negative infinity, and a search for zero neighbors must not walk the tree.
     pub(crate) fn worst(&self) -> f64 {
+        if self.k == 0 {
+            return f64::NEG_INFINITY;
+        }
         if self.heap.len() < self.k {
             return f64::INFINITY;
         }
@@ -136,11 +142,17 @@ mod tests {
         assert_eq!(heap.into_sorted_vec(), vec!["a", "d"]);
     }
 
+    /// `worst` has to prune rather than admit when no neighbors are wanted, or every tree walks
+    /// itself in full to answer a query for zero neighbors.
     #[test]
-    fn test_zero_k_keeps_nothing() {
+    fn test_zero_k_keeps_nothing_and_prunes_everything() {
         let mut heap: KnnHeap<&str> = KnnHeap::new(0);
         heap.offer(1.0, "a");
-        assert_eq!(heap.worst(), f64::INFINITY);
+        assert_eq!(heap.worst(), f64::NEG_INFINITY);
+        assert!(
+            0.0 > heap.worst(),
+            "any candidate distance must fail the prune test"
+        );
         assert!(heap.into_sorted_vec().is_empty());
     }
 

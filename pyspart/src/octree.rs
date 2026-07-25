@@ -6,7 +6,7 @@ use std::fs::File;
 use spart::geometry::{EuclideanDistance, Point3D};
 use spart::octree::Octree;
 
-use crate::geometry::PyCube;
+use crate::geometry::{PyCube};
 use crate::point3d::PyPoint3D;
 use crate::types::PyData;
 
@@ -73,7 +73,7 @@ impl PyOctree {
         self.tree
             .knn_search::<EuclideanDistance>(&p, k)
             .into_iter()
-            .map(|p| (&p).into())
+            .map(|p| p.into())
             .collect()
     }
 
@@ -90,7 +90,72 @@ impl PyOctree {
         self.tree
             .range_search::<EuclideanDistance>(&p, radius)
             .into_iter()
-            .map(|p| (&p).into())
+            .map(|p| p.into())
+            .collect()
+    }
+
+    /// Number of points held in the tree.
+    fn __len__(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Number of points held in the tree.
+    ///
+    /// Returns:
+    ///     int: The number of points.
+    fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Whether the tree holds no points.
+    ///
+    /// Returns:
+    ///     bool: True when the tree is empty.
+    fn is_empty(&self) -> bool {
+        self.tree.is_empty()
+    }
+
+    /// Removes every point from the tree.
+    fn clear(&mut self) {
+        self.tree.clear();
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn __contains__(&self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Whether an equal point is stored in the tree.
+    ///
+    /// Args:
+    ///     point (Point3D): The point to look for.
+    ///
+    /// Returns:
+    ///     bool: True when an equal point is stored.
+    fn contains(&self, point: PyPoint3D) -> bool {
+        let p: Point3D<PyData> = point.into();
+        self.tree.contains(&p)
+    }
+
+    /// Finds all points inside a query box.
+    ///
+    /// Args:
+    ///     query (CubeDict): The box to search, as a dict of x, y, z, width, height, depth.
+    ///
+    /// Returns:
+    ///     list[Point3D]: All points inside the box.
+    fn range_search_bbox(&self, query: PyCube) -> Vec<PyPoint3D> {
+        self.tree
+            .range_search_bbox(&query.0)
+            .into_iter()
+            .map(|p| p.into())
             .collect()
     }
 
