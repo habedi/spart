@@ -1,7 +1,8 @@
 [package]
 name = "pyspart"
-version = "0.5.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 publish = false
 
 [lib]

@@ -1,6 +1,4 @@
-#[path = "shared.rs"]
-mod shared;
-use shared::*;
+use crate::shared::*;
 
 use criterion::{Criterion, criterion_group};
 use spart::geometry::Rectangle;

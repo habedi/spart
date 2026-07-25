@@ -143,8 +143,12 @@ class Quadtree:
         """
         ...
 
-    def insert_bulk(self, points: List[Point2D]) -> None:
-        """Insert many points efficiently."""
+    def insert_bulk(self, points: List[Point2D]) -> int:
+        """Insert many points efficiently, skipping any outside the boundary.
+
+        Returns:
+            The number of points that were inserted.
+        """
         ...
 
     def delete(self, point: Point2D) -> bool:
@@ -161,6 +165,34 @@ class Quadtree:
 
     def range_search(self, point: Point2D, radius: float) -> List[Point2D]:
         """Find all points within a radius of the query point."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: RectangleDict) -> List[Point2D]:
+        """Find all points inside a query box."""
         ...
 
     def save(self, path: str) -> None:
@@ -197,8 +229,12 @@ class Octree:
         """
         ...
 
-    def insert_bulk(self, points: List[Point3D]) -> None:
-        """Insert many points efficiently."""
+    def insert_bulk(self, points: List[Point3D]) -> int:
+        """Insert many points efficiently, skipping any outside the boundary.
+
+        Returns:
+            The number of points that were inserted.
+        """
         ...
 
     def delete(self, point: Point3D) -> bool:
@@ -215,6 +251,34 @@ class Octree:
 
     def range_search(self, point: Point3D, radius: float) -> List[Point3D]:
         """Find all points within a radius of the query point."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: CubeDict) -> List[Point3D]:
+        """Find all points inside a query box."""
         ...
 
     def save(self, path: str) -> None:
@@ -261,6 +325,34 @@ class KdTree2D:
         """Find all points within a radius of the query point."""
         ...
 
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: RectangleDict) -> List[Point2D]:
+        """Find all points inside a query box."""
+        ...
+
     def save(self, path: str) -> None:
         """Serialize and save the tree to a file path."""
         ...
@@ -303,6 +395,34 @@ class KdTree3D:
 
     def range_search(self, point: Point3D, radius: float) -> List[Point3D]:
         """Find all points within a radius of the query point."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: CubeDict) -> List[Point3D]:
+        """Find all points inside a query box."""
         ...
 
     def save(self, path: str) -> None:
@@ -353,6 +473,34 @@ class RTree2D:
         """Find all points within a radius of the query point."""
         ...
 
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: RectangleDict) -> List[Point2D]:
+        """Find all points inside a query box."""
+        ...
+
     def save(self, path: str) -> None:
         """Serialize and save the tree to a file path."""
         ...
@@ -399,6 +547,34 @@ class RTree3D:
 
     def range_search(self, point: Point3D, radius: float) -> List[Point3D]:
         """Find all points within a radius of the query point."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: CubeDict) -> List[Point3D]:
+        """Find all points inside a query box."""
         ...
 
     def save(self, path: str) -> None:
@@ -449,6 +625,34 @@ class RStarTree2D:
         """Find all points within a radius of the query point."""
         ...
 
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point2D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: RectangleDict) -> List[Point2D]:
+        """Find all points inside a query box."""
+        ...
+
     def save(self, path: str) -> None:
         """Serialize and save the tree to a file path."""
         ...
@@ -495,6 +699,34 @@ class RStarTree3D:
 
     def range_search(self, point: Point3D, radius: float) -> List[Point3D]:
         """Find all points within a radius of the query point."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def len(self) -> int:
+        """Number of points held in the tree."""
+        ...
+
+    def is_empty(self) -> bool:
+        """Whether the tree holds no points."""
+        ...
+
+    def clear(self) -> None:
+        """Remove every point from the tree."""
+        ...
+
+    def __contains__(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def contains(self, point: Point3D) -> bool:
+        """Whether an equal point is stored in the tree."""
+        ...
+
+    def range_search_bbox(self, query: CubeDict) -> List[Point3D]:
+        """Find all points inside a query box."""
         ...
 
     def save(self, path: str) -> None:

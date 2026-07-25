@@ -25,14 +25,13 @@
 //! assert!(!neighbors3d.is_empty());
 //! ```
 
-use std::{cmp::Ordering, collections::BinaryHeap};
+use std::cmp::Ordering;
 
-use ordered_float::OrderedFloat;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{errors::SpartError, geometry::DistanceMetric};
+use crate::{errors::SpartError, geometry::DistanceMetric, knn::KnnHeap};
 
 /// Trait representing a point that can be stored in the Kd‑tree implementation.
 ///
@@ -89,32 +88,19 @@ where
     }
 }
 
-/// Internal structure used to store items in the k‑nearest neighbor heap.
-#[derive(Debug, Clone)]
-struct HeapItem<P> {
-    dist: OrderedFloat<f64>,
-    point: P,
-}
+/// How lopsided a subtree may get before it is rebuilt.
+///
+/// A subtree is rebuilt when one of its children holds more than `REBUILD_RATIO_NUM /
+/// REBUILD_RATIO_DEN` of it. Keeping every subtree within that ratio bounds the height of the tree at
+/// `log(n) / log(3/2)`, which is what stops sorted input from degenerating into a linked list.
+/// Inserting ascending coordinates used to build a tree of depth *n*, and every recursive walk over
+/// it (search, and dropping the tree itself) overflowed the stack somewhere past 50k points.
+const REBUILD_RATIO_NUM: usize = 2;
+const REBUILD_RATIO_DEN: usize = 3;
 
-impl<P> PartialEq for HeapItem<P> {
-    fn eq(&self, other: &Self) -> bool {
-        self.dist.eq(&other.dist)
-    }
-}
-
-impl<P> Eq for HeapItem<P> {}
-
-impl<P> PartialOrd for HeapItem<P> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<P> Ord for HeapItem<P> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.dist.cmp(&other.dist)
-    }
-}
+/// Subtrees smaller than this are never rebuilt: they can only contribute a couple of levels, and
+/// rebuilding them would cost more than it saves.
+const REBUILD_MIN_SIZE: usize = 8;
 
 /// A node in the Kd‑tree containing a point and references to its children.
 #[derive(Debug, Clone)]
@@ -123,6 +109,9 @@ struct KdNode<P: KdPoint> {
     point: P,
     left: Option<Box<KdNode<P>>>,
     right: Option<Box<KdNode<P>>>,
+    /// Number of nodes in this subtree, including this one. Maintained by every insert and delete
+    /// so the balance condition can be checked without walking the subtree.
+    size: usize,
 }
 
 impl<P: KdPoint> KdNode<P> {
@@ -132,7 +121,26 @@ impl<P: KdPoint> KdNode<P> {
             point,
             left: None,
             right: None,
+            size: 1,
         }
+    }
+
+    fn child_size(child: &Option<Box<KdNode<P>>>) -> usize {
+        child.as_ref().map_or(0, |node| node.size)
+    }
+
+    /// Recomputes `size` from the children. Call after either child changes.
+    fn update_size(&mut self) {
+        self.size = 1 + Self::child_size(&self.left) + Self::child_size(&self.right);
+    }
+
+    /// Whether this subtree is lopsided enough to be worth rebuilding.
+    fn is_unbalanced(&self) -> bool {
+        if self.size < REBUILD_MIN_SIZE {
+            return false;
+        }
+        let heaviest = Self::child_size(&self.left).max(Self::child_size(&self.right));
+        heaviest * REBUILD_RATIO_DEN > self.size * REBUILD_RATIO_NUM
     }
 }
 
@@ -167,6 +175,54 @@ impl<P: KdPoint> KdTree<P> {
         KdTree {
             root: None,
             k: Some(k),
+        }
+    }
+
+    /// Number of points held in the tree.
+    pub fn len(&self) -> usize {
+        self.root.as_ref().map_or(0, |node| node.size)
+    }
+
+    /// Whether the tree holds no points.
+    pub fn is_empty(&self) -> bool {
+        self.root.is_none()
+    }
+
+    /// Removes every point, keeping the dimension the tree was built with.
+    pub fn clear(&mut self) {
+        self.root = None;
+    }
+
+    /// Collects the points inside the axis-aligned box given as per-axis `lo` and `hi` bounds.
+    ///
+    /// Generic over the number of axes so the 2D and 3D box queries share one traversal.
+    fn bbox_search_rec<'a>(
+        node: &'a Option<Box<KdNode<P>>>,
+        lo: &[f64],
+        hi: &[f64],
+        depth: usize,
+        found: &mut Vec<&'a P>,
+    ) {
+        let Some(n) = node else {
+            return;
+        };
+        let axes = lo.len();
+        let inside = (0..axes).all(|axis| {
+            let c = n.point.coord(axis).unwrap_or(f64::NAN);
+            lo[axis] <= c && c <= hi[axis]
+        });
+        if inside {
+            found.push(&n.point);
+        }
+
+        let axis = depth % axes;
+        let node_coord = n.point.coord(axis).unwrap_or(f64::NAN);
+        // Left holds coordinates below the node's, right holds those at or above it.
+        if lo[axis] <= node_coord {
+            Self::bbox_search_rec(&n.left, lo, hi, depth + 1, found);
+        }
+        if node_coord <= hi[axis] {
+            Self::bbox_search_rec(&n.right, lo, hi, depth + 1, found);
         }
     }
 
@@ -237,8 +293,63 @@ impl<P: KdPoint> KdTree<P> {
             }
         };
         info!("Inserting point: {:?}", point);
-        self.root = Some(Self::insert_rec(self.root.take(), point, 0, k));
+        self.root = Some(Self::insert_rec(self.root.take(), point.clone(), 0, k));
+        Self::rebalance_along_path(&mut self.root, &point, k);
         Ok(())
+    }
+
+    /// Restores the balance condition after the search path towards `point` changed.
+    ///
+    /// Walks down that path, finds the highest subtree whose children have become too lopsided, and
+    /// rebuilds it as a perfectly balanced subtree. Rebuilding the *highest* offender is what leaves
+    /// no violation behind on the path, and since only nodes on the path changed size, the condition
+    /// then holds everywhere again.
+    fn rebalance_along_path(root: &mut Option<Box<KdNode<P>>>, point: &P, k: usize) {
+        // Locate the offender first, so the walk that rebuilds it does not need to hold a borrow.
+        let mut target_depth = None;
+        let mut current = &*root;
+        let mut depth = 0;
+        while let Some(node) = current {
+            if node.is_unbalanced() {
+                target_depth = Some(depth);
+                break;
+            }
+            current = if Self::goes_left(point, &node.point, depth % k) {
+                &node.left
+            } else {
+                &node.right
+            };
+            depth += 1;
+        }
+
+        let Some(target_depth) = target_depth else {
+            return;
+        };
+
+        let mut current = root;
+        for depth in 0..target_depth {
+            let Some(node) = current.as_mut() else {
+                return;
+            };
+            current = if Self::goes_left(point, &node.point, depth % k) {
+                &mut node.left
+            } else {
+                &mut node.right
+            };
+        }
+
+        let mut points = Vec::new();
+        Self::collect_points(current, &mut points);
+        *current = Self::insert_bulk_rec(&mut points, target_depth, k);
+    }
+
+    /// Whether `point` belongs in the left subtree of a node holding `pivot` split on `axis`.
+    ///
+    /// Mirrors the comparison used by `insert_rec`, so the two always walk the same path.
+    fn goes_left(point: &P, pivot: &P, axis: usize) -> bool {
+        let p = point.coord(axis).unwrap_or(f64::NAN);
+        let c = pivot.coord(axis).unwrap_or(f64::NAN);
+        p < c
     }
 
     /// Inserts a bulk of points into the Kd-tree.
@@ -256,14 +367,8 @@ impl<P: KdPoint> KdTree<P> {
         if points.is_empty() {
             return Ok(());
         }
-        let k = match self.k {
-            Some(k) => k,
-            None => {
-                let k = points[0].dims();
-                self.k = Some(k);
-                k
-            }
-        };
+        // Validate before touching any state, so a rejected batch leaves the tree exactly as it was.
+        let k = self.k.unwrap_or_else(|| points[0].dims());
         for p in &points {
             if p.dims() != k {
                 return Err(SpartError::DimensionMismatch {
@@ -272,6 +377,7 @@ impl<P: KdPoint> KdTree<P> {
                 });
             }
         }
+        self.k = Some(k);
 
         if self.root.is_some() {
             let mut existing = Vec::new();
@@ -292,22 +398,21 @@ impl<P: KdPoint> KdTree<P> {
         }
     }
 
+    /// Builds a balanced subtree from `points` by splitting on the median of each axis in turn.
     fn insert_bulk_rec(points: &mut [P], depth: usize, k: usize) -> Option<Box<KdNode<P>>> {
         if points.is_empty() {
             return None;
         }
 
         let axis = depth % k;
-        points.sort_by(|a, b| {
-            let ac = a
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let bc = b
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
+        let median_idx = points.len() / 2;
+        // Partitioning around the median is enough; a full sort at every level would make the
+        // build O(n log^2 n) for no benefit.
+        points.select_nth_unstable_by(median_idx, |a, b| {
+            let ac = a.coord(axis).unwrap_or(f64::NAN);
+            let bc = b.coord(axis).unwrap_or(f64::NAN);
             ac.partial_cmp(&bc).unwrap_or(Ordering::Equal)
         });
-        let median_idx = points.len() / 2;
 
         let mut node = KdNode::new(points[median_idx].clone());
         let (left_slice, right_slice) = points.split_at_mut(median_idx);
@@ -315,6 +420,7 @@ impl<P: KdPoint> KdTree<P> {
 
         node.left = Self::insert_bulk_rec(left_slice, depth + 1, k);
         node.right = Self::insert_bulk_rec(right_slice, depth + 1, k);
+        node.update_size();
 
         Some(Box::new(node))
     }
@@ -326,19 +432,12 @@ impl<P: KdPoint> KdTree<P> {
         k: usize,
     ) -> Box<KdNode<P>> {
         if let Some(mut current) = node {
-            let axis = depth % k;
-            let p_coord = point
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let c_coord = current
-                .point
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            if p_coord < c_coord {
+            if Self::goes_left(&point, &current.point, depth % k) {
                 current.left = Some(Self::insert_rec(current.left.take(), point, depth + 1, k));
             } else {
                 current.right = Some(Self::insert_rec(current.right.take(), point, depth + 1, k));
             }
+            current.update_size();
             current
         } else {
             Box::new(KdNode::new(point))
@@ -355,7 +454,13 @@ impl<P: KdPoint> KdTree<P> {
     /// # Returns
     ///
     /// A vector of the nearest points, ordered from nearest to farthest.
-    pub fn knn_search<M: DistanceMetric<P>>(&self, target: &P, k_neighbors: usize) -> Vec<P> {
+    pub fn knn_search<'a, M: DistanceMetric<P>>(
+        &'a self,
+        target: &P,
+        k_neighbors: usize,
+    ) -> Vec<&'a P> {
+        // A search for no neighbors has no work to do. `KnnHeap::worst` also fails every prune test
+        // when k is zero, but the traversal still descends the near side to reach it.
         if k_neighbors == 0 {
             return Vec::new();
         }
@@ -367,67 +472,42 @@ impl<P: KdPoint> KdTree<P> {
             return Vec::new();
         }
         info!(
-            "Performing k‑NN search for target {:?} with k={}",
+            "Performing k\u{2011}NN search for target {:?} with k={}",
             target, k_neighbors
         );
-        let mut heap: BinaryHeap<HeapItem<P>> = BinaryHeap::new();
-        Self::knn_search_rec::<M>(&self.root, target, k_neighbors, 0, &mut heap);
-        let mut result: Vec<(f64, P)> = heap
-            .into_iter()
-            .map(|item| (item.dist.into_inner(), item.point))
-            .collect();
-        result.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
-        result.into_iter().map(|(_d, p)| p).collect()
+        let mut heap = KnnHeap::new(k_neighbors);
+        Self::knn_search_rec::<M>(&self.root, target, 0, k, &mut heap);
+        heap.into_sorted_vec()
     }
 
-    fn knn_search_rec<M: DistanceMetric<P>>(
-        node: &Option<Box<KdNode<P>>>,
+    fn knn_search_rec<'a, M: DistanceMetric<P>>(
+        node: &'a Option<Box<KdNode<P>>>,
         target: &P,
-        k_neighbors: usize,
         depth: usize,
-        heap: &mut BinaryHeap<HeapItem<P>>,
+        k: usize,
+        heap: &mut KnnHeap<&'a P>,
     ) {
-        if let Some(n) = node {
-            let dist_sq = M::distance_sq(target, &n.point);
-            let dist = OrderedFloat(dist_sq);
-            if heap.len() < k_neighbors {
-                heap.push(HeapItem {
-                    dist,
-                    point: n.point.clone(),
-                });
-            } else if let Some(top) = heap.peek() {
-                if dist < top.dist {
-                    heap.pop();
-                    heap.push(HeapItem {
-                        dist,
-                        point: n.point.clone(),
-                    });
-                }
-            }
-            let axis = depth % target.dims();
-            let target_coord = target
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let node_coord = n
-                .point
-                .coord(axis)
-                .unwrap_or_else(|_| unreachable!("axis computed from dims, must be valid"));
-            let (first, second) = if target_coord < node_coord {
-                (&n.left, &n.right)
-            } else {
-                (&n.right, &n.left)
-            };
-            Self::knn_search_rec::<M>(first, target, k_neighbors, depth + 1, heap);
-            let diff = (target_coord - node_coord).abs();
-            let diff_sq = diff * diff;
-            if heap.len() < k_neighbors
-                || heap
-                    .peek()
-                    .map(|h| diff_sq < h.dist.into_inner())
-                    .unwrap_or(true)
-            {
-                Self::knn_search_rec::<M>(second, target, k_neighbors, depth + 1, heap);
-            }
+        let Some(n) = node else {
+            return;
+        };
+        heap.offer(M::distance_sq(target, &n.point), &n.point);
+
+        let axis = depth % k;
+        let target_coord = target.coord(axis).unwrap_or(f64::NAN);
+        let node_coord = n.point.coord(axis).unwrap_or(f64::NAN);
+        let (near, far) = if target_coord < node_coord {
+            (&n.left, &n.right)
+        } else {
+            (&n.right, &n.left)
+        };
+
+        Self::knn_search_rec::<M>(near, target, depth + 1, k, heap);
+        // The far side can only help if the splitting plane itself is closer than the worst kept
+        // distance. `worst` is infinite while the heap has room, so the far side is always visited
+        // until k items have been found.
+        let plane_distance = target_coord - node_coord;
+        if plane_distance * plane_distance < heap.worst() {
+            Self::knn_search_rec::<M>(far, target, depth + 1, k, heap);
         }
     }
 
@@ -441,8 +521,13 @@ impl<P: KdPoint> KdTree<P> {
     /// # Returns
     ///
     /// A vector of points within the specified radius.
-    pub fn range_search<M: DistanceMetric<P>>(&self, center: &P, radius: f64) -> Vec<P> {
+    pub fn range_search<'a, M: DistanceMetric<P>>(&'a self, center: &P, radius: f64) -> Vec<&'a P> {
         info!("Finding points within radius {} of {:?}", radius, center);
+        // Squaring the radius would turn a negative one into a positive threshold, so reject it
+        // here as the other trees do.
+        if radius < 0.0 {
+            return Vec::new();
+        }
         let k = match self.k {
             Some(k) => k,
             None => return Vec::new(),
@@ -456,18 +541,18 @@ impl<P: KdPoint> KdTree<P> {
         found
     }
 
-    fn range_search_rec<M: DistanceMetric<P>>(
-        node: &Option<Box<KdNode<P>>>,
+    fn range_search_rec<'a, M: DistanceMetric<P>>(
+        node: &'a Option<Box<KdNode<P>>>,
         center: &P,
         radius_sq: f64,
         depth: usize,
         radius: f64,
-        found: &mut Vec<P>,
+        found: &mut Vec<&'a P>,
     ) {
         if let Some(n) = node {
             let dist_sq = M::distance_sq(center, &n.point);
             if dist_sq <= radius_sq {
-                found.push(n.point.clone());
+                found.push(&n.point);
             }
             let axis = depth % center.dims();
             let center_coord = center
@@ -506,8 +591,10 @@ impl<P: KdPoint> KdTree<P> {
         };
         let (new_root, deleted) = Self::delete_rec(self.root.take(), point, 0, k);
         self.root = new_root;
-        if self.root.is_none() {
-            self.k = None;
+        // The dimension stays as it is. Clearing it when the tree empties would silently let the
+        // next insert establish a different dimension, discarding an explicit `with_dimension`.
+        if deleted {
+            Self::rebalance_along_path(&mut self.root, point, k);
         }
         deleted
     }
@@ -531,6 +618,7 @@ impl<P: KdPoint> KdTree<P> {
                             Self::delete_rec(Some(right_subtree), &successor, depth + 1, k);
                         current.point = successor;
                         current.right = new_right;
+                        current.update_size();
                         (Some(current), true)
                     } else if let Some(left_subtree) = current.left.take() {
                         // Replace with min from left subtree on current axis, then delete that min
@@ -538,9 +626,12 @@ impl<P: KdPoint> KdTree<P> {
                         let (mut new_left, _) =
                             Self::delete_rec(Some(left_subtree), &successor, depth + 1, k);
                         current.point = successor;
-                        // As per standard kd-tree deletion, attach the adjusted left subtree as right child
+                        // The promoted point is the minimum of the old left subtree along this axis,
+                        // so every point left over is >= it: the standard kd-tree move is to hang
+                        // that subtree off the right, where the invariant now holds.
                         current.right = new_left.take();
                         current.left = None;
+                        current.update_size();
                         (Some(current), true)
                     } else {
                         (None, true)
@@ -558,11 +649,13 @@ impl<P: KdPoint> KdTree<P> {
                         let (new_left, deleted) =
                             Self::delete_rec(current.left.take(), point, depth + 1, k);
                         current.left = new_left;
+                        current.update_size();
                         (Some(current), deleted)
                     } else if p_coord > c_coord {
                         let (new_right, deleted) =
                             Self::delete_rec(current.right.take(), point, depth + 1, k);
                         current.right = new_right;
+                        current.update_size();
                         (Some(current), deleted)
                     } else {
                         // Equal on this axis but not equal overall: the point could be in either subtree.
@@ -571,11 +664,13 @@ impl<P: KdPoint> KdTree<P> {
                             Self::delete_rec(current.right.take(), point, depth + 1, k);
                         current.right = new_right;
                         if deleted_right {
+                            current.update_size();
                             (Some(current), true)
                         } else {
                             let (new_left, deleted_left) =
                                 Self::delete_rec(current.left.take(), point, depth + 1, k);
                             current.left = new_left;
+                            current.update_size();
                             (Some(current), deleted_left)
                         }
                     }
@@ -630,6 +725,111 @@ impl<P: KdPoint> KdTree<P> {
         min
     }
 }
+
+impl<T: std::fmt::Debug + Clone + PartialEq> KdTree<crate::geometry::Point2D<T>> {
+    /// Performs a range search over a query rectangle, returning every point inside it.
+    pub fn range_search_bbox(
+        &self,
+        query: &crate::geometry::Rectangle,
+    ) -> Vec<&crate::geometry::Point2D<T>> {
+        let lo = [query.x, query.y];
+        let hi = [query.x + query.width, query.y + query.height];
+        // Every other query checks the tree's dimension before traversing; the box query rotates its
+        // axis off `lo.len()`, so make sure the two agree.
+        if self.k.is_some_and(|k| k != lo.len()) {
+            return Vec::new();
+        }
+        let mut found = Vec::new();
+        Self::bbox_search_rec(&self.root, &lo, &hi, 0, &mut found);
+        found
+    }
+}
+
+impl<T: std::fmt::Debug + Clone + PartialEq> KdTree<crate::geometry::Point3D<T>> {
+    /// Performs a range search over a query cube, returning every point inside it.
+    pub fn range_search_bbox(
+        &self,
+        query: &crate::geometry::Cube,
+    ) -> Vec<&crate::geometry::Point3D<T>> {
+        let lo = [query.x, query.y, query.z];
+        let hi = [
+            query.x + query.width,
+            query.y + query.height,
+            query.z + query.depth,
+        ];
+        // Every other query checks the tree's dimension before traversing; the box query rotates its
+        // axis off `lo.len()`, so make sure the two agree.
+        if self.k.is_some_and(|k| k != lo.len()) {
+            return Vec::new();
+        }
+        let mut found = Vec::new();
+        Self::bbox_search_rec(&self.root, &lo, &hi, 0, &mut found);
+        found
+    }
+}
+
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one Kd-tree point dimension.
+///
+/// Both impls are pure delegation and differ only in the point and volume names.
+macro_rules! impl_kdtree_spatial_index {
+    ($point:ident, $volume:ident) => {
+        impl<T: std::fmt::Debug + Clone + PartialEq> crate::index::SpatialIndex
+            for KdTree<crate::geometry::$point<T>>
+        {
+            type Item = crate::geometry::$point<T>;
+            type Volume = crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                KdTree::len(self)
+            }
+
+            fn clear(&mut self) {
+                KdTree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                KdTree::contains(self, item)
+            }
+
+            /// Always `Ok(true)` on success; the Kd-tree has no boundary to fall outside of.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, SpartError> {
+                KdTree::insert(self, item).map(|()| true)
+            }
+
+            fn insert_bulk(&mut self, items: Vec<Self::Item>) -> Result<usize, SpartError> {
+                let count = items.len();
+                KdTree::insert_bulk(self, items).map(|()| count)
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                KdTree::delete(self, item)
+            }
+
+            fn knn_search<M: DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                KdTree::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                KdTree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                <KdTree<crate::geometry::$point<T>>>::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+impl_kdtree_spatial_index!(Point2D, Rectangle);
+impl_kdtree_spatial_index!(Point3D, Cube);
 
 #[cfg(test)]
 mod tests {
@@ -716,6 +916,21 @@ mod tests {
         assert_eq!(knn_results.len(), num_points);
     }
 
+    /// Every other tree rejects a negative radius; squaring it here used to make it behave like a
+    /// positive one, so a negative radius silently returned neighbors.
+    #[test]
+    fn test_range_search_negative_radius_empty() {
+        let mut tree: KdTree<Point2D<&str>> = KdTree::new();
+        let target = Point2D::new(5.0, 5.0, Some("T"));
+        tree.insert(target.clone()).unwrap();
+        tree.insert(Point2D::new(5.2, 5.0, Some("N"))).unwrap();
+
+        assert!(
+            tree.range_search::<EuclideanDistance>(&target, -1.0)
+                .is_empty()
+        );
+    }
+
     #[test]
     fn test_range_zero_radius_exact_match() {
         let mut tree: KdTree<Point2D<&str>> = KdTree::new();
@@ -725,7 +940,7 @@ mod tests {
 
         let results = tree.range_search::<EuclideanDistance>(&target, 0.0);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0], target);
+        assert_eq!(*results[0], target);
     }
 
     #[test]

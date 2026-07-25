@@ -94,3 +94,7 @@ src/main.rs
 pyspart/target/
 .output.txt
 *.proptest-regressions
+.claude/
+.codex
+.agents/
+NOTES.md

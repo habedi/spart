@@ -34,6 +34,25 @@ pub trait NodeAccess {
     fn entries_mut(&mut self) -> &mut Vec<Self::Entry>;
 }
 
+/// Height of `node` counted from the leaves: a leaf node has height 0, its parent height 1, ...
+///
+/// Heights are measured from the bottom on purpose. Levels numbered from the root shift every time
+/// the tree grows a new root, which makes a level recorded before a split meaningless afterwards;
+/// heights measured from the leaves stay valid.
+pub fn node_height<N>(node: &N) -> usize
+where
+    N: NodeAccess,
+    N::Entry: EntryAccess<Node = N>,
+{
+    let mut height = 0;
+    let mut current = node;
+    while let Some(child) = current.entries().first().and_then(EntryAccess::child) {
+        height += 1;
+        current = child;
+    }
+    height
+}
+
 /// Generic helper to compute the group MBR of a slice of entries.
 pub fn compute_group_mbr<E: EntryAccess>(entries: &[E]) -> Option<E::BV> {
     let mut iter = entries.iter();
@@ -42,6 +61,9 @@ pub fn compute_group_mbr<E: EntryAccess>(entries: &[E]) -> Option<E::BV> {
 }
 
 /// Generic range search on a node.
+///
+/// Dispatch is on the *entry* kind rather than on `NodeAccess::is_leaf`, so a search can never
+/// silently skip part of the tree because a node's leaf flag disagrees with its contents.
 pub fn search_node<'a, N>(
     node: &'a N,
     query: &<N::Entry as EntryAccess>::BV,
@@ -49,32 +71,35 @@ pub fn search_node<'a, N>(
 ) where
     N: NodeAccess,
 {
-    if node.is_leaf() {
-        for entry in node.entries() {
-            if let Some(obj) = entry.as_leaf_obj() {
-                if entry.mbr().intersects(query) {
-                    result.push(obj);
-                }
-            }
+    for entry in node.entries() {
+        if !entry.mbr().intersects(query) {
+            continue;
         }
-    } else {
-        for entry in node.entries() {
-            if let Some(child) = entry.child() {
-                if entry.mbr().intersects(query) {
-                    search_node(child, query, result);
-                }
-            }
+        if let Some(obj) = entry.as_leaf_obj() {
+            result.push(obj);
+        } else if let Some(child) = entry.child() {
+            search_node(child, query, result);
         }
     }
 }
 
 /// Generic delete logic that mirrors both R-tree and R*-tree implementations.
+///
+/// Removes at most one object equal to `object` and returns whether it removed one.
+///
+/// `height` is the height of `node` counted from the leaves: a leaf node has height 0, its parent
+/// height 1, and so on. When a child underflows it is detached and its entries are pushed onto
+/// `reinsert_list` paired with **the height of the node they came from**. Callers must re-attach
+/// each entry to a node at exactly that height: an entry moved to the wrong level either puts a
+/// subtree where an object belongs or an object where a subtree belongs, and the tree stops being
+/// uniformly deep.
 pub fn delete_entry<N>(
     node: &mut N,
     object: &<N::Entry as EntryAccess>::Obj,
     object_mbr: &<N::Entry as EntryAccess>::BV,
     min_entries: usize,
-    reinsert_list: &mut Vec<N::Entry>,
+    height: usize,
+    reinsert_list: &mut Vec<(N::Entry, usize)>,
 ) -> bool
 where
     N: NodeAccess,
@@ -82,50 +107,63 @@ where
     <<N as NodeAccess>::Entry as EntryAccess>::BV: Clone,
     <<N as NodeAccess>::Entry as EntryAccess>::Obj: PartialEq,
 {
-    let mut deleted = false;
     if node.is_leaf() {
         let entries = node.entries_mut();
-        if let Some(pos) = entries.iter().position(|e| match e.as_leaf_obj() {
-            Some(o) => o == object,
-            None => false,
-        }) {
-            entries.remove(pos);
-            deleted = true;
-        }
-    } else {
-        let entries = node.entries_mut();
-        let mut to_delete_indices = Vec::new();
-        for (i, entry) in entries.iter_mut().enumerate() {
-            // Only descend into child nodes if MBR intersects object MBR
-            let do_descend = {
-                let mbr_clone = entry.mbr().clone();
-                mbr_clone.intersects(object_mbr)
-            };
-            if do_descend {
-                if let Some(child) = entry.child_mut() {
-                    if delete_entry(child, object, object_mbr, min_entries, reinsert_list) {
-                        deleted = true;
-                        if child.entries().len() < min_entries {
-                            to_delete_indices.push(i);
-                        } else if let Some(new_mbr) = compute_group_mbr(child.entries()) {
-                            entry.set_mbr(new_mbr);
-                        }
-                    }
-                }
+        let found = entries
+            .iter()
+            .position(|e| e.as_leaf_obj().is_some_and(|o| o == object));
+        return match found {
+            Some(pos) => {
+                entries.remove(pos);
+                true
             }
-        }
+            None => false,
+        };
+    }
 
-        // Remove underfilled children and reinsert their entries
-        for &index in to_delete_indices.iter().rev() {
-            // We need to move the entry out to get ownership and extract its child
-            let removed = entries.remove(index);
-            if let Some(child_box) = removed.into_child() {
-                // Move all child entries into the reinsert list
-                let mut child = *child_box;
-                reinsert_list.append(child.entries_mut());
+    let child_height = height.saturating_sub(1);
+    let entries = node.entries_mut();
+    let mut deleted = false;
+    let mut underfull: Option<usize> = None;
+
+    for (i, entry) in entries.iter_mut().enumerate() {
+        if !entry.mbr().intersects(object_mbr) {
+            continue;
+        }
+        let Some(child) = entry.child_mut() else {
+            continue;
+        };
+        if !delete_entry(
+            child,
+            object,
+            object_mbr,
+            min_entries,
+            child_height,
+            reinsert_list,
+        ) {
+            continue;
+        }
+        deleted = true;
+        if child.entries().len() < min_entries {
+            underfull = Some(i);
+        } else if let Some(new_mbr) = compute_group_mbr(child.entries()) {
+            entry.set_mbr(new_mbr);
+        }
+        // Only one object is removed per call, so there is no reason to look at further siblings.
+        // Scanning on would also delete one copy of a duplicated object from *every* subtree.
+        break;
+    }
+
+    if let Some(index) = underfull {
+        let removed = entries.remove(index);
+        if let Some(child_box) = removed.into_child() {
+            let mut child = *child_box;
+            for entry in child.entries_mut().drain(..) {
+                reinsert_list.push((entry, child_height));
             }
         }
     }
+
     deleted
 }
 
@@ -155,6 +193,246 @@ impl<E: EntryAccess> PartialOrd for KnnCandidate<'_, E> {
         Some(self.cmp(other))
     }
 }
+
+/// Test-only check of the structural invariants every tree in the R-tree family must hold, and of
+/// how many objects are actually reachable.
+///
+/// The invariants are what the search algorithms rely on:
+///
+/// * a leaf node holds only object entries and an interior node only subtree entries, because
+///   mixing them used to make whole subtrees unreachable;
+/// * every leaf sits at the same depth;
+/// * no node holds more than `max_entries` entries, and (when `min_entries` is given) no node other
+///   than the root holds fewer than that.
+///
+/// Returns the number of reachable objects so callers can assert nothing was lost.
+#[cfg(test)]
+pub(crate) fn assert_structure<N>(
+    root: &N,
+    max_entries: usize,
+    min_entries: Option<usize>,
+    context: &str,
+) -> usize
+where
+    N: NodeAccess,
+    N::Entry: EntryAccess<Node = N>,
+{
+    fn walk<N>(
+        node: &N,
+        depth: usize,
+        is_root: bool,
+        max_entries: usize,
+        min_entries: Option<usize>,
+        leaf_depths: &mut Vec<usize>,
+        problems: &mut Vec<String>,
+    ) -> usize
+    where
+        N: NodeAccess,
+        N::Entry: EntryAccess<Node = N>,
+    {
+        let size = node.entries().len();
+        if size > max_entries {
+            problems.push(format!(
+                "node at depth {depth} holds {size} entries, above max_entries={max_entries}"
+            ));
+        }
+        if let Some(min) = min_entries {
+            if !is_root && size < min {
+                problems.push(format!(
+                    "non-root node at depth {depth} holds {size} entries, below min_entries={min}"
+                ));
+            }
+        }
+        if node.is_leaf() {
+            leaf_depths.push(depth);
+        }
+
+        let mut objects = 0;
+        for entry in node.entries() {
+            if entry.as_leaf_obj().is_some() {
+                if !node.is_leaf() {
+                    problems.push(format!(
+                        "object entry inside interior node at depth {depth}"
+                    ));
+                }
+                objects += 1;
+            } else if let Some(child) = entry.child() {
+                if node.is_leaf() {
+                    problems.push(format!("subtree entry inside leaf node at depth {depth}"));
+                }
+                objects += walk(
+                    child,
+                    depth + 1,
+                    false,
+                    max_entries,
+                    min_entries,
+                    leaf_depths,
+                    problems,
+                );
+            } else {
+                problems.push(format!(
+                    "entry at depth {depth} is neither an object nor a subtree"
+                ));
+            }
+        }
+        objects
+    }
+
+    let mut leaf_depths = Vec::new();
+    let mut problems = Vec::new();
+    let objects = walk(
+        root,
+        0,
+        true,
+        max_entries,
+        min_entries,
+        &mut leaf_depths,
+        &mut problems,
+    );
+    leaf_depths.sort_unstable();
+    leaf_depths.dedup();
+    if leaf_depths.len() > 1 {
+        problems.push(format!("leaves sit at differing depths: {leaf_depths:?}"));
+    }
+    assert!(problems.is_empty(), "{context}: {problems:#?}");
+    objects
+}
+
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one R-tree variant at one point
+/// dimension.
+///
+/// The four impls needed (two variants, two dimensions) are pure delegation and differ only in the
+/// names, so they are generated rather than copied. `contains` is the one method with a body: an
+/// object is reachable only through its own bounding volume, so the lookup queries with that.
+macro_rules! impl_rtree_spatial_index {
+    ($tree:ident, $point:ident, $volume:ident) => {
+        impl<T: std::fmt::Debug + Clone + PartialEq> $crate::index::SpatialIndex
+            for $tree<$crate::geometry::$point<T>>
+        {
+            type Item = $crate::geometry::$point<T>;
+            type Volume = $crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                $tree::len(self)
+            }
+
+            fn clear(&mut self) {
+                $tree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                use $crate::geometry::BoundedObject;
+                $tree::range_search_bbox(self, &item.mbr())
+                    .into_iter()
+                    .any(|stored| stored == item)
+            }
+
+            /// Always `Ok(true)`; an R-tree has no boundary to fall outside of.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, $crate::errors::SpartError> {
+                $tree::insert(self, item);
+                Ok(true)
+            }
+
+            fn insert_bulk(
+                &mut self,
+                items: Vec<Self::Item>,
+            ) -> Result<usize, $crate::errors::SpartError> {
+                let count = items.len();
+                $tree::insert_bulk(self, items);
+                Ok(count)
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                $tree::delete(self, item)
+            }
+
+            fn knn_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                <$tree<$crate::geometry::$point<T>>>::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                $tree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                $tree::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_rtree_spatial_index;
+
+/// Writes the [`SpatialIndex`](crate::index::SpatialIndex) impl for one bounded tree.
+///
+/// The quadtree and octree impls are pure delegation and differ only in the names, so they are
+/// generated rather than copied.
+macro_rules! impl_bounded_spatial_index {
+    ($tree:ident, $point:ident, $volume:ident) => {
+        impl<T: Clone + PartialEq + std::fmt::Debug> $crate::index::SpatialIndex for $tree<T> {
+            type Item = $crate::geometry::$point<T>;
+            type Volume = $crate::geometry::$volume;
+
+            fn len(&self) -> usize {
+                $tree::len(self)
+            }
+
+            fn clear(&mut self) {
+                $tree::clear(self);
+            }
+
+            fn contains(&self, item: &Self::Item) -> bool {
+                $tree::contains(self, item)
+            }
+
+            /// `Ok(false)` for a point outside the tree's boundary; never an error.
+            fn insert(&mut self, item: Self::Item) -> Result<bool, $crate::errors::SpartError> {
+                Ok($tree::insert(self, item))
+            }
+
+            fn insert_bulk(
+                &mut self,
+                items: Vec<Self::Item>,
+            ) -> Result<usize, $crate::errors::SpartError> {
+                Ok($tree::insert_bulk(self, &items))
+            }
+
+            fn delete(&mut self, item: &Self::Item) -> bool {
+                $tree::delete(self, item)
+            }
+
+            fn knn_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                k: usize,
+            ) -> Vec<&Self::Item> {
+                $tree::knn_search::<M>(self, query, k)
+            }
+
+            fn range_search<M: $crate::geometry::DistanceMetric<Self::Item>>(
+                &self,
+                query: &Self::Item,
+                radius: f64,
+            ) -> Vec<&Self::Item> {
+                $tree::range_search::<M>(self, query, radius)
+            }
+
+            fn range_search_bbox(&self, query: &Self::Volume) -> Vec<&Self::Item> {
+                $tree::range_search_bbox(self, query)
+            }
+        }
+    };
+}
+
+pub(crate) use impl_bounded_spatial_index;
 
 #[cfg(test)]
 mod tests {

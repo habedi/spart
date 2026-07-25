@@ -16,6 +16,43 @@ use tracing::debug;
 // Import custom errors from the exceptions module.
 use crate::errors::SpartError;
 
+/// Returns the smallest extent `len` for which `lo + len >= hi` holds.
+///
+/// Bounding volumes here are stored as an origin plus an extent, and containment tests compare
+/// against `origin + extent`. Computing the extent as a plain `hi - lo` can round *down*, so that
+/// `lo + (hi - lo) < hi` and the volume fails to contain the very corner it was built from.
+/// Nudging the extent up by the minimum number of ULPs keeps the volume tight. That in turn keeps
+/// `union` idempotent, so `enlargement` is exactly zero for an already-contained volume.
+#[inline]
+pub(crate) fn span(lo: f64, hi: f64) -> f64 {
+    let mut len = hi - lo;
+    // `!is_finite()` also covers NaN, which no comparison would catch.
+    if len <= 0.0 || !len.is_finite() {
+        // Degenerate (zero or inverted) or non-finite: there is nothing to correct.
+        return len;
+    }
+    // One step is normally enough; the bound is a safety net against pathological inputs.
+    for _ in 0..4 {
+        if lo + len >= hi {
+            break;
+        }
+        len = f64::from_bits(len.to_bits() + 1);
+    }
+    len
+}
+
+/// Distance from `v` to the closest point of the interval `[lo, lo + len]`.
+#[inline]
+fn axis_distance(v: f64, lo: f64, len: f64) -> f64 {
+    if v < lo {
+        lo - v
+    } else if v > lo + len {
+        v - (lo + len)
+    } else {
+        0.0
+    }
+}
+
 /// Represents a 2D point with an optional payload.
 ///
 /// ### Example
@@ -250,19 +287,11 @@ impl Rectangle {
         let x2 = (self.x + self.width).max(other.x + other.width);
         let y2 = (self.y + self.height).max(other.y + other.height);
 
-        // Add small epsilon to width/height to account for floating-point precision errors
-        // This guarantees that corner points are always contained in the union
-        let eps = f64::EPSILON * 4.0 * (x2.abs() + x1.abs()).max(1.0);
-        let width = (x2 - x1) + eps;
-
-        let eps_y = f64::EPSILON * 4.0 * (y2.abs() + y1.abs()).max(1.0);
-        let height = (y2 - y1) + eps_y;
-
         let union_rect = Rectangle {
             x: x1,
             y: y1,
-            width,
-            height,
+            width: span(x1, x2),
+            height: span(y1, y2),
         };
         debug!(
             "Rectangle::union(): self: (x: {}, y: {}, w: {}, h: {}), other: (x: {}, y: {}, w: {}, h: {}), result: (x: {}, y: {}, w: {}, h: {})",
@@ -566,18 +595,13 @@ impl Cube {
         let y2 = (self.y + self.height).max(other.y + other.height);
         let z2 = (self.z + self.depth).max(other.z + other.depth);
 
-        // Add small epsilon to dimensions to account for floating-point precision errors
-        let eps_x = f64::EPSILON * 4.0 * (x2.abs() + x1.abs()).max(1.0);
-        let eps_y = f64::EPSILON * 4.0 * (y2.abs() + y1.abs()).max(1.0);
-        let eps_z = f64::EPSILON * 4.0 * (z2.abs() + z1.abs()).max(1.0);
-
         let union_cube = Cube {
             x: x1,
             y: y1,
             z: z1,
-            width: (x2 - x1) + eps_x,
-            height: (y2 - y1) + eps_y,
-            depth: (z2 - z1) + eps_z,
+            width: span(x1, x2),
+            height: span(y1, y2),
+            depth: span(z1, z2),
         };
         debug!(
             "Cube::union(): self: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), other: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {}), result: (x: {}, y: {}, z: {}, w: {}, h: {}, d: {})",
@@ -796,36 +820,82 @@ impl BoundingVolume for Cube {
     }
 }
 
-/// Represents an item in a heap, typically used for nearest neighbor or best-first search algorithms.
+/// Extent given to the bounding volume of a single point.
 ///
-/// The `neg_distance` field is used to order items in a max-heap by their (negated) distance value.
-#[derive(Debug)]
-pub struct HeapItem<T: Clone> {
-    /// The negated distance, used for ordering.
-    pub neg_distance: OrderedFloat<f64>,
-    /// An optional 2D point associated with the heap item.
-    pub point_2d: Option<Point2D<T>>,
-    /// An optional 3D point associated with the heap item.
-    pub point_3d: Option<Point3D<T>>,
+/// Exactly zero, so that a box query over points means containment rather than "within an epsilon
+/// of". An inflated extent used to make `RTree::range_search_bbox` report points just outside the
+/// query, which the point-exact trees never did. The split heuristics are unaffected: they compare
+/// the volumes of *groups* of points, which have real extent, and never the volume of one point.
+const POINT_EXTENT: f64 = 0.0;
+
+/// What a bounding volume has to satisfy to be usable by the R-tree family.
+///
+/// This exists only so that [`BoundedObject`] can be declared once instead of twice under a `cfg`,
+/// with the serde requirements folded in when that feature is on. It is blanket-implemented, so you
+/// never write an impl for it yourself.
+#[cfg(feature = "serde")]
+pub trait VolumeBound:
+    BoundingVolume + std::fmt::Debug + Clone + serde::Serialize + for<'de> serde::Deserialize<'de>
+{
 }
 
-impl<T: Clone> PartialEq for HeapItem<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.neg_distance == other.neg_distance
+#[cfg(feature = "serde")]
+impl<V> VolumeBound for V where
+    V: BoundingVolume
+        + std::fmt::Debug
+        + Clone
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>
+{
+}
+
+/// What a bounding volume has to satisfy to be usable by the R-tree family.
+///
+/// This exists only so that [`BoundedObject`] can be declared once instead of twice under a `cfg`.
+/// It is blanket-implemented, so you never write an impl for it yourself.
+#[cfg(not(feature = "serde"))]
+pub trait VolumeBound: BoundingVolume + std::fmt::Debug + Clone {}
+
+#[cfg(not(feature = "serde"))]
+impl<V> VolumeBound for V where V: BoundingVolume + std::fmt::Debug + Clone {}
+
+/// An object that can be indexed by its bounding volume.
+///
+/// Implemented for [`Point2D`] and [`Point3D`], and by anything else you want to put in an
+/// [`RTree`](crate::rtree::RTree) or [`RStarTree`](crate::rstar_tree::RStarTree).
+pub trait BoundedObject: std::fmt::Debug + Clone {
+    /// The bounding volume this object reports, such as [`Rectangle`] for 2D or [`Cube`] for 3D.
+    type Volume: VolumeBound;
+
+    /// Returns the minimum bounding volume of the object.
+    fn mbr(&self) -> Self::Volume;
+}
+
+impl<T: std::fmt::Debug + Clone> BoundedObject for Point2D<T> {
+    type Volume = Rectangle;
+
+    fn mbr(&self) -> Self::Volume {
+        Rectangle {
+            x: self.x,
+            y: self.y,
+            width: POINT_EXTENT,
+            height: POINT_EXTENT,
+        }
     }
 }
 
-impl<T: Clone> Eq for HeapItem<T> {}
+impl<T: std::fmt::Debug + Clone> BoundedObject for Point3D<T> {
+    type Volume = Cube;
 
-impl<T: Clone> PartialOrd for HeapItem<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: Clone> Ord for HeapItem<T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.neg_distance.cmp(&self.neg_distance)
+    fn mbr(&self) -> Self::Volume {
+        Cube {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            width: POINT_EXTENT,
+            height: POINT_EXTENT,
+            depth: POINT_EXTENT,
+        }
     }
 }
 
@@ -833,6 +903,15 @@ impl<T: Clone> Ord for HeapItem<T> {
 pub trait HasMinDistance<Q> {
     /// Computes the minimum distance from the bounding volume to the given query.
     fn min_distance(&self, query: &Q) -> f64;
+
+    /// Computes the *squared* minimum distance from the bounding volume to the given query.
+    ///
+    /// Search pruning compares against squared distances, so implementors should override this
+    /// to avoid a `sqrt` that the caller only squares again.
+    fn min_distance_sq(&self, query: &Q) -> f64 {
+        let d = self.min_distance(query);
+        d * d
+    }
 }
 
 /// Trait for constructing a bounding volume from a point and a radius.
@@ -843,21 +922,13 @@ pub trait BoundingVolumeFromPoint<Q>: BoundingVolume {
 
 impl<T> HasMinDistance<Point2D<T>> for Rectangle {
     fn min_distance(&self, point: &Point2D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy).sqrt()
+        self.min_distance_sq(point).sqrt()
+    }
+
+    fn min_distance_sq(&self, point: &Point2D<T>) -> f64 {
+        let dx = axis_distance(point.x, self.x, self.width);
+        let dy = axis_distance(point.y, self.y, self.height);
+        dx * dx + dy * dy
     }
 }
 
@@ -874,28 +945,14 @@ impl<T> BoundingVolumeFromPoint<Point2D<T>> for Rectangle {
 
 impl<T> HasMinDistance<Point3D<T>> for Cube {
     fn min_distance(&self, point: &Point3D<T>) -> f64 {
-        let dx = if point.x < self.x {
-            self.x - point.x
-        } else if point.x > self.x + self.width {
-            point.x - (self.x + self.width)
-        } else {
-            0.0
-        };
-        let dy = if point.y < self.y {
-            self.y - point.y
-        } else if point.y > self.y + self.height {
-            point.y - (self.y + self.height)
-        } else {
-            0.0
-        };
-        let dz = if point.z < self.z {
-            self.z - point.z
-        } else if point.z > self.z + self.depth {
-            point.z - (self.z + self.depth)
-        } else {
-            0.0
-        };
-        (dx * dx + dy * dy + dz * dz).sqrt()
+        self.min_distance_sq(point).sqrt()
+    }
+
+    fn min_distance_sq(&self, point: &Point3D<T>) -> f64 {
+        let dx = axis_distance(point.x, self.x, self.width);
+        let dy = axis_distance(point.y, self.y, self.height);
+        let dz = axis_distance(point.z, self.z, self.depth);
+        dx * dx + dy * dy + dz * dz
     }
 }
 
@@ -1044,6 +1101,99 @@ mod tests {
         let d13 = p1.distance_sq(&p3).sqrt();
 
         assert!(d13 <= d12 + d23 + 1e-9);
+    }
+
+    /// `union` must be tight: unioning with an already-contained volume has to be a no-op, or
+    /// `enlargement` never reaches zero and every recomputed MBR creeps outwards.
+    #[test]
+    fn test_union_is_idempotent_and_enlargement_is_zero_when_contained() {
+        let outer = Rectangle {
+            x: -191.20362538993982,
+            y: 3.5,
+            width: 302.29038972380923,
+            height: 17.25,
+        };
+        let inner = Rectangle {
+            x: -100.5,
+            y: 4.0,
+            width: 1.0,
+            height: 1.0,
+        };
+
+        let u = outer.union(&outer);
+        assert_eq!(u.x, outer.x);
+        assert_eq!(u.y, outer.y);
+        assert_eq!(u.width, outer.width);
+        assert_eq!(u.height, outer.height);
+        assert_eq!(outer.enlargement(&outer), 0.0);
+        assert_eq!(outer.enlargement(&inner), 0.0);
+
+        let cube = Cube {
+            x: -191.20362538993982,
+            y: 3.5,
+            z: -0.125,
+            width: 302.29038972380923,
+            height: 17.25,
+            depth: 9.75,
+        };
+        let u3 = cube.union(&cube);
+        assert_eq!(u3.width, cube.width);
+        assert_eq!(u3.height, cube.height);
+        assert_eq!(u3.depth, cube.depth);
+        assert_eq!(cube.enlargement(&cube), 0.0);
+    }
+
+    /// Repeatedly folding volumes together must not grow the result without bound.
+    #[test]
+    fn test_repeated_union_does_not_drift() {
+        let a = Rectangle {
+            x: -191.20362538993982,
+            y: 0.0,
+            width: 302.29038972380923,
+            height: 1.0,
+        };
+        let b = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 111.08676433386941,
+            height: 1.0,
+        };
+        let once = a.union(&b);
+        let mut acc = once.clone();
+        for _ in 0..1000 {
+            acc = acc.union(&b).union(&a);
+        }
+        assert_eq!(acc.width, once.width);
+        assert_eq!(acc.height, once.height);
+    }
+
+    #[test]
+    fn test_min_distance_sq_matches_min_distance() {
+        let rect = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 10.0,
+        };
+        for (x, y) in [(-3.0, -4.0), (5.0, 5.0), (15.0, 5.0), (12.0, 14.0)] {
+            let p = Point2D::new(x, y, None::<()>);
+            let d = rect.min_distance(&p);
+            assert!((rect.min_distance_sq(&p) - d * d).abs() < 1e-12);
+        }
+
+        let cube = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 10.0,
+            depth: 10.0,
+        };
+        for (x, y, z) in [(-1.0, -2.0, -2.0), (5.0, 5.0, 5.0), (11.0, 12.0, 13.0)] {
+            let p = Point3D::new(x, y, z, None::<()>);
+            let d = cube.min_distance(&p);
+            assert!((cube.min_distance_sq(&p) - d * d).abs() < 1e-12);
+        }
     }
 
     #[test]

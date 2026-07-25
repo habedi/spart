@@ -137,3 +137,5 @@ pub fn distance_2d(a: &Point2D<impl std::fmt::Debug>, b: &Point2D<impl std::fmt:
 pub fn distance_3d(a: &Point3D<impl std::fmt::Debug>, b: &Point3D<impl std::fmt::Debug>) -> f64 {
     ((a.x - b.x).powi(2) + (a.y - b.y).powi(2) + (a.z - b.z).powi(2)).sqrt()
 }
+
+pub type Anyhow = anyhow::Result<()>;

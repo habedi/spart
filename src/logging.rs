@@ -10,8 +10,10 @@ use ctor::ctor;
 #[cfg(feature = "setup_tracing")]
 use tracing::Level;
 
+// `ctor` runs this before `main`, which is inherently unsafe (it touches process-global state before
+// the runtime is up), so the attribute has to say so explicitly.
 #[cfg(feature = "setup_tracing")]
-#[ctor]
+#[ctor(unsafe)]
 fn set_debug_level() {
     // If DEBUG_SPART is not set or set to a falsy value, disable logging.
     // Otherwise, initialize a debug-level subscriber.

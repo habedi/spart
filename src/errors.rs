@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// Represents errors specific to invalid operations or parameters in Spart.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpartError {
     /// Occurs when an invalid dimension is requested.
     InvalidDimension {

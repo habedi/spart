@@ -1,5 +1,9 @@
 use criterion::criterion_main;
 
+// Declared once here so the bench modules below share a single copy; each of them declaring its own
+// `#[path = "shared.rs"] mod shared;` compiled the same file five times over.
+mod shared;
+
 mod bench_delete;
 mod bench_insert;
 mod bench_insert_bulk;
