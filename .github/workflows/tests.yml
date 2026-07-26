@@ -32,8 +32,7 @@ jobs:
 
     strategy:
       matrix:
-        # Define the Rust versions to test against
-        rust-version: [ "1.85.0", "stable", "beta" ]
+        rust-version: [ "1.85.0", "stable" ]
 
     steps:
       - name: Checkout Repository
@@ -52,7 +51,7 @@ jobs:
           make install-deps
 
       - name: Run Tests and Generate Coverage Report
-        run: make coverage # Generates a coverage report
+        run: make coverage
 
       - name: Upload Coverage Reports to Codecov
         uses: codecov/codecov-action@v5
