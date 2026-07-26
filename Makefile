@@ -4,11 +4,11 @@ BINARY_NAME := $(or $(PROJ_BINARY), $(notdir $(PROJ_REPO)))
 BINARY = :target/release/$(BINARY_NAME)
 PATH := /snap/bin:$(PATH)
 RUST_BACKTRACE := 0
-DEBUG_SPART := 0
 RUST_LOG        := info
 WHEEL_DIR       := dist
 PYSPART_DIR     := pyspart
 PY_DEP_MNGR     := uv
+WASM_TARGETS    := wasm32-unknown-unknown wasm32-wasip1
 PYSPART_VERSION := $(shell grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
 WHEEL_FILES     := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-$(PYSPART_VERSION)-*.whl 2>/dev/null)
 SDIST_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-$(PYSPART_VERSION).tar.gz 2>/dev/null)
@@ -38,22 +38,35 @@ format: ## Format Rust files
 .PHONY: test
 test: format ## Run the tests
 	@echo "Running tests..."
-	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo test -- --nocapture
+	@RUST_BACKTRACE=$(RUST_BACKTRACE) cargo test -- --nocapture
 
 .PHONY: coverage
 coverage: format ## Generate test coverage report
 	@echo "Generating test coverage report..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo tarpaulin --out Xml --out Html
+	@cargo tarpaulin --out Xml --out Html
 
 .PHONY: build
 build: format ## Build the binary for the current platform
 	@echo "Building the project..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo build --release
+	@cargo build --release
+
+.PHONY: wasm
+wasm: ## Build the library for the WebAssembly targets
+	@echo "Building the library for WebAssembly..."
+	@for target in $(WASM_TARGETS); do \
+	   echo "  $$target"; \
+	   rustup target add $$target >/dev/null 2>&1 || true; \
+	   cargo build --lib --all-features --target $$target || exit 1; \
+	done
+	@echo "The library builds for: $(WASM_TARGETS)"
+	@echo "Note: --lib is deliberate. Tests, examples, and benches pull in dev-dependencies"
+	@echo "      (proptest -> rusty-fork -> wait-timeout) that do not compile for WebAssembly,"
+	@echo "      so only the library itself is checked here."
 
 .PHONY: run
 run: build ## Build and run the binary
 	@echo "Running the $(BINARY) binary..."
-	@DEBUG_SPART=$(DEBUG_SPART) ./$(BINARY)
+	@./$(BINARY)
 
 .PHONY: run-examples
 run-examples: build ## Run the Rust examples
@@ -102,7 +115,7 @@ install-deps: install-snap ## Install development dependencies
 .PHONY: lint
 lint: format ## Run linters on Rust files
 	@echo "Linting Rust files..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+	@cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
 
 .PHONY: publish
 publish: ## Publish the package to crates.io (requires CARGO_REGISTRY_TOKEN to be set)
@@ -112,7 +125,7 @@ publish: ## Publish the package to crates.io (requires CARGO_REGISTRY_TOKEN to b
 .PHONY: bench
 bench: ## Run benchmarks
 	@echo "Running benchmarks..."
-	@DEBUG_SPART=$(DEBUG_SPART) cargo bench
+	@cargo bench
 
 .PHONY: audit
 audit: ## Run security audit on Rust dependencies
@@ -122,12 +135,12 @@ audit: ## Run security audit on Rust dependencies
 .PHONY: careful
 careful: ## Run security checks on Rust code
 	@echo "Running security checks..."
-	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo careful run
+	@RUST_BACKTRACE=$(RUST_BACKTRACE) cargo careful run
 
 .PHONY: nextest
 nextest: ## Run tests using nextest
 	@echo "Running tests using nextest..."
-	@DEBUG_SPART=$(DEBUG_SPART) RUST_BACKTRACE=$(RUST_BACKTRACE) cargo nextest run
+	@RUST_BACKTRACE=$(RUST_BACKTRACE) cargo nextest run
 
 .PHONY: docs
 docs: format ## Generate the documentation

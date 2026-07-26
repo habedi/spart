@@ -18,7 +18,6 @@ jobs:
 
     strategy:
       matrix:
-        # Define the Rust versions to test against
         rust-version: [ "1.85.0", "stable" ]
 
     steps:

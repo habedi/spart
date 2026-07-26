@@ -126,11 +126,8 @@ A tree provides at least the following methods:
 - `range_search`: finds all points within a given radius of a query point.
     - The inputs are the query point and the radius within which to search.
 - `range_search_bbox`: finds all points inside a query rectangle or cube.
-- `contains`: reports whether an equal point is stored.
-- `len`, `is_empty`, and `clear`: the size of the tree, and emptying it.
-
-All trees implement the `SpatialIndex` trait, which states these operations once so that code
-can be written against any of them. Searches return references into the tree, so clone only what you keep.
+- `contains`: reports if tree contains the given point.
+- `len`, `is_empty`, and `clear`: gets the size of the tree, and checks if it is empty or clears all points from the tree.
 
 > [!NOTE]
 > Currently, the following properties hold for all trees:
@@ -209,24 +206,6 @@ fn main() {
 }
 ```
 
-#### Debugging Mode
-
-You can enable debugging mode for Spart by setting the `DEBUG_SPART` environment variable to `true` or `1`.
-
-```bash
-# Enable debugging mode on Linux and macOS
-export DEBUG_SPART=true
-```
-
-```powershell
-# Enable debugging mode on Windows (PowerShell)
-$env:DEBUG_SPART = "true"
-```
-
-> [!NOTE]
-> When debugging mode is enabled, Spart will be very verbose.
-> It is recommended to use this only for debugging purposes.
-
 ### Examples
 
 - For Rust examples, see the [examples](examples) directory.
@@ -247,4 +226,4 @@ Spart is available under the terms of either of the following licenses:
 
 ### Acknowledgements
 
-* The logo is from [SVG Repo](https://www.svgrepo.com/svg/382456/autumn-fall-leaf-orange-season-tree).
+* The logo is from [SVG Repo](https://www.svgrepo.com/svg/382456/autumn-fall-leaf-orange-season-tree) with some modifications.
