@@ -1223,4 +1223,151 @@ mod tests {
         assert!(union.contains(&r2_min));
         assert!(union.contains(&r2_max));
     }
+
+    #[test]
+    fn test_span_exact_subtraction_stays_tight() {
+        // `hi - lo` is representable here, so the extent must come back unwidened. A wider extent
+        // would make `union` non-idempotent and `enlargement` non-zero for a contained volume.
+        assert_eq!(span(0.0, 1.0), 1.0);
+        assert_eq!(span(-5.0, 5.0), 10.0);
+        assert_eq!(span(2.5, 7.5), 5.0);
+    }
+
+    #[test]
+    fn test_span_widens_when_subtraction_rounds_down() {
+        // Magnitudes far enough apart that the subtraction rounds down: `lo + (hi - lo) < hi`.
+        let (lo, hi) = (-1e17, 0.1);
+        let naive = hi - lo;
+        assert!(
+            lo + naive < hi,
+            "input no longer exercises the widening path"
+        );
+
+        let len = span(lo, hi);
+        assert!(lo + len >= hi, "span must reach hi");
+        // One ULP is both necessary and sufficient; anything more would not be the smallest extent.
+        assert_eq!(len, f64::from_bits(naive.to_bits() + 1));
+    }
+
+    #[test]
+    fn test_span_degenerate_and_non_finite_inputs() {
+        assert_eq!(span(1.0, 1.0), 0.0);
+        assert_eq!(span(5.0, 1.0), -4.0);
+        assert!(span(f64::NAN, 1.0).is_nan());
+        assert_eq!(span(f64::NEG_INFINITY, f64::INFINITY), f64::INFINITY);
+    }
+
+    #[test]
+    fn test_rectangle_bsp_bounds_reject_out_of_range_dimension() {
+        let rect = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 10.0,
+            height: 20.0,
+        };
+        assert_eq!(rect.center(0), Ok(5.0));
+        assert_eq!(rect.center(1), Ok(10.0));
+        assert_eq!(rect.extent(0), Ok(10.0));
+        assert_eq!(rect.extent(1), Ok(20.0));
+
+        let expected = Err(SpartError::InvalidDimension {
+            requested: 2,
+            available: 2,
+        });
+        assert_eq!(rect.center(2), expected);
+        assert_eq!(rect.extent(2), expected);
+    }
+
+    #[test]
+    fn test_cube_bsp_bounds_reject_out_of_range_dimension() {
+        let cube = Cube {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            width: 10.0,
+            height: 20.0,
+            depth: 30.0,
+        };
+        assert_eq!(cube.center(0), Ok(5.0));
+        assert_eq!(cube.center(1), Ok(10.0));
+        assert_eq!(cube.center(2), Ok(15.0));
+        assert_eq!(cube.extent(0), Ok(10.0));
+        assert_eq!(cube.extent(1), Ok(20.0));
+        assert_eq!(cube.extent(2), Ok(30.0));
+
+        let expected = Err(SpartError::InvalidDimension {
+            requested: 3,
+            available: 3,
+        });
+        assert_eq!(cube.center(3), expected);
+        assert_eq!(cube.extent(3), expected);
+    }
+
+    #[test]
+    fn test_point2d_ordering_breaks_coordinate_ties_with_data() {
+        let a = Point2D::new(1.0, 2.0, Some(1));
+        let same_coords = Point2D::new(1.0, 2.0, Some(2));
+        let greater_y = Point2D::new(1.0, 3.0, Some(0));
+        let greater_x = Point2D::new(2.0, 0.0, Some(0));
+
+        // Coordinates decide first, x before y, and the payload only breaks a full tie.
+        assert_eq!(a.cmp(&greater_x), Ordering::Less);
+        assert_eq!(a.cmp(&greater_y), Ordering::Less);
+        assert_eq!(greater_y.cmp(&a), Ordering::Greater);
+        assert_eq!(a.cmp(&same_coords), Ordering::Less);
+        assert_eq!(a.cmp(&Point2D::new(1.0, 2.0, Some(1))), Ordering::Equal);
+
+        assert_eq!(a.partial_cmp(&same_coords), Some(Ordering::Less));
+        assert_eq!(a.partial_cmp(&greater_y), Some(Ordering::Less));
+    }
+
+    #[test]
+    fn test_point3d_ordering_breaks_coordinate_ties_with_data() {
+        let a = Point3D::new(1.0, 2.0, 3.0, Some(1));
+        let same_coords = Point3D::new(1.0, 2.0, 3.0, Some(2));
+        let greater_z = Point3D::new(1.0, 2.0, 4.0, Some(0));
+        let greater_y = Point3D::new(1.0, 3.0, 0.0, Some(0));
+
+        assert_eq!(a.cmp(&greater_z), Ordering::Less);
+        assert_eq!(a.cmp(&greater_y), Ordering::Less);
+        assert_eq!(greater_z.cmp(&a), Ordering::Greater);
+        assert_eq!(a.cmp(&same_coords), Ordering::Less);
+        assert_eq!(
+            a.cmp(&Point3D::new(1.0, 2.0, 3.0, Some(1))),
+            Ordering::Equal
+        );
+
+        assert_eq!(a.partial_cmp(&same_coords), Some(Ordering::Less));
+        assert_eq!(a.partial_cmp(&greater_z), Some(Ordering::Less));
+    }
+
+    #[test]
+    fn test_point_ordering_is_total_over_nan_coordinates() {
+        // The coordinates are wrapped in `OrderedFloat`, so a NaN coordinate still yields an
+        // ordering rather than `None`. Sorting a set of points must not depend on NaN luck.
+        let nan: Point2D<i32> = Point2D::new(f64::NAN, 0.0, Some(0));
+        let finite: Point2D<i32> = Point2D::new(1.0, 0.0, Some(0));
+        assert!(nan.partial_cmp(&finite).is_some());
+        assert!(finite.partial_cmp(&nan).is_some());
+        assert_eq!(
+            nan.cmp(&Point2D::new(f64::NAN, 0.0, Some(0))),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn test_has_min_distance_default_squares_min_distance() {
+        // Every implementor in the crate overrides `min_distance_sq`, so the default body is only
+        // reachable through a type that does not. It still has to agree with `min_distance`.
+        struct OnlyMinDistance(f64);
+        impl HasMinDistance<f64> for OnlyMinDistance {
+            fn min_distance(&self, query: &f64) -> f64 {
+                (self.0 - query).abs()
+            }
+        }
+
+        let volume = OnlyMinDistance(7.0);
+        assert_eq!(volume.min_distance(&3.0), 4.0);
+        assert_eq!(volume.min_distance_sq(&3.0), 16.0);
+    }
 }

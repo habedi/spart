@@ -47,3 +47,6 @@ jobs:
 
       - name: Run linters
         run: make lint
+
+      - name: Run security audit
+        run: make audit

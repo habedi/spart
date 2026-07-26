@@ -253,3 +253,76 @@ class TestDataIntegrity:
         assert "center" in data_list
         assert "on_boundary" in data_list
         assert "outside" not in data_list
+
+
+class TestBoundaryExtraction:
+    """Test the dict-to-Rectangle and dict-to-Cube conversions.
+
+    These paths are the FromPyObject impls in the Rust bindings, so they are invisible to both
+    coverage.py (the module is compiled) and tarpaulin (no Rust test drives them).
+
+    The assertions deliberately check the exception *type* for errors PyO3 generates, and the
+    message only for the ones the bindings raise themselves. PyO3's own wording is not a stable
+    contract: it changed from "cannot be converted to 'PyDict'" to "is not an instance of 'dict'"
+    between 0.25 and 0.29.
+    """
+
+    RECT = {"x": 0.0, "y": 0.0, "width": 100.0, "height": 100.0}
+    CUBE = {"x": 0.0, "y": 0.0, "z": 0.0, "width": 100.0, "height": 100.0, "depth": 100.0}
+
+    @pytest.mark.parametrize("boundary", ["not a dict", 42, [0, 0, 100, 100], None, (0, 0, 100, 100)])
+    def test_quadtree_rejects_non_dict_boundary(self, boundary):
+        with pytest.raises(TypeError):
+            Quadtree(boundary, 4)
+
+    @pytest.mark.parametrize("missing", ["x", "y", "width", "height"])
+    def test_quadtree_reports_the_missing_boundary_key(self, missing):
+        boundary = {k: v for k, v in self.RECT.items() if k != missing}
+        with pytest.raises(ValueError, match=f"missing '{missing}'"):
+            Quadtree(boundary, 4)
+
+    @pytest.mark.parametrize("missing", ["x", "y", "z", "width", "height", "depth"])
+    def test_octree_reports_the_missing_boundary_key(self, missing):
+        boundary = {k: v for k, v in self.CUBE.items() if k != missing}
+        with pytest.raises(ValueError, match=f"missing '{missing}'"):
+            Octree(boundary, 4)
+
+    @pytest.mark.parametrize("bad", ["nope", None, [1.0], {}])
+    def test_quadtree_rejects_non_numeric_boundary_value(self, bad):
+        boundary = dict(self.RECT, x=bad)
+        with pytest.raises(TypeError):
+            Quadtree(boundary, 4)
+
+    def test_octree_rejects_non_dict_boundary(self):
+        with pytest.raises(TypeError):
+            Octree("not a dict", 4)
+
+    def test_boundary_accepts_integer_coordinates(self):
+        """Python ints are valid f64 sources, so an int-valued boundary must be accepted."""
+        tree = Quadtree({"x": 0, "y": 0, "width": 100, "height": 100}, 4)
+        assert tree.insert(Point2D(10.0, 10.0, "a"))
+        assert len(tree) == 1
+
+    def test_range_search_bbox_rejects_non_dict_query(self):
+        tree = Quadtree(self.RECT, 4)
+        tree.insert(Point2D(10.0, 10.0, "a"))
+        with pytest.raises(TypeError):
+            tree.range_search_bbox(42)
+
+    def test_range_search_bbox_reports_the_missing_query_key(self):
+        tree = Quadtree(self.RECT, 4)
+        tree.insert(Point2D(10.0, 10.0, "a"))
+        with pytest.raises(ValueError, match="missing 'width'"):
+            tree.range_search_bbox({"x": 0.0, "y": 0.0, "height": 100.0})
+
+    def test_octree_range_search_bbox_reports_the_missing_query_key(self):
+        tree = Octree(self.CUBE, 4)
+        tree.insert(Point3D(10.0, 10.0, 10.0, "a"))
+        with pytest.raises(ValueError, match="missing 'depth'"):
+            tree.range_search_bbox({k: v for k, v in self.CUBE.items() if k != "depth"})
+
+    def test_extra_boundary_keys_are_ignored(self):
+        """Only the named keys are read, so an unrelated extra key must not be an error."""
+        tree = Quadtree(dict(self.RECT, unrelated="ignored"), 4)
+        assert tree.insert(Point2D(10.0, 10.0, "a"))
+        assert len(tree) == 1

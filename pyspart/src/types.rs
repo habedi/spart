@@ -3,18 +3,18 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A wrapper around PyObject to allow it to be used as a generic parameter in spart's data structures.
-pub struct PyData(pub PyObject);
+/// A wrapper around Py<PyAny> to allow it to be used as a generic parameter in spart's data structures.
+pub struct PyData(pub Py<PyAny>);
 
 impl Clone for PyData {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| PyData(self.0.clone_ref(py)))
+        Python::attach(|py| PyData(self.0.clone_ref(py)))
     }
 }
 
 impl PartialEq for PyData {
     fn eq(&self, other: &Self) -> bool {
-        Python::with_gil(
+        Python::attach(
             |py| match self.0.bind(py).rich_compare(&other.0, CompareOp::Eq) {
                 Ok(result) => result.is_truthy().unwrap_or(false),
                 Err(_) => false,
@@ -27,7 +27,7 @@ impl Eq for PyData {}
 
 impl PartialOrd for PyData {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let self_obj = self.0.bind(py);
             let other_obj = other.0.bind(py);
             if let Ok(result) = self_obj.rich_compare(other_obj, CompareOp::Lt) {
@@ -52,7 +52,7 @@ impl PartialOrd for PyData {
 
 impl std::fmt::Debug for PyData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let repr = self
                 .0
                 .bind(py)
@@ -69,7 +69,7 @@ impl Serialize for PyData {
     where
         S: Serializer,
     {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let pickle = py.import("pickle").map_err(serde::ser::Error::custom)?;
             let bound_self = self.0.bind(py);
             let bytes = pickle
@@ -87,7 +87,7 @@ impl<'de> Deserialize<'de> for PyData {
         D: Deserializer<'de>,
     {
         let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let pickle = py.import("pickle").map_err(serde::de::Error::custom)?;
             let obj = pickle
                 .call_method("loads", (PyBytes::new(py, &bytes),), None)

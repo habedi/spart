@@ -109,7 +109,6 @@ Do not invent modules that do not yet exist, but do place new modules according 
     - `pyspart/examples/`: runnable Python examples.
 - `Cargo.toml`: workspace root and the `spart` manifest. All dependency version pins live here, as
   does `[workspace.package] version`, which both crates inherit.
-- `CHANGELOG.md`: one entry per release, listing fixes and every breaking change.
 - `Makefile`: developer workflow entry points.
 
 ## Testing Layout Rules
@@ -191,7 +190,7 @@ the unit tests; extend it rather than writing a new walker.
 - Features are `serde` and `enable_log`; the default set is empty. Every combination has to compile and pass, so check `--all-features` and not just
   the default build.
 - Adding or reordering a field of a serialized type breaks compatibility with data written by an earlier version, because bincode is positional. Such
-  a change needs a version bump and a note in the release notes.
+  a change needs a version bump and has to be called out to users.
 - Logging goes through `tracing` at `debug` and `info` level. Do not print to stdout or stderr from library code, and never install a subscriber: that
   is the application's decision, and a library that takes the global subscriber slot takes it away from everyone else.
 - The library has to keep building for WebAssembly; run `make wasm` after touching dependencies. Note that dev-dependencies do not compile for those

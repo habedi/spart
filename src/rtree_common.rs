@@ -583,4 +583,109 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].id, 1);
     }
+
+    /// A unit rectangle at the origin, for entries whose geometry does not matter.
+    fn unit_rect() -> Rectangle {
+        Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+        }
+    }
+
+    fn obj_entry(id: i32) -> TestEntry {
+        TestEntry {
+            mbr: unit_rect(),
+            obj: Some(TestObj {
+                id,
+                rect: unit_rect(),
+            }),
+            child: None,
+        }
+    }
+
+    fn subtree_entry(child: TestNode) -> TestEntry {
+        TestEntry {
+            mbr: unit_rect(),
+            obj: None,
+            child: Some(Box::new(child)),
+        }
+    }
+
+    fn leaf(ids: &[i32]) -> TestNode {
+        TestNode {
+            is_leaf: true,
+            entries: ids.iter().copied().map(obj_entry).collect(),
+        }
+    }
+
+    fn interior(children: Vec<TestNode>) -> TestNode {
+        TestNode {
+            is_leaf: false,
+            entries: children.into_iter().map(subtree_entry).collect(),
+        }
+    }
+
+    // The tests below feed `assert_structure` deliberately malformed trees. They guard the checker
+    // itself: were it to stop detecting a violation, every R-tree invariant test that relies on it
+    // would keep passing while saying nothing.
+
+    #[test]
+    fn test_assert_structure_accepts_a_well_formed_tree_and_counts_objects() {
+        let tree = interior(vec![leaf(&[1, 2]), leaf(&[3, 4, 5])]);
+        assert_eq!(assert_structure(&tree, 4, Some(2), "well-formed"), 5);
+    }
+
+    #[test]
+    #[should_panic(expected = "above max_entries")]
+    fn test_assert_structure_detects_overfull_node() {
+        assert_structure(&leaf(&[1, 2, 3, 4, 5]), 4, None, "overfull");
+    }
+
+    #[test]
+    #[should_panic(expected = "below min_entries")]
+    fn test_assert_structure_detects_underfull_non_root_node() {
+        // The root itself is exempt, so the underfull node has to sit one level down.
+        let tree = interior(vec![leaf(&[1]), leaf(&[2, 3])]);
+        assert_structure(&tree, 4, Some(2), "underfull");
+    }
+
+    #[test]
+    #[should_panic(expected = "object entry inside interior node")]
+    fn test_assert_structure_detects_object_entry_in_interior_node() {
+        let mut tree = interior(vec![leaf(&[1, 2])]);
+        tree.entries.push(obj_entry(9));
+        assert_structure(&tree, 4, None, "mixed interior");
+    }
+
+    #[test]
+    #[should_panic(expected = "subtree entry inside leaf node")]
+    fn test_assert_structure_detects_subtree_entry_in_leaf_node() {
+        let mut tree = leaf(&[1, 2]);
+        tree.entries.push(subtree_entry(leaf(&[3])));
+        assert_structure(&tree, 4, None, "mixed leaf");
+    }
+
+    #[test]
+    #[should_panic(expected = "leaves sit at differing depths")]
+    fn test_assert_structure_detects_differing_leaf_depths() {
+        let shallow = leaf(&[1, 2]);
+        let deep = interior(vec![leaf(&[3, 4])]);
+        assert_structure(&interior(vec![shallow, deep]), 4, None, "ragged depth");
+    }
+
+    #[test]
+    #[should_panic(expected = "neither an object nor a subtree")]
+    fn test_assert_structure_detects_entry_that_is_neither_object_nor_subtree() {
+        let tree = TestNode {
+            is_leaf: true,
+            entries: vec![TestEntry {
+                mbr: unit_rect(),
+                obj: None,
+                child: None,
+            }],
+        };
+        assert_structure(&tree, 4, None, "empty entry");
+    }
 }

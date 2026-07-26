@@ -4,18 +4,18 @@ use spart::geometry::Point3D;
 
 use crate::types::PyData;
 
-#[pyclass(name = "Point3D", get_all)]
+#[pyclass(name = "Point3D", get_all, from_py_object)]
 #[derive(Debug)]
 pub struct PyPoint3D {
     pub x: f64,
     pub y: f64,
     pub z: f64,
-    pub data: PyObject,
+    pub data: Py<PyAny>,
 }
 
 impl Clone for PyPoint3D {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| PyPoint3D {
+        Python::attach(|py| PyPoint3D {
             x: self.x,
             y: self.y,
             z: self.z,
@@ -29,7 +29,7 @@ impl PartialEq for PyPoint3D {
         self.x == other.x
             && self.y == other.y
             && self.z == other.z
-            && Python::with_gil(|py| {
+            && Python::attach(|py| {
                 match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
                     Ok(result) => result.is_truthy().unwrap_or(false),
                     Err(_) => false,
@@ -41,7 +41,7 @@ impl PartialEq for PyPoint3D {
 #[pymethods]
 impl PyPoint3D {
     #[new]
-    fn new(x: f64, y: f64, z: f64, data: PyObject) -> Self {
+    fn new(x: f64, y: f64, z: f64, data: Py<PyAny>) -> Self {
         PyPoint3D { x, y, z, data }
     }
 
@@ -66,7 +66,7 @@ impl From<PyPoint3D> for Point3D<PyData> {
 
 impl From<&Point3D<PyData>> for PyPoint3D {
     fn from(p: &Point3D<PyData>) -> Self {
-        Python::with_gil(|py| PyPoint3D {
+        Python::attach(|py| PyPoint3D {
             x: p.x,
             y: p.y,
             z: p.z,

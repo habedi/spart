@@ -98,3 +98,4 @@ pyspart/target/
 .codex
 .agents/
 NOTES.md
+dist-*
