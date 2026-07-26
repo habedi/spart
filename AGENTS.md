@@ -21,7 +21,7 @@ Priorities, in order:
   the logic shared by the two R-tree variants, and `pyspart` wraps the public API. Do not import across those boundaries in the wrong direction; see
   Dependency Boundaries.
 - Keep all mutable state inside the tree values themselves; do not introduce module-level `static mut`, `lazy_static`, or `OnceLock` globals for
-  runtime state. The crate touches no process-global state on its own: `init_tracing` installs a subscriber only when an application calls it.
+  runtime state. The crate touches no process-global state at all, and installs no tracing subscriber: choosing one is the application's decision.
 - `#![forbid(unsafe_code)]` is set in `src/lib.rs`. Nothing here needs `unsafe`; if you reach for it, the design is wrong.
 - A tree operation that cannot store a point must report it. Never drop a point silently; return `false`, return a count, or return an `Err`.
 - Define a concept once. Nearest-neighbor accumulation lives in `knn::KnnHeap`, minimum distance in `HasMinDistance`, and the indexable-object
@@ -68,14 +68,12 @@ Quick examples:
 Do not invent modules that do not yet exist, but do place new modules according to this map.
 
 - `src/lib.rs`: module declarations only. `errors`, `geometry`, `index`, `kdtree`, `octree`, `quadtree`, `rstar_tree`, and `rtree` are public;
-  `knn`, `logging`, and `rtree_common` are private.
+  `knn` and `rtree_common` are private.
 - `src/index.rs`: the `SpatialIndex` trait, which is the uniform interface every tree implements.
 - `src/geometry.rs`: shared primitives and the traits over them. `Point2D`, `Point3D`, `Rectangle`, and `Cube`, plus `DistanceMetric`,
   `EuclideanDistance`, `BSPBounds`, `BoundingVolume`, `HasMinDistance`, `BoundingVolumeFromPoint`, `VolumeBound`, and `BoundedObject`, plus the
   `BoundedObject` impls for the two point types. Also the `pub(crate)` `span` helper and the module-private `axis_distance`.
 - `src/errors.rs`: `SpartError`, the single error type. Every fallible constructor and insert returns it.
-- `src/logging.rs`: `init_tracing`, behind the `setup_tracing` feature, which an application calls to install a subscriber driven by the
-  `DEBUG_SPART` environment variable. Nothing runs before `main`, and the crate installs nothing unless asked.
 - `src/quadtree.rs`: `Quadtree`, a 2D point quadtree over a `Rectangle` boundary with a per-node `capacity`.
 - `src/octree.rs`: `Octree`, the 3D counterpart over a `Cube` boundary. Mirrors `quadtree.rs` structurally; a fix in one almost always belongs in the
   other.
@@ -190,12 +188,12 @@ the unit tests; extend it rather than writing a new walker.
 
 ### Features and Compatibility
 
-- Features are `serde`, `enable_log`, and `setup_tracing`; the default set is empty. Every combination has to compile and pass, so check
-  `--all-features` and not just the default build.
+- Features are `serde` and `enable_log`; the default set is empty. Every combination has to compile and pass, so check `--all-features` and not just
+  the default build.
 - Adding or reordering a field of a serialized type breaks compatibility with data written by an earlier version, because bincode is positional. Such
   a change needs a version bump and a note in the release notes.
-- Logging goes through `tracing` at `debug` and `info` level. Do not print to stdout or stderr from library code, and do not install a subscriber
-  anywhere other than `init_tracing`, which only runs when an application calls it.
+- Logging goes through `tracing` at `debug` and `info` level. Do not print to stdout or stderr from library code, and never install a subscriber: that
+  is the application's decision, and a library that takes the global subscriber slot takes it away from everyone else.
 - The library has to keep building for WebAssembly; run `make wasm` after touching dependencies. Note that dev-dependencies do not compile for those
   targets, so only the library is checked, never the tests, examples, or benches.
 - Async is not used anywhere in the crate. Do not introduce a runtime or an `.await`.
@@ -261,7 +259,7 @@ Unbounded, keyed on the bounding volume an object reports through `mbr`.
 
 ### Encapsulation Rule
 
-`rtree_common` and `logging` are private modules and are not reachable from outside the crate. The `root`, `max_entries`, and `min_entries` fields of
+`rtree_common` and `knn` are private modules and are not reachable from outside the crate. The `root`, `max_entries`, and `min_entries` fields of
 the trees are private and must stay that way. Do not add a "just for now" accessor; add a test-only helper inside the module if a test needs internal
 access.
 

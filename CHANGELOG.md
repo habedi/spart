@@ -35,7 +35,7 @@ around a single trait. **This release is not source-compatible with 0.5.2, and i
 - Quadtree and Octree nearest-neighbor search now visits children nearest first. In a fixed spatial order the pruning bound was still loose when the
   far children were tested, so most of them were entered anyway: over 5000 uniformly scattered points a single-neighbor query computed 315 distances
   where it now computes 12.
-- The `setup_tracing` feature did not compile at all.
+- The `setup_tracing` feature did not compile at all. It has since been removed; see below.
 
 ### Changed
 
