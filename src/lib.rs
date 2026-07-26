@@ -32,18 +32,23 @@
 //!
 //! * `serde`: derives `Serialize` and `Deserialize` for every tree and geometric type.
 //! * `enable_log`: routes this crate's `tracing` output through the `log` facade.
-//! * `setup_tracing`: installs a tracing subscriber before `main`, controlled by the `DEBUG_SPART`
-//!   environment variable. Intended for debugging this crate, not for use by a library that depends
-//!   on it.
+//!
+//! ### Logging
+//!
+//! Spart emits [`tracing`](https://docs.rs/tracing) events but never installs a subscriber. Choosing
+//! one is the application's decision, so whatever subscriber it installs will pick Spart's events up
+//! with no feature flag and no setup call.
 
 #![deny(missing_docs)]
+// Nothing in this crate needs `unsafe`. The one exception used to be the `ctor` constructor that
+// installed a tracing subscriber before `main`; that is gone.
+#![forbid(unsafe_code)]
 
 pub mod errors;
 pub mod geometry;
 pub mod index;
 pub mod kdtree;
 mod knn;
-mod logging;
 pub mod octree;
 pub mod quadtree;
 pub mod rstar_tree;

@@ -209,24 +209,6 @@ fn main() {
 }
 ```
 
-#### Debugging Mode
-
-You can enable debugging mode for Spart by setting the `DEBUG_SPART` environment variable to `true` or `1`.
-
-```bash
-# Enable debugging mode on Linux and macOS
-export DEBUG_SPART=true
-```
-
-```powershell
-# Enable debugging mode on Windows (PowerShell)
-$env:DEBUG_SPART = "true"
-```
-
-> [!NOTE]
-> When debugging mode is enabled, Spart will be very verbose.
-> It is recommended to use this only for debugging purposes.
-
 ### Examples
 
 - For Rust examples, see the [examples](examples) directory.

@@ -48,8 +48,11 @@ around a single trait. **This release is not source-compatible with 0.5.2, and i
 - **Breaking:** `Quadtree::insert_bulk` and `Octree::insert_bulk` return the number of points stored instead of `()`, since they skip points outside
   the boundary.
 - **Breaking:** the serialized layout changed. Trees written by 0.5.2 cannot be loaded by 0.6.0.
+- **Breaking:** the `setup_tracing` feature no longer installs a subscriber before `main`. Call `spart::init_tracing()` instead, which honours `DEBUG_SPART` exactly as before and returns whether it installed anything. A library taking the global subscriber slot without being asked is not its decision to make, and doing it before `main` required running unsafe code before the runtime was up. The `ctor` dependency is gone with it.
 - `SpartError` now derives `Clone`, `PartialEq`, and `Eq`.
-- `#![deny(missing_docs)]` is enabled.
+- `#![deny(missing_docs)]` and `#![forbid(unsafe_code)]` are enabled. The crate contains no `unsafe`.
+- The crate is verified to build for `wasm32-unknown-unknown` and `wasm32-wasip1`; `make wasm` checks
+  both. Dev-dependencies do not compile for those targets, so the check covers the library only.
 
 ### Added
 

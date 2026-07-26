@@ -21,7 +21,8 @@ Priorities, in order:
   the logic shared by the two R-tree variants, and `pyspart` wraps the public API. Do not import across those boundaries in the wrong direction; see
   Dependency Boundaries.
 - Keep all mutable state inside the tree values themselves; do not introduce module-level `static mut`, `lazy_static`, or `OnceLock` globals for
-  runtime state. The only process-global state is the optional tracing subscriber behind the `setup_tracing` feature.
+  runtime state. The crate touches no process-global state on its own: `init_tracing` installs a subscriber only when an application calls it.
+- `#![forbid(unsafe_code)]` is set in `src/lib.rs`. Nothing here needs `unsafe`; if you reach for it, the design is wrong.
 - A tree operation that cannot store a point must report it. Never drop a point silently; return `false`, return a count, or return an `Err`.
 - Define a concept once. Nearest-neighbor accumulation lives in `knn::KnnHeap`, minimum distance in `HasMinDistance`, and the indexable-object
   contract in `BoundedObject`. If you find yourself writing a second copy for another dimension or another tree variant, reach for a generic or the
@@ -73,8 +74,8 @@ Do not invent modules that do not yet exist, but do place new modules according 
   `EuclideanDistance`, `BSPBounds`, `BoundingVolume`, `HasMinDistance`, `BoundingVolumeFromPoint`, `VolumeBound`, and `BoundedObject`, plus the
   `BoundedObject` impls for the two point types. Also the `pub(crate)` `span` helper and the module-private `axis_distance`.
 - `src/errors.rs`: `SpartError`, the single error type. Every fallible constructor and insert returns it.
-- `src/logging.rs`: optional tracing subscriber installed before `main` by a `ctor`, behind the `setup_tracing` feature and driven by the
-  `DEBUG_SPART` environment variable.
+- `src/logging.rs`: `init_tracing`, behind the `setup_tracing` feature, which an application calls to install a subscriber driven by the
+  `DEBUG_SPART` environment variable. Nothing runs before `main`, and the crate installs nothing unless asked.
 - `src/quadtree.rs`: `Quadtree`, a 2D point quadtree over a `Rectangle` boundary with a per-node `capacity`.
 - `src/octree.rs`: `Octree`, the 3D counterpart over a `Cube` boundary. Mirrors `quadtree.rs` structurally; a fix in one almost always belongs in the
   other.
@@ -193,7 +194,10 @@ the unit tests; extend it rather than writing a new walker.
   `--all-features` and not just the default build.
 - Adding or reordering a field of a serialized type breaks compatibility with data written by an earlier version, because bincode is positional. Such
   a change needs a version bump and a note in the release notes.
-- Logging goes through `tracing` at `debug` and `info` level. Do not print to stdout or stderr from library code.
+- Logging goes through `tracing` at `debug` and `info` level. Do not print to stdout or stderr from library code, and do not install a subscriber
+  anywhere other than `init_tracing`, which only runs when an application calls it.
+- The library has to keep building for WebAssembly; run `make wasm` after touching dependencies. Note that dev-dependencies do not compile for those
+  targets, so only the library is checked, never the tests, examples, or benches.
 - Async is not used anywhere in the crate. Do not introduce a runtime or an `.await`.
 
 ## Dependency Boundaries
@@ -294,6 +298,7 @@ Additional validation when relevant:
 
 - `make bench` for a performance-sensitive change. `make test-py` for anything reaching the bindings. `make run-examples` and `make run-py-examples`
   after a public API change.
+- `make wasm` after adding or changing a dependency, since a dependency that pulls in libc or threads silently drops the WebAssembly targets.
 - `make coverage` and `make nextest` are available for coverage and for a process-per-test run.
 - `make audit` after touching dependencies.
 
