@@ -9,7 +9,7 @@ indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.rs]
+[*.{rs,py,pyi}]
 max_line_length = 100
 
 [*.md]
@@ -21,6 +21,3 @@ indent_size = 2
 
 [*.{yaml,yml,json}]
 indent_size = 2
-
-[*.{py,pyi}]
-max_line_length = 100
