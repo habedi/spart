@@ -49,18 +49,20 @@ jobs:
             zig: false
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Up Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Set Up Rust
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+
+      - name: Add the target to the pinned toolchain
+        run: rustup target add ${{ matrix.target }}
+        shell: bash
 
       - name: Install Zig
         uses: mlugg/setup-zig@v1
@@ -89,15 +91,15 @@ jobs:
     name: Source distribution
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Up Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Set Up Rust
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install maturin
@@ -137,12 +139,12 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
 
     steps:
-      - name: Set Up Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Set Up uv
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
 
       - name: Download all artifacts

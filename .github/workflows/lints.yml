@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Rust
@@ -39,11 +39,11 @@ jobs:
           toolchain: '1.85.0'
           cache: true
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
-      - name: Run Linters
+      - name: Run linters
         run: make lint

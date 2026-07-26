@@ -22,7 +22,7 @@ jobs:
     if: success()
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust

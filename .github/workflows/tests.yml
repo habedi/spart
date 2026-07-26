@@ -35,7 +35,7 @@ jobs:
         rust-version: [ "1.85.0", "stable" ]
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust ${{ matrix.rust-version }}
@@ -44,16 +44,16 @@ jobs:
           toolchain: ${{ matrix.rust-version }}
           cache: true
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
-      - name: Run Tests and Generate Coverage Report
+      - name: Run tests and generate coverage report
         run: make coverage
 
-      - name: Upload Coverage Reports to Codecov
+      - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

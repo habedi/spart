@@ -21,7 +21,7 @@ jobs:
         rust-version: [ "1.85.0", "stable" ]
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust ${{ matrix.rust-version }}
@@ -30,11 +30,11 @@ jobs:
           toolchain: ${{ matrix.rust-version }}
           cache: true
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y clang curl pkg-config libssl-dev make
           make install-deps
 
-      - name: Run Benchmarks
+      - name: Run benchmarks
         run: make bench
