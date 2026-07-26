@@ -6,9 +6,11 @@ use spart::geometry::{Cube, Rectangle};
 #[derive(Clone)]
 pub struct PyRectangle(pub Rectangle);
 
-impl<'source> FromPyObject<'source> for PyRectangle {
-    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
-        let dict: &Bound<PyDict> = ob.downcast()?;
+impl<'a, 'py> FromPyObject<'a, 'py> for PyRectangle {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
+        let dict = ob.cast::<PyDict>()?;
         let x: f64 = dict
             .get_item("x")?
             .ok_or_else(|| PyValueError::new_err("missing 'x'"))?
@@ -37,9 +39,11 @@ impl<'source> FromPyObject<'source> for PyRectangle {
 #[derive(Clone)]
 pub struct PyCube(pub Cube);
 
-impl<'source> FromPyObject<'source> for PyCube {
-    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
-        let dict: &Bound<PyDict> = ob.downcast()?;
+impl<'a, 'py> FromPyObject<'a, 'py> for PyCube {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
+        let dict = ob.cast::<PyDict>()?;
         let x: f64 = dict
             .get_item("x")?
             .ok_or_else(|| PyValueError::new_err("missing 'x'"))?

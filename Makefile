@@ -16,7 +16,7 @@ SDIST_FILE      := $(shell ls $(PYSPART_DIR)/$(WHEEL_DIR)/pyspart-$(PYSPART_VERS
 # Pinned versions for Rust development tools
 TARPAULIN_VERSION=0.32.0
 NEXTEST_VERSION=0.9.97-b.2
-AUDIT_VERSION=0.21.2
+AUDIT_VERSION=0.22.1
 CAREFUL_VERSION=0.4.8
 
 # Default target

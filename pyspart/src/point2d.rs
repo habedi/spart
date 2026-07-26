@@ -4,17 +4,17 @@ use spart::geometry::Point2D;
 
 use crate::types::PyData;
 
-#[pyclass(name = "Point2D", get_all)]
+#[pyclass(name = "Point2D", get_all, from_py_object)]
 #[derive(Debug)]
 pub struct PyPoint2D {
     pub x: f64,
     pub y: f64,
-    pub data: PyObject,
+    pub data: Py<PyAny>,
 }
 
 impl Clone for PyPoint2D {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| PyPoint2D {
+        Python::attach(|py| PyPoint2D {
             x: self.x,
             y: self.y,
             data: self.data.clone_ref(py),
@@ -26,7 +26,7 @@ impl PartialEq for PyPoint2D {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x
             && self.y == other.y
-            && Python::with_gil(|py| {
+            && Python::attach(|py| {
                 match self.data.bind(py).rich_compare(&other.data, CompareOp::Eq) {
                     Ok(result) => result.is_truthy().unwrap_or(false),
                     Err(_) => false,
@@ -38,7 +38,7 @@ impl PartialEq for PyPoint2D {
 #[pymethods]
 impl PyPoint2D {
     #[new]
-    fn new(x: f64, y: f64, data: PyObject) -> Self {
+    fn new(x: f64, y: f64, data: Py<PyAny>) -> Self {
         PyPoint2D { x, y, data }
     }
 
@@ -63,7 +63,7 @@ impl From<PyPoint2D> for Point2D<PyData> {
 
 impl From<&Point2D<PyData>> for PyPoint2D {
     fn from(p: &Point2D<PyData>) -> Self {
-        Python::with_gil(|py| PyPoint2D {
+        Python::attach(|py| PyPoint2D {
             x: p.x,
             y: p.y,
             data: p
