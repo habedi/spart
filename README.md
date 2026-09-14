@@ -10,7 +10,6 @@
 [![Code Coverage](https://img.shields.io/codecov/c/github/habedi/spart?label=coverage&style=flat&labelColor=282c34&logo=codecov)](https://codecov.io/gh/habedi/spart)
 [![Crates.io](https://img.shields.io/crates/v/spart.svg?label=crates.io&style=flat&labelColor=282c34&color=fc8d62&logo=rust)](https://crates.io/crates/spart)
 [![Docs.rs](https://img.shields.io/badge/docs-spart-66c2a5?style=flat&labelColor=282c34&logo=docs.rs)](https://docs.rs/spart)
-[![MSRV](https://img.shields.io/badge/msrv-1.85.0-informational?style=flat&labelColor=282c34&logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-007ec6?style=flat&labelColor=282c34&logo=open-source-initiative)](https://github.com/habedi/spart)
 
 A collection of space partitioning trees for Rust
@@ -29,11 +28,11 @@ At the moment, the following tree data structures and features are supported:
 
 | # | Tree Type                                          | 2D | 3D | kNN Search | Radius Search |
 |---|----------------------------------------------------|:--:|:--:|:----------:|:-------------:|
-| 1 | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓  |    |     ✓      |       ✓       |
-| 2 | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓  |     ✓      |       ✓       |
-| 3 | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓  | ✓  |     ✓      |       ✓       |
-| 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓  | ✓  |     ✓      |       ✓       |
-| 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓  | ✓  |     ✓      |       ✓       |
+| 1 | [Quadtree](https://en.wikipedia.org/wiki/Quadtree) | ✓ |    |     ✓     |      ✓       |
+| 2 | [Octree](https://en.wikipedia.org/wiki/Octree)     |    | ✓ |     ✓     |      ✓       |
+| 3 | [Kd-tree](https://en.wikipedia.org/wiki/K-d_tree)  | ✓ | ✓ |     ✓     |      ✓       |
+| 4 | [R-tree](https://en.wikipedia.org/wiki/R-tree)     | ✓ | ✓ |     ✓     |      ✓       |
+| 5 | [R*-tree](https://en.wikipedia.org/wiki/R*-tree)   | ✓ | ✓ |     ✓     |      ✓       |
 
 See [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
