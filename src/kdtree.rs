@@ -35,9 +35,8 @@ use crate::{errors::SpartError, geometry::DistanceMetric, knn::KnnHeap};
 
 /// Trait representing a point that can be stored in the Kd‑tree implementation.
 ///
-/// A type implementing `KdPoint` must provide the number of dimensions,
-/// a method to access a coordinate along a given axis, and a method to compute
-/// the squared Euclidean distance to another point.
+/// A type implementing `KdPoint` must provide the number of dimensions
+/// and a method to access a coordinate along a given axis.
 pub trait KdPoint: Clone + PartialEq + std::fmt::Debug {
     /// Returns the number of dimensions of the point.
     fn dims(&self) -> usize;

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use tracing::debug;
 
-// Import custom errors from the exceptions module.
+// Import custom errors.
 use crate::errors::SpartError;
 
 /// Returns the smallest extent `len` for which `lo + len >= hi` holds.

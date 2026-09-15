@@ -63,8 +63,6 @@ impl PyQuadtree {
 
     /// Finds the k nearest neighbors to the given point.
     ///
-    /// Finds the k nearest neighbors to the given point.
-    ///
     /// Args:
     ///     point (Point2D): The query point to search from.
     ///     k (int): The number of nearest neighbors to find.

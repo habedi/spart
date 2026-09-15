@@ -16,11 +16,6 @@
 //!
 //! # Key Design Notes
 //!
-//! ## Return Type Differences
-//! Different tree structures return search results differently:
-//! - Quadtree, Octree, KdTree: Return references (use `(&p).into()`)
-//! - RTree, RStarTree: Return owned values (use `p.into()`)
-//!
 //! ## Data Handling
 //! All points must have non-None data when converted from Python. Conversions will
 //! panic with descriptive messages if None data is encountered.
