@@ -10,7 +10,7 @@ Python bindings for the [Spart](https://github.com/habedi/spart) library.
 
 ```bash
 pip install pyspart
-````
+```
 
 ### Examples
 

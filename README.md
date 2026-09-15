@@ -42,7 +42,7 @@ See [ROADMAP.md](ROADMAP.md) for the list of implemented and planned features.
 
 ```bash
 cargo add spart
-````
+```
 
 *Spart requires Rust 1.85.0 or later.*
 
@@ -115,7 +115,7 @@ A tree provides at least the following methods:
 - `new`: creates a new tree given the following parameters:
     - The bounding area of the tree (for Quadtree and Octree only)
     - The number of dimensions (for Kd-tree only)
-    - The maximum capacity of points per node (for Quadtree, Octree, and R-tree)
+    - The maximum capacity of points per node (for Quadtree, Octree, R-tree, and R*-tree)
 - `insert`: inserts a point into the tree.
 - `insert_bulk`: inserts multiple points into the tree at once.
     - This is generally more efficient than inserting points one by one.
@@ -125,7 +125,7 @@ A tree provides at least the following methods:
 - `range_search`: finds all points within a given radius of a query point.
     - The inputs are the query point and the radius within which to search.
 - `range_search_bbox`: finds all points inside a query rectangle or cube.
-- `contains`: reports if tree contains the given point.
+- `contains`: reports if the tree contains the given point (inherent on Quadtree, Octree, and Kd-tree, or via SpatialIndex on all trees).
 - `len`, `is_empty`, and `clear`: gets the size of the tree, and checks if it is empty or clears all points from the tree.
 
 > [!NOTE]
@@ -169,7 +169,7 @@ To enable serialization in Rust, you need to enable the `serde` feature in your 
 
 ```toml
 [dependencies]
-spart = { version = "0.3.0", features = ["serde"] }
+spart = { version = "0.6.2", features = ["serde"] }
 ```
 
 Then, you can use `bincode` (or any other serde-compatible library) to serialize and deserialize the tree.

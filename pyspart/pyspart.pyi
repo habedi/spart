@@ -4,8 +4,7 @@ Type stubs for PySpart - Python bindings for Spart Rust crate.
 This file provides type hints for IDEs and type checkers.
 """
 
-from typing import Optional, Dict, List, Tuple, Union, Any, Iterator, TypedDict, Type, TypeVar
-
+from typing import Any, List, Type, TypedDict, TypeVar
 
 # Basic geometry dictionaries accepted by constructors
 class RectangleDict(TypedDict):

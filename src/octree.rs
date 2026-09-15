@@ -46,10 +46,6 @@ const MAX_DEPTH: usize = 32;
 /// # Type Parameters
 ///
 /// * `T`: The type of additional data stored in each point.
-///
-/// # Panics
-///
-/// Panics with `SpartError::InvalidCapacity` if `capacity` is zero.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Octree<T: Clone + PartialEq> {
